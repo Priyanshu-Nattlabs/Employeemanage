@@ -82,13 +82,37 @@ export class UserProfile {
   @Prop() studentRollNumber?: string;
 }
 
+export type OrgAccountType = "EMPLOYEE" | "ADMIN";
+export type OrgCurrentRole = "EMPLOYEE" | "MANAGER";
+
+@Schema({ collection: "company_users", timestamps: true })
+export class CompanyUser {
+  @Prop({ required: true, unique: true, lowercase: true, trim: true }) email!: string;
+  @Prop({ required: true }) passwordHash!: string;
+
+  @Prop({ required: true }) fullName!: string;
+  @Prop() designation?: string;
+
+  @Prop({ required: true }) companyName!: string;
+  @Prop({ required: true, lowercase: true, trim: true }) companyDomain!: string; // e.g. nattlabs.com
+
+  @Prop() employeeId?: string;
+  @Prop({ default: "EMPLOYEE" }) currentRole!: OrgCurrentRole;
+  @Prop({ default: "EMPLOYEE" }) accountType!: OrgAccountType;
+
+  @Prop() mobileNo?: string;
+  @Prop({ lowercase: true, trim: true }) reportingManagerEmail?: string;
+}
+
 export type BlueprintDocument = HydratedDocument<Blueprint>;
 export type RolePreparationDocument = HydratedDocument<RolePreparation>;
 export type SkillTestDocument = HydratedDocument<SkillTest>;
 export type UserProfileDocument = HydratedDocument<UserProfile>;
+export type CompanyUserDocument = HydratedDocument<CompanyUser>;
 
 export const BlueprintSchema = SchemaFactory.createForClass(Blueprint);
 export const RolePreparationSchema = SchemaFactory.createForClass(RolePreparation);
 export const SkillTestSchema = SchemaFactory.createForClass(SkillTest);
 export const UserProfileSchema = SchemaFactory.createForClass(UserProfile);
+export const CompanyUserSchema = SchemaFactory.createForClass(CompanyUser);
 

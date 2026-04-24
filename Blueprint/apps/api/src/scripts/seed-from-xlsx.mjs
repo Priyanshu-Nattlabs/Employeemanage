@@ -3,11 +3,13 @@
  * Parses all 5 sheets: Roles, Industries, Educations, Specializations, Skills
  */
 import { readFileSync } from "fs";
+import path from "path";
 import { read, utils } from "xlsx";
 import { MongoClient } from "mongodb";
 
-const FILE   = process.env.BLUEPRINT_XLSX_FILE || "C:/Employee/JBV2/Job_Blueprint_Final_Phase13.xlsx";
-const MONGO  = process.env.MONGODB_URI || "mongodb://localhost:27017/job_blueprint_v2";
+const FILE_RAW = (process.env.BLUEPRINT_XLSX_FILE || "C:/Employee/JBV2/Job_Blueprint_Final_Phase13.xlsx").trim();
+const FILE = path.isAbsolute(FILE_RAW) ? FILE_RAW : path.resolve(process.cwd(), FILE_RAW);
+const MONGO = (process.env.MONGODB_URI || "mongodb://localhost:27017/job_blueprint_v2").trim();
 
 // ── helpers ────────────────────────────────────────────────────────────────
 const split = (val) =>

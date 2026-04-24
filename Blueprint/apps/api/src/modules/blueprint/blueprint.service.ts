@@ -207,6 +207,8 @@ Rules:
     for (let i = 0; i < duration; i++) {
       fallback[startMonth + i] = [defaultPhases[i % defaultPhases.length], `${skillName} deep-dive`, "Review & self-test"];
     }
+    const fallbackRel: Record<string, string[]> = {};
+    for (let i = 0; i < duration; i++) fallbackRel[String(i + 1)] = fallback[startMonth + i];
 
     const system = `You are a curriculum designer. Return ONLY a valid JSON object mapping relative month numbers (as string keys "1", "2", ...) to arrays of 3-5 specific learning topics for that month. No markdown, no extra text.
 Example for 2 months: {"1":["Intro to X","Basic syntax","First project"],"2":["Advanced X","Real-world usage","Assessment"]}`;
@@ -217,13 +219,7 @@ Keys must be "1" through "${duration}" (relative month numbers).
 Each value must be an array of 3-5 specific, actionable learning topics.
 Return ONLY the JSON object.`;
 
-    let raw: Record<string, string[]> | null = null;
-    try {
-      raw = await this.ai.chatJson<Record<string, string[]>>(prompt, system, null);
-    } catch (e) {
-      this.logger.warn(`getSkillTopics: AI call threw for "${skillName}", using fallback. ${e}`);
-      return fallback;
-    }
+    const raw = await this.ai.chatJson<Record<string, string[]>>(prompt, system, fallbackRel);
 
     if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
       this.logger.warn(`getSkillTopics: AI returned invalid shape for "${skillName}", using fallback.`);

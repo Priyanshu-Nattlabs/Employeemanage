@@ -11,6 +11,10 @@ export function getApiPrefix(): string {
     const first = window.location.pathname.split("/").filter(Boolean)[0];
     if (first === "job-blueprint-v2") return "/job-blueprint-v2";
     if (first === "job-blueprint") return "/job-blueprint";
+    // Local dev safety: if basePath env is set but URL isn't hosted under it, don't prepend it.
+    if (fromEnv && !window.location.pathname.startsWith(fromEnv + "/") && window.location.pathname !== fromEnv) {
+      return "";
+    }
   }
 
   return fromEnv;
