@@ -1,0 +1,60 @@
+name: job-blueprint-v2
+
+services:
+  mongodb:
+    image: mongo:4.4.29
+    container_name: job-blueprint-v2-mongodb
+    ports:
+      - "27018:27017"
+    volumes:
+      - job-blueprint-v2-mongo-data:/data/db
+    networks:
+      - saarthix-network
+    restart: unless-stopped
+
+  backend:
+    build:
+      context: ./apps/api
+      dockerfile: Dockerfile
+    container_name: job-blueprint-v2-backend
+    ports:
+      - "8082:8081"
+    depends_on:
+      - mongodb
+    environment:
+      - PORT=8081
+    env_file:
+      - .env
+    networks:
+      - saarthix-network
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./apps/web
+      dockerfile: Dockerfile
+      args:
+        - BACKEND_URL=http://job-blueprint-v2-backend:8081
+        - NEXT_PUBLIC_BASE_PATH=${NEXT_PUBLIC_BASE_PATH}
+        - NEXT_PUBLIC_SAARTHIX_URL=${NEXT_PUBLIC_SAARTHIX_URL}
+    container_name: job-blueprint-v2-frontend
+    ports:
+      - "3002:3001"
+    depends_on:
+      - backend
+    environment:
+      - NODE_ENV=production
+    env_file:
+      - .env
+    networks:
+      - saarthix-network
+    restart: unless-stopped
+
+volumes:
+  job-blueprint-v2-mongo-data:
+
+networks:
+  saarthix-network:
+    external: true
+    name: somethingx_saarthix-network
+
