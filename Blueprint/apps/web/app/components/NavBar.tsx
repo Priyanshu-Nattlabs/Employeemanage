@@ -1,107 +1,37 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useCallback, useEffect, useState, type CSSProperties } from "react";
+import { useEffect, useState, type CSSProperties } from "react";
+import { clearOrgAuthInStorage, getOrgAuthFromStorage } from "@/lib/orgAuth";
 
 export function NavBar() {
   const pathname = usePathname();
 
-  const [openMenu, setOpenMenu] = useState<null | "career" | "practice" | "jobs" | "user">(null);
-
-  const [auth, setAuth] = useState({ token: "", email: "", name: "User", userType: "STUDENT", sxUserId: "" });
+  const [orgAuth, setOrgAuth] = useState<{ token: string; user: any | null }>({ token: "", user: null });
   const [mounted, setMounted] = useState(false);
 
-  const readAuthFromStorage = useCallback(() => {
-    const token = localStorage.getItem("somethingx_auth_token") || "";
-    const sxUserId = localStorage.getItem("jbv2_userId") || "";
-    let email = "";
-    let name = "User";
-    let userType = "STUDENT";
-    try {
-      const user = JSON.parse(localStorage.getItem("somethingx_auth_user") || "{}");
-      email = user.email || "";
-      name = user.name || "User";
-      userType = user.userType || "STUDENT";
-    } catch {
-      /* ignore invalid JSON */
-    }
-    setAuth({ token, email, name, userType, sxUserId });
-  }, []);
-
   useEffect(() => {
+    const onOrgChange = () => setOrgAuth(getOrgAuthFromStorage());
     setMounted(true);
-    readAuthFromStorage();
-  }, [pathname, readAuthFromStorage]);
+    onOrgChange();
+    window.addEventListener("jbv2-org-auth-changed", onOrgChange);
+    return () => window.removeEventListener("jbv2-org-auth-changed", onOrgChange);
+  }, [pathname]);
 
-  useEffect(() => {
-    window.addEventListener("jbv2-profile-synced", readAuthFromStorage);
-    return () => window.removeEventListener("jbv2-profile-synced", readAuthFromStorage);
-  }, [readAuthFromStorage]);
-
-  const sxOrigin = (process.env.NEXT_PUBLIC_SAARTHIX_URL || "https://saarthix.com").replace(/\/$/, "");
-
-  const buildSxUrl = (path: string) => {
-    const url = new URL(path.startsWith("/") ? `${sxOrigin}${path}` : `${sxOrigin}/${path}`);
-    if (auth.token) url.searchParams.set("token", auth.token);
-    if (auth.email) url.searchParams.set("email", auth.email);
-    if (auth.name && auth.name !== "User") url.searchParams.set("name", auth.name);
-    if (auth.userType) url.searchParams.set("userType", auth.userType);
-    if (auth.sxUserId) url.searchParams.set("sxUserId", auth.sxUserId);
-    return url.toString();
+  const logoutOrg = () => {
+    clearOrgAuthInStorage();
+    window.location.href = "/";
   };
 
-  /** Jobs app: same-origin `/jobs` + route (e.g. `/apply-jobs`), with SSO query — mirrors SomethingX `redirectToJobs`. */
-  const buildJobsUrl = (route: string) => {
-    const explicit = process.env.NEXT_PUBLIC_JOBS_URL?.trim().replace(/\/$/, "");
-    const base = explicit || `${sxOrigin}/jobs`;
-    const r = route.startsWith("/") ? route : `/${route}`;
-    const url = new URL(`${base.replace(/\/$/, "")}${r}`);
-    if (auth.token) url.searchParams.set("token", auth.token);
-    if (auth.email) url.searchParams.set("email", auth.email);
-    if (auth.name && auth.name !== "User") url.searchParams.set("name", auth.name);
-    if (auth.userType) url.searchParams.set("userType", auth.userType);
-    if (auth.sxUserId) url.searchParams.set("sxUserId", auth.sxUserId);
-    return url.toString();
-  };
+  const user = orgAuth.user as any | null;
+  const isLoggedIn = mounted && Boolean(orgAuth.token);
+  const isAdmin = Boolean(user && user.accountType === "ADMIN");
+  const isManager = Boolean(user && user.accountType === "EMPLOYEE" && user.currentRole === "MANAGER");
+  const isEmployee = Boolean(user && user.accountType === "EMPLOYEE" && !isManager);
 
-  const buildResumeUrl = () => {
-    const explicit = process.env.NEXT_PUBLIC_RESUME_URL?.trim().replace(/\/$/, "");
-    if (explicit) {
-      const url = new URL(`${explicit}/`);
-      if (auth.token) url.searchParams.set("token", auth.token);
-      if (auth.email) url.searchParams.set("email", auth.email);
-      if (auth.name && auth.name !== "User") url.searchParams.set("name", auth.name);
-      if (auth.userType) url.searchParams.set("userType", auth.userType);
-      if (auth.sxUserId) url.searchParams.set("sxUserId", auth.sxUserId);
-      return url.toString().replace(/\/$/, "");
-    }
-    return buildSxUrl("/resume");
-  };
-
-  const logout = () => {
-    try {
-      localStorage.removeItem("somethingx_auth_token");
-      localStorage.removeItem("somethingx_auth_user");
-      localStorage.removeItem("token");
-      localStorage.removeItem("refreshToken");
-      localStorage.removeItem("jbv2_userId");
-      localStorage.setItem("somethingx_logout", Date.now().toString());
-      localStorage.removeItem("somethingx_logout");
-    } catch {
-      /* ignore */
-    }
-    setAuth({ token: "", email: "", name: "User", userType: "STUDENT", sxUserId: "" });
-    window.location.href = `${sxOrigin}/login/student`;
-  };
-
-  const open = (key: "career" | "practice" | "jobs" | "user") => setOpenMenu(key);
-  const close = () => setOpenMenu(null);
-  const initials = (auth.name || "U")
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((s) => s[0]?.toUpperCase())
-    .join("") || "U";
+  const dashboardHref = isAdmin ? "/dashboard/admin" : isManager ? "/dashboard/manager" : "/";
+  const profileHref = isAdmin ? "/profile/admin" : "/profile/employee";
+  const profileLabel = isAdmin ? "Admin Profile" : "Employee Profile";
 
   return (
     <header
@@ -126,202 +56,89 @@ export function NavBar() {
         }}
       >
         <Link
-          href={buildSxUrl("/students")}
+          href="/"
           style={{ display: "flex", alignItems: "center", textDecoration: "none", color: "#0f172a", gap: 8 }}
         >
-          <img
-            src={`${sxOrigin}/assets/Saarthi%20logoimg.png`}
-            alt="SaarthiX Logo"
-            style={{ height: 45, width: "auto", display: "block" }}
-          />
+          <div style={{ fontWeight: 900, fontSize: 16, letterSpacing: "-0.02em" }}>Employee Portal</div>
         </Link>
 
-        <nav
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            gap: 24,
-            flex: 1,
-            height: "100%",
-          }}
-        >
-          <div onMouseEnter={() => open("career")} onMouseLeave={close} style={{ position: "relative" }}>
-            <button type="button" style={menuButtonStyle}>
-              <span>Career Tools</span>
-              <span style={caretStyle} />
-            </button>
-            {openMenu === "career" ? (
-              <div style={dropdownStyle}>
-                <a href={buildSxUrl("/profiling")} style={itemStyle}>
-                  Hire me Profile
-                </a>
-                <a href={buildResumeUrl()} style={itemStyle}>
-                  Resume Builder
-                </a>
-                <a href={buildSxUrl("/students/career-counselling")} style={itemStyle}>
-                  Career Counselling
-                </a>
-              </div>
+        <div style={{ flex: 1 }} />
+
+        {isLoggedIn ? (
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            {(isAdmin || isManager) ? (
+              <Link href={dashboardHref} style={portalDashStyle}>
+                Dashboard
+              </Link>
             ) : null}
-          </div>
-
-          <div onMouseEnter={() => open("practice")} onMouseLeave={close} style={{ position: "relative" }}>
-            <button type="button" style={menuButtonStyle}>
-              <span>Practice</span>
-              <span style={caretStyle} />
+            <Link href={profileHref} style={portalDashStyle}>
+              {profileLabel}
+            </Link>
+            <button type="button" onClick={logoutOrg} style={portalLogoutStyle}>
+              Logout
             </button>
-            {openMenu === "practice" ? (
-              <div style={dropdownStyle}>
-                <a href={buildSxUrl("/students/interview-preparation")} style={itemStyle}>
-                  Interview Preparation
-                </a>
-                <a href={buildSxUrl("/students/personality-test")} style={itemStyle}>
-                  Personality Test
-                </a>
-                <Link href="/" style={itemStyle} onClick={close}>
-                  Job Blueprint
-                </Link>
-              </div>
-            ) : null}
           </div>
-
-          <div onMouseEnter={() => open("jobs")} onMouseLeave={close} style={{ position: "relative" }}>
-            <button type="button" style={menuButtonStyle}>
-              <span>Jobs and Hackathons</span>
-              <span style={caretStyle} />
-            </button>
-            {openMenu === "jobs" ? (
-              <div style={dropdownStyle}>
-                <a href={buildJobsUrl("/apply-jobs")} style={itemStyle}>
-                  Apply to Jobs and Hackathons
-                </a>
-              </div>
-            ) : null}
+        ) : mounted ? (
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <Link href="/auth/employee/login" style={portalLoginStyle}>
+              Login / Signup
+            </Link>
+            <Link href="/auth/admin/login" style={portalCreateStyle}>
+              Admin
+            </Link>
           </div>
+        ) : null}
 
-          <a href={buildSxUrl("/about-us")} style={{ ...menuButtonStyle, textDecoration: "none" }}>
-            About
-          </a>
-        </nav>
-
-        <a href={buildSxUrl("/dashboard")} style={dashboardStyle}>
-          Dashboard
-        </a>
-
-        <div onMouseEnter={() => open("user")} onMouseLeave={close} style={{ position: "relative" }}>
-          <button type="button" style={userButtonStyle}>
-            <span style={avatarStyle}>{initials}</span>
-            <span>{auth.name || "User"}</span>
-            <span style={caretStyle} />
-          </button>
-          {openMenu === "user" ? (
-            <div style={{ ...dropdownStyle, right: 0, left: "auto", minWidth: 180 }}>
-              <a href={buildSxUrl("/profile-builder")} style={itemStyle}>
-                Profile
-              </a>
-              <button type="button" onClick={logout} style={logoutItemStyle}>
-                Logout
-              </button>
-            </div>
-          ) : null}
-        </div>
       </div>
     </header>
   );
 }
 
-const menuButtonStyle: CSSProperties = {
-  border: "none",
-  background: "transparent",
-  fontSize: 15,
-  fontWeight: 600,
-  color: "#111827",
-  cursor: "pointer",
-  padding: "0 2px",
-  height: 64,
-  display: "inline-flex",
-  alignItems: "center",
-  justifyContent: "center",
-  gap: 6,
+const portalLoginStyle: CSSProperties = {
+  textDecoration: "none",
+  border: "1px solid #cbd5e1",
+  color: "#0f172a",
+  borderRadius: 10,
+  padding: "8px 12px",
+  fontSize: 14,
+  fontWeight: 800,
   lineHeight: "20px",
+  background: "#fff"
 };
 
-const dropdownStyle: CSSProperties = {
-  position: "absolute",
-  top: "calc(100% - 8px)",
-  left: -14,
-  marginTop: 0,
-  minWidth: 220,
+const portalCreateStyle: CSSProperties = {
+  textDecoration: "none",
+  background: "#0f172a",
+  color: "#fff",
+  borderRadius: 10,
+  padding: "8px 12px",
+  fontSize: 14,
+  fontWeight: 900,
+  lineHeight: "20px"
+};
+
+const portalDashStyle: CSSProperties = {
+  textDecoration: "none",
+  border: "1px solid #cbd5e1",
+  color: "#0f172a",
+  borderRadius: 10,
+  padding: "8px 12px",
+  fontSize: 14,
+  fontWeight: 900,
+  lineHeight: "20px",
+  background: "#fff"
+};
+
+const portalLogoutStyle: CSSProperties = {
+  border: "1px solid #fecaca",
   background: "#fff",
-  border: "1px solid #e5e7eb",
-  borderRadius: 12,
-  boxShadow: "0 10px 24px rgba(2, 6, 23, 0.14)",
-  padding: "8px 0",
-  zIndex: 60,
-};
-
-const itemStyle: CSSProperties = {
-  display: "block",
-  padding: "10px 14px",
+  color: "#991b1b",
+  borderRadius: 10,
+  padding: "8px 12px",
   fontSize: 14,
-  color: "#111827",
-  textDecoration: "none",
-};
-
-const logoutItemStyle: CSSProperties = {
-  ...itemStyle,
-  width: "100%",
-  border: "none",
-  background: "none",
-  cursor: "pointer",
-  textAlign: "left",
-  color: "#dc2626",
-  fontFamily: "inherit",
-};
-
-const dashboardStyle: CSSProperties = {
-  textDecoration: "none",
-  background: "#0b5fe8",
-  color: "#fff",
-  borderRadius: 8,
-  padding: "8px 14px",
-  fontSize: 14,
-  fontWeight: 700,
+  fontWeight: 900,
   lineHeight: "20px",
+  cursor: "pointer"
 };
 
-const userButtonStyle: CSSProperties = {
-  border: "none",
-  background: "transparent",
-  display: "flex",
-  alignItems: "center",
-  gap: 8,
-  height: 64,
-  cursor: "pointer",
-  color: "#111827",
-  fontSize: 14,
-  fontWeight: 600,
-};
-
-const avatarStyle: CSSProperties = {
-  width: 28,
-  height: 28,
-  borderRadius: "50%",
-  background: "#f59e0b",
-  color: "#fff",
-  display: "inline-flex",
-  alignItems: "center",
-  justifyContent: "center",
-  fontSize: 12,
-  fontWeight: 700,
-};
-
-const caretStyle: CSSProperties = {
-  width: 7,
-  height: 7,
-  borderRight: "1.5px solid #6b7280",
-  borderBottom: "1.5px solid #6b7280",
-  transform: "rotate(45deg) translateY(-1px)",
-  display: "inline-block",
-};
+// caretStyle/menu dropdown styles removed (navbar simplified)

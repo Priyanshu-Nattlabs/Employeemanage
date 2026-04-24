@@ -17,6 +17,11 @@ type Profile = {
 };
 
 export default function ProfilePage() {
+  // Legacy route; new profiles live at /profile/employee and /profile/admin
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    window.location.replace("/profile/employee");
+  }, []);
   const [userId, setUserId] = useState("demo-student-1");
   const [profile, setProfile] = useState<Profile>({ userId: "demo-student-1" });
   const [saved, setSaved] = useState("");

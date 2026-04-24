@@ -89,7 +89,13 @@ export class RolePreparationService {
     if (!preps.length) throw new NotFoundException("Preparation not found");
     for (const prep of preps) {
       prep.skillProgress = prep.skillProgress || {};
-      prep.skillProgress[skillName] = { ...(prep.skillProgress[skillName] || {}), completed: false, score: null, completedDate: null, subtopicCompletion: {} };
+      prep.skillProgress[skillName] = {
+        ...(prep.skillProgress[skillName] || {}),
+        completed: false,
+        score: undefined,
+        completedDate: undefined,
+        subtopicCompletion: {},
+      };
       prep.markModified("skillProgress");
       await prep.save();
     }

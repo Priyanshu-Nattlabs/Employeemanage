@@ -2,7 +2,6 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { getApiPrefix, publicAssetUrl } from "@/lib/apiBase";
-import { syncSomethingXProfileToJbv2 } from "@/lib/somethingxUserProfileSync";
 import { SiteFooter } from "@/app/components/SiteFooter";
 
 function normalizeSearch(s: string) {
@@ -95,7 +94,6 @@ export default function HomePage() {
   useEffect(() => {
     let cancelled = false;
     const load = async () => {
-      await syncSomethingXProfileToJbv2();
       const prefix = getApiPrefix();
       const r = await fetch(`${prefix}/api/blueprint/roles`);
       const rolesData = r.ok ? await r.json() : [];

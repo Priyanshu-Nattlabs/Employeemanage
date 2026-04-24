@@ -6,6 +6,7 @@ import { SkillTestModule } from "./skill-test/skill-test.module";
 import { RolePreparationModule } from "./role-preparation/role-preparation.module";
 import { AiModule } from "./shared/ai.module";
 import { UserProfileModule } from "./user-profile/user-profile.module";
+import { OrgAuthModule } from "./org-auth/org-auth.module";
 
 @Module({
   imports: [
@@ -20,7 +21,8 @@ import { UserProfileModule } from "./user-profile/user-profile.module";
     BlueprintModule,
     SkillTestModule,
     RolePreparationModule,
-    UserProfileModule
+    UserProfileModule,
+    OrgAuthModule
   ]
 })
 export class AppModule {}

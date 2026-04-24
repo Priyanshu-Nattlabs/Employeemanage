@@ -1,10 +1,11 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { syncSomethingXDeletePreparation } from "../../../../lib/somethingxRolePreparationSync";
 
 import { getApiPrefix } from "@/lib/apiBase";
+import { getOrgAuthFromStorage } from "@/lib/orgAuth";
 
 const API = getApiPrefix();
 
@@ -324,9 +325,11 @@ function DonutRing({ pct, size = 110, stroke = 14 }: { pct: number; size?: numbe
 export default function AnalyticsPage() {
   const params   = useParams<{ roleName: string }>();
   const router   = useRouter();
+  const searchParams = useSearchParams();
   const roleName = decodeURIComponent(params.roleName);
 
   const [userId,      setUserId]      = useState("demo-student-1");
+  const [viewingLabel, setViewingLabel] = useState<string>("");
   const [analytics,   setAnalytics]   = useState<any>(null);
   const [prep,        setPrep]        = useState<any>(null);
   const [role,        setRole]        = useState<any>(null);
@@ -336,7 +339,34 @@ export default function AnalyticsPage() {
   const [error,       setError]       = useState("");
 
   useEffect(() => {
-    const uid = localStorage.getItem("jbv2_userId") || "demo-student-1";
+    const auth = getOrgAuthFromStorage();
+    const me = auth?.user || null;
+    const meId = me?.id || "demo-student-1";
+
+    const requested = (searchParams?.get("studentId") || "").trim();
+    const isOther = !!requested && requested !== meId;
+    const canViewOther = me?.accountType === "ADMIN" || me?.currentRole === "MANAGER";
+
+    const uid = isOther
+      ? (canViewOther ? requested : meId)
+      : meId;
+
+    if (isOther && !canViewOther) {
+      // silently drop the override + keep user on their own analytics
+      try {
+        const url = new URL(window.location.href);
+        url.searchParams.delete("studentId");
+        window.history.replaceState({}, "", url.toString());
+      } catch { /* ignore */ }
+    }
+
+    const email = (searchParams?.get("employeeEmail") || "").trim();
+    const name = (searchParams?.get("employeeName") || "").trim();
+    const label = isOther && canViewOther
+      ? (name || email || `Employee ${requested}`)
+      : (me?.fullName || me?.email || "");
+
+    setViewingLabel(label);
     setUserId(uid);
     let cancelled = false;
 
@@ -389,7 +419,7 @@ export default function AnalyticsPage() {
     })();
 
     return () => { cancelled = true; };
-  }, [roleName]);
+  }, [roleName, searchParams]);
 
   const skills = useMemo(() => role?.skillRequirements || [], [role]);
 
@@ -458,7 +488,10 @@ export default function AnalyticsPage() {
       {/* hero */}
       <div style={{ background:"linear-gradient(135deg,#0f172a,#1e293b)", borderRadius:24, padding:"28px 32px", marginBottom:24, color:"white" }}>
         <h1 style={{ margin:"0 0 6px", fontSize:26, fontWeight:900 }}>📊 Preparation Analytics</h1>
-        <p style={{ margin:0, color:"rgba(255,255,255,.7)", fontSize:14 }}>{roleName} · User: {userId}</p>
+        <p style={{ margin:0, color:"rgba(255,255,255,.7)", fontSize:14 }}>
+          {roleName}
+          {viewingLabel ? ` · Viewing: ${viewingLabel}` : ""}
+        </p>
       </div>
 
       {/* stats grid */}
@@ -760,9 +793,6 @@ export default function AnalyticsPage() {
                 `${API}/api/role-preparation/${encodeURIComponent(roleName)}?studentId=${encodeURIComponent(userId)}`,
                 { method: "DELETE" }
               );
-              if (res.ok) {
-                await syncSomethingXDeletePreparation(roleName, userId);
-              }
               router.push(`/role/${encodeURIComponent(roleName)}`);
             }}
             disabled={leaving}

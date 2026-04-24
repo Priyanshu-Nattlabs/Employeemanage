@@ -3,15 +3,9 @@ import React, { Suspense, useEffect, useMemo, useState, useRef } from "react";
 import { createPortal } from "react-dom";
 import { useParams, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import {
-  syncSomethingXDeletePreparation,
-  syncSomethingXStartPreparation,
-  syncSomethingXToggleSubtopic,
-  syncSomethingXUpdateSkill,
-} from "../../../lib/somethingxRolePreparationSync";
 
 import { getApiPrefix } from "@/lib/apiBase";
-import { syncSomethingXProfileToJbv2 } from "@/lib/somethingxUserProfileSync";
+import { getOrgAuthFromStorage } from "@/lib/orgAuth";
 
 const API = getApiPrefix();
 
@@ -392,7 +386,6 @@ function RolePageContent() {
      Otherwise call the chart endpoint to generate a fresh chart.           */
   const load = async (uid?: string) => {
     setLoading(true); setTooltip(null); setTopicsCache({});
-    await syncSomethingXProfileToJbv2();
     const u = uid ?? userId;
     try {
       const [pR, mR, roleR] = await Promise.all([
@@ -455,7 +448,7 @@ function RolePageContent() {
   };
 
   useEffect(() => {
-    const uid = localStorage.getItem("jbv2_userId") || "demo-student-1";
+    const uid = getOrgAuthFromStorage()?.user?.id || "demo-student-1";
     setUserId(uid);
 
     // Initial calculation from localStorage to avoid extra fetch if possible,
@@ -475,7 +468,6 @@ function RolePageContent() {
     // Load months remaining immediately so the "Plan Months" stat is correct
     // even before the chart/JD APIs return.
     void (async () => {
-      await syncSomethingXProfileToJbv2();
       try {
         const r = await fetch(`${API}/api/blueprint/remaining-months?userId=${enc(uid)}`);
         const d = await r.json().catch(() => null);
@@ -631,9 +623,6 @@ function RolePageContent() {
       method: "POST", headers: { "content-type": "application/json" },
       body: JSON.stringify({ ganttChartData: snapshot }),
     });
-    if (res.ok) {
-      await syncSomethingXStartPreparation(roleName, userId, snapshot);
-    }
     setSavedMsg("Preparation locked & saved!"); setTimeout(() => setSavedMsg(""), 3000);
     await load();
     setSaving(false);
@@ -643,9 +632,6 @@ function RolePageContent() {
   const stopPrep = async () => {
     setSaving(true);
     const res = await fetch(`${API}/api/role-preparation/${enc(roleName)}?studentId=${enc(userId)}`, { method: "DELETE" });
-    if (res.ok) {
-      await syncSomethingXDeletePreparation(roleName, userId);
-    }
     setSavedMsg("Preparation stopped."); setTimeout(() => setSavedMsg(""), 2500);
     await load();
     setSaving(false);
@@ -653,9 +639,6 @@ function RolePageContent() {
 
   const markUndone = async (skillName:string) => {
     const res = await fetch(`${API}/api/role-preparation/skill/${enc(roleName)}/${enc(skillName)}?studentId=${enc(userId)}&completed=false`, { method:"PUT" });
-    if (res.ok) {
-      await syncSomethingXUpdateSkill(roleName, skillName, userId, false);
-    }
     await load();
   };
 
@@ -664,9 +647,6 @@ function RolePageContent() {
       `${API}/api/role-preparation/subtopic/${enc(roleName)}/${enc(skillName)}?studentId=${enc(userId)}&month=${month}&topicIndex=${topicIndex}&completed=${completed}`,
       { method: "PUT" }
     );
-    if (res.ok) {
-      await syncSomethingXToggleSubtopic(roleName, skillName, userId, month, topicIndex, completed);
-    }
     setPrep((prev: any) => {
       if (!prev) return prev;
       const next = { ...prev, skillProgress: { ...(prev.skillProgress || {}) } };

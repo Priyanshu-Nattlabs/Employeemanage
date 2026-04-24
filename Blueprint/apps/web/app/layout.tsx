@@ -1,7 +1,5 @@
 import type { Metadata } from "next";
 import { NavBar } from "./components/NavBar";
-import { SomethingXBridge } from "./SomethingXBridge";
-import { SomethingXProfileSync } from "./SomethingXProfileSync";
 
 export const metadata: Metadata = {
   title: "Job Blueprint",
@@ -29,8 +27,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <style suppressHydrationWarning dangerouslySetInnerHTML={{ __html: globalCss }} />
       </head>
       <body>
-        <SomethingXBridge />
-        <SomethingXProfileSync />
         <NavBar />
         <main style={{ maxWidth: 1280, margin: "0 auto", padding: "18px 20px 0" }}>{children}</main>
       </body>

@@ -4,6 +4,7 @@ import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 
 import { getApiPrefix } from "@/lib/apiBase";
+import { getOrgAuthFromStorage } from "@/lib/orgAuth";
 
 const API = getApiPrefix();
 
@@ -160,7 +161,7 @@ export default function SkillTestPage() {
   const progress   = questionCount ? Math.round((answered / questionCount) * 100) : 0;
 
   useEffect(() => {
-    const uid = localStorage.getItem("jbv2_userId") || "demo-student-1";
+    const uid = getOrgAuthFromStorage()?.user?.id || "demo-student-1";
     setUserId(uid);
     void loadTest(uid, false);
   // eslint-disable-next-line react-hooks/exhaustive-deps
