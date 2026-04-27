@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { orgLogin, setOrgAuthInStorage } from "@/lib/orgAuth";
 
-export default function EmployeeLoginPage() {
+export default function ManagerLoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -16,10 +16,11 @@ export default function EmployeeLoginPage() {
     setLoading(true);
     try {
       const r = await orgLogin({ email, password });
-      if (r.user.accountType !== "EMPLOYEE") throw new Error("Please use Admin login.");
+      const role = r.user.currentRole;
+      const allowed = r.user.accountType === "EMPLOYEE" && (role === "MANAGER" || role === "HR");
+      if (!allowed) throw new Error("This area is for Manager / HR accounts. Please use Employee login.");
       setOrgAuthInStorage(r.token, r.user);
-      // If a manager logs in via the Employee login, they should see the same preparation flow as employees.
-      window.location.href = "/target-role";
+      window.location.href = "/dashboard/manager";
     } catch (err: any) {
       setError(err?.message || "Login failed");
     } finally {
@@ -29,13 +30,13 @@ export default function EmployeeLoginPage() {
 
   return (
     <div style={card}>
-      <h1 style={h1}>Employee login</h1>
-      <p style={sub}>Login using your company email and password.</p>
+      <h1 style={h1}>Manager/HR login</h1>
+      <p style={sub}>Managers see their department. HR sees the full company.</p>
 
       <form onSubmit={onSubmit} style={{ display: "grid", gap: 12 }}>
         <label style={labelWrap}>
           <div style={label}>Email</div>
-          <input value={email} onChange={(e) => setEmail(e.target.value)} required type="email" style={input} placeholder="name@company.com" />
+          <input value={email} onChange={(e) => setEmail(e.target.value)} required type="email" style={input} placeholder="manager@company.com" />
         </label>
         <label style={labelWrap}>
           <div style={label}>Password</div>
@@ -46,7 +47,7 @@ export default function EmployeeLoginPage() {
         {error?.toLowerCase?.().includes("not verified") ? (
           <div style={{ fontSize: 13, color: "#475569" }}>
             Need to verify?{" "}
-            <Link href={`/auth/verify-otp?email=${encodeURIComponent(email)}`} style={link}>
+            <Link href={`/auth/verify-otp?email=${encodeURIComponent(email)}&next=${encodeURIComponent("/dashboard/manager")}`} style={link}>
               Enter OTP
             </Link>
           </div>
@@ -57,8 +58,8 @@ export default function EmployeeLoginPage() {
         </button>
 
         <div style={{ fontSize: 13, color: "#475569" }}>
-          First time here?{" "}
-          <Link href="/auth/employee/register" style={link}>
+          New Manager/HR?{" "}
+          <Link href="/auth/manager/register" style={link}>
             Create account
           </Link>
         </div>

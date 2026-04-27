@@ -1,6 +1,6 @@
-import { Body, Controller, Get, Headers, Patch, Post, Query, UnauthorizedException } from "@nestjs/common";
+import { Body, Controller, Get, Headers, Param, Patch, Post, Query, UnauthorizedException } from "@nestjs/common";
 import { OrgAuthService } from "./org-auth.service";
-import { LoginDto, RegisterAdminDto, RegisterEmployeeDto } from "./org-auth.dto";
+import { LoginDto, RegisterAdminDto, RegisterEmployeeDto, ResendEmailOtpDto, VerifyEmailOtpDto } from "./org-auth.dto";
 
 function getBearerToken(authHeader?: string): string {
   const h = (authHeader || "").trim();
@@ -21,6 +21,16 @@ export class OrgAuthController {
   @Post("register/admin")
   registerAdmin(@Body() body: RegisterAdminDto) {
     return this.service.registerAdmin(body as any);
+  }
+
+  @Post("verify-email-otp")
+  verifyEmailOtp(@Body() body: VerifyEmailOtpDto) {
+    return this.service.verifyEmailOtp(body.email, body.otp);
+  }
+
+  @Post("resend-email-otp")
+  resendEmailOtp(@Body() body: ResendEmailOtpDto) {
+    return this.service.resendEmailOtp(body.email);
   }
 
   @Post("login")
@@ -51,20 +61,26 @@ export class OrgAuthController {
     return this.service.updateProfileById(me?.sub, body || {});
   }
 
-  /** Manager view: list employees for the manager's company domain. */
+  /** Manager / HR view: list employees for the user's company domain. Manager scoped to their department, HR sees all. */
   @Get("employees")
   async employees(@Headers("authorization") authorization?: string, @Query("companyDomain") companyDomain?: string) {
     const token = getBearerToken(authorization);
     if (!token) throw new UnauthorizedException("Missing token");
     const me = this.service.verifyToken(token);
 
-    if (me?.accountType !== "EMPLOYEE" || me?.currentRole !== "MANAGER") {
-      throw new UnauthorizedException("Only managers can access employee listings");
+    const isManager = me?.accountType === "EMPLOYEE" && me?.currentRole === "MANAGER";
+    const isHR = me?.accountType === "EMPLOYEE" && me?.currentRole === "HR";
+    if (!isManager && !isHR) {
+      throw new UnauthorizedException("Only managers or HR can access employee listings");
     }
 
     const domain = (companyDomain || me.companyDomain || "").trim().toLowerCase();
     if (!domain) throw new UnauthorizedException("Missing companyDomain");
-    return this.service.getEmployeesForManager(domain);
+
+    if (isHR) return this.service.getEmployeesForManager(domain);
+    const profile = await this.service.getProfileById(me?.sub);
+    const department = (profile as any)?.department || "";
+    return this.service.getEmployeesForManager(domain, department);
   }
 
   /** Admin view: list employees for admin's company name + domain. */
@@ -97,18 +113,172 @@ export class OrgAuthController {
     return this.service.getEmployeesPrepSummaryForAdmin(domain, companyName);
   }
 
-  /** Manager view: employees + preparation/test summary. */
+  /** Manager / HR view: aggregated activity feed, trends, skill + role stats. Manager is scoped to their department. */
+  @Get("employees-activity")
+  async managerEmployeesActivity(@Headers("authorization") authorization?: string) {
+    const token = getBearerToken(authorization);
+    if (!token) throw new UnauthorizedException("Missing token");
+    const me = this.service.verifyToken(token);
+    const isManager = me?.accountType === "EMPLOYEE" && me?.currentRole === "MANAGER";
+    const isHR = me?.accountType === "EMPLOYEE" && me?.currentRole === "HR";
+    if (!isManager && !isHR) {
+      throw new UnauthorizedException("Only managers or HR can access employee activity");
+    }
+    const domain = (me.companyDomain || "").trim().toLowerCase();
+    if (!domain) throw new UnauthorizedException("Missing companyDomain");
+
+    if (isHR) return this.service.getEmployeesActivityForManager(domain);
+    const profile = await this.service.getProfileById(me?.sub);
+    const department = (profile as any)?.department || "";
+    return this.service.getEmployeesActivityForManager(domain, department);
+  }
+
+  /** Manager / HR view: employees + preparation/test summary. Manager is scoped to their department. */
   @Get("employees-summary")
   async managerEmployeesSummary(@Headers("authorization") authorization?: string) {
     const token = getBearerToken(authorization);
     if (!token) throw new UnauthorizedException("Missing token");
     const me = this.service.verifyToken(token);
-    if (me?.accountType !== "EMPLOYEE" || me?.currentRole !== "MANAGER") {
-      throw new UnauthorizedException("Only managers can access employee summaries");
+    const isManager = me?.accountType === "EMPLOYEE" && me?.currentRole === "MANAGER";
+    const isHR = me?.accountType === "EMPLOYEE" && me?.currentRole === "HR";
+    if (!isManager && !isHR) {
+      throw new UnauthorizedException("Only managers or HR can access employee summaries");
     }
     const domain = (me.companyDomain || "").trim().toLowerCase();
     if (!domain) throw new UnauthorizedException("Missing companyDomain");
-    return this.service.getEmployeesPrepSummaryForManager(domain);
+
+    if (isHR) return this.service.getEmployeesPrepSummaryForManager(domain);
+    const profile = await this.service.getProfileById(me?.sub);
+    const department = (profile as any)?.department || "";
+    return this.service.getEmployeesPrepSummaryForManager(domain, department);
+  }
+
+  // ───────────────────── Organization structure ─────────────────────
+
+  /** Manager / HR: read the company's org structure (departments → roles map). */
+  @Get("org-structure")
+  async getOrgStructure(@Headers("authorization") authorization?: string) {
+    const token = getBearerToken(authorization);
+    if (!token) throw new UnauthorizedException("Missing token");
+    const me = this.service.verifyToken(token);
+    const isManager = me?.accountType === "EMPLOYEE" && me?.currentRole === "MANAGER";
+    const isHR = me?.accountType === "EMPLOYEE" && me?.currentRole === "HR";
+    if (!isManager && !isHR) throw new UnauthorizedException("Only managers or HR can view org structure");
+    const domain = (me.companyDomain || "").trim().toLowerCase();
+    return this.service.getOrgStructure(domain);
+  }
+
+  /** Manager / HR: upsert the company's org structure. */
+  @Post("org-structure")
+  async saveOrgStructure(@Headers("authorization") authorization?: string, @Body() body?: any) {
+    const token = getBearerToken(authorization);
+    if (!token) throw new UnauthorizedException("Missing token");
+    const me = this.service.verifyToken(token);
+    const isManager = me?.accountType === "EMPLOYEE" && me?.currentRole === "MANAGER";
+    const isHR = me?.accountType === "EMPLOYEE" && me?.currentRole === "HR";
+    if (!isManager && !isHR) throw new UnauthorizedException("Only managers or HR can edit org structure");
+    const domain = (me.companyDomain || "").trim().toLowerCase();
+    return this.service.upsertOrgStructure({
+      companyDomain: domain,
+      companyName: me.companyName,
+      setupByEmail: me.email,
+      setupByName: me.fullName,
+      departments: body?.departments || [],
+    });
+  }
+
+  // ───────────────────── Role recommendations ─────────────────────
+
+  /** Manager / HR: list the roles a manager can recommend to a given employee. */
+  @Get("recommendable-roles")
+  async recommendableRoles(
+    @Headers("authorization") authorization?: string,
+    @Query("employeeId") employeeId?: string,
+  ) {
+    const token = getBearerToken(authorization);
+    if (!token) throw new UnauthorizedException("Missing token");
+    const me = this.service.verifyToken(token);
+    const isManager = me?.accountType === "EMPLOYEE" && me?.currentRole === "MANAGER";
+    const isHR = me?.accountType === "EMPLOYEE" && me?.currentRole === "HR";
+    if (!isManager && !isHR) throw new UnauthorizedException("Only managers or HR can view recommendable roles");
+
+    const domain = (me.companyDomain || "").trim().toLowerCase();
+    const profile = await this.service.getProfileById(me?.sub);
+    const department = (profile as any)?.department || "";
+
+    return this.service.listRecommendableRolesForEmployee({
+      companyDomain: domain,
+      managerDepartment: department,
+      managerRole: me.currentRole,
+      employeeId: String(employeeId || ""),
+    });
+  }
+
+  /** Manager / HR: send a role recommendation to an employee. */
+  @Post("recommendations")
+  async createRecommendation(@Headers("authorization") authorization?: string, @Body() body?: any) {
+    const token = getBearerToken(authorization);
+    if (!token) throw new UnauthorizedException("Missing token");
+    const me = this.service.verifyToken(token);
+    const isManager = me?.accountType === "EMPLOYEE" && me?.currentRole === "MANAGER";
+    const isHR = me?.accountType === "EMPLOYEE" && me?.currentRole === "HR";
+    if (!isManager && !isHR) throw new UnauthorizedException("Only managers or HR can recommend roles");
+
+    const domain = (me.companyDomain || "").trim().toLowerCase();
+    const profile = await this.service.getProfileById(me?.sub);
+    const department = (profile as any)?.department || "";
+
+    return this.service.createRecommendation({
+      companyDomain: domain,
+      manager: {
+        id: me.sub,
+        email: me.email,
+        name: me.fullName,
+        role: me.currentRole,
+        department,
+      },
+      employeeId: String(body?.employeeId || ""),
+      roleName: String(body?.roleName || ""),
+      note: body?.note ? String(body.note) : undefined,
+    });
+  }
+
+  /** Manager / HR: list recommendations they have sent. */
+  @Get("recommendations/sent")
+  async sentRecommendations(@Headers("authorization") authorization?: string) {
+    const token = getBearerToken(authorization);
+    if (!token) throw new UnauthorizedException("Missing token");
+    const me = this.service.verifyToken(token);
+    const isManager = me?.accountType === "EMPLOYEE" && me?.currentRole === "MANAGER";
+    const isHR = me?.accountType === "EMPLOYEE" && me?.currentRole === "HR";
+    if (!isManager && !isHR) throw new UnauthorizedException("Only managers or HR can view sent recommendations");
+    return this.service.listRecommendationsByManager(me.sub);
+  }
+
+  /** Employee inbox: list role recommendations sent to me. */
+  @Get("recommendations/inbox")
+  async myRecommendations(@Headers("authorization") authorization?: string) {
+    const token = getBearerToken(authorization);
+    if (!token) throw new UnauthorizedException("Missing token");
+    const me = this.service.verifyToken(token);
+    return this.service.listRecommendationsForEmployee(me.sub);
+  }
+
+  /** Employee: update status of one of my recommendations (mark seen/dismissed/accepted). */
+  @Post("recommendations/:id/status")
+  async updateRecommendationStatus(
+    @Headers("authorization") authorization?: string,
+    @Param("id") id?: string,
+    @Body() body?: any,
+  ) {
+    const token = getBearerToken(authorization);
+    if (!token) throw new UnauthorizedException("Missing token");
+    const me = this.service.verifyToken(token);
+    return this.service.setRecommendationStatus({
+      recommendationId: String(id || ""),
+      employeeId: me.sub,
+      status: String(body?.status || "").toUpperCase() as any,
+    });
   }
 }
 

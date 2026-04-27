@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, usePathname, useRouter } from "next/navigation";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 
@@ -326,6 +326,10 @@ export default function AnalyticsPage() {
   const params   = useParams<{ roleName: string }>();
   const router   = useRouter();
   const searchParams = useSearchParams();
+  const pathname = usePathname() || "";
+  // When this component is mounted via the manager tracking route, suppress the
+  // employee-facing breadcrumb and destructive "Leave Preparation" action.
+  const inManagerTrack = pathname.startsWith("/dashboard/manager/track");
   const roleName = decodeURIComponent(params.roleName);
 
   const [userId,      setUserId]      = useState("demo-student-1");
@@ -345,7 +349,7 @@ export default function AnalyticsPage() {
 
     const requested = (searchParams?.get("studentId") || "").trim();
     const isOther = !!requested && requested !== meId;
-    const canViewOther = me?.accountType === "ADMIN" || me?.currentRole === "MANAGER";
+    const canViewOther = me?.accountType === "ADMIN" || me?.currentRole === "MANAGER" || me?.currentRole === "HR";
 
     const uid = isOther
       ? (canViewOther ? requested : meId)
@@ -476,37 +480,109 @@ export default function AnalyticsPage() {
   );
 
   return (
-    <div style={{ maxWidth: 1100 }}>
-      {/* breadcrumb */}
-      <p style={{ color:"#64748b", fontSize:13, marginBottom:14 }}>
-        <Link href="/" style={{ color:"#3b82f6" }}>Home</Link>
-        {" › "}
-        <Link href={`/role/${encodeURIComponent(roleName)}`} style={{ color:"#3b82f6" }}>{roleName}</Link>
-        {" › Analytics"}
-      </p>
-
-      {/* hero */}
-      <div style={{ background:"linear-gradient(135deg,#0f172a,#1e293b)", borderRadius:24, padding:"28px 32px", marginBottom:24, color:"white" }}>
-        <h1 style={{ margin:"0 0 6px", fontSize:26, fontWeight:900 }}>📊 Preparation Analytics</h1>
-        <p style={{ margin:0, color:"rgba(255,255,255,.7)", fontSize:14 }}>
-          {roleName}
-          {viewingLabel ? ` · Viewing: ${viewingLabel}` : ""}
+    <div style={{ padding: "8px 0 0 4px", marginRight: -20 }}>
+      {/* breadcrumb (hidden in manager-tracking mode — that route has its own header) */}
+      {!inManagerTrack && (
+        <p style={{ color:"#64748b", fontSize:13, marginBottom:14 }}>
+          <Link href="/" style={{ color:"#6366f1", fontWeight:700, textDecoration:"none" }}>Home</Link>
+          <span style={{ color:"#cbd5e1", margin:"0 6px" }}>›</span>
+          <Link href={`/role/${encodeURIComponent(roleName)}`} style={{ color:"#6366f1", fontWeight:700, textDecoration:"none" }}>{roleName}</Link>
+          <span style={{ color:"#cbd5e1", margin:"0 6px" }}>›</span>
+          <span style={{ color:"#0f172a", fontWeight:700 }}>Analytics</span>
         </p>
+      )}
+
+      {/* hero — colorful gradient with decorative blobs */}
+      <div style={{
+        background: "linear-gradient(135deg,#4f46e5 0%,#7c3aed 30%,#db2777 65%,#f59e0b 100%)",
+        borderRadius: 24,
+        padding: "30px 0 28px 32px",
+        marginRight: 0,
+        marginBottom: 24,
+        color: "white",
+        position: "relative",
+        overflow: "hidden",
+        boxShadow: "0 18px 40px -18px rgba(124,58,237,0.55)",
+      }}>
+        {/* decorative blobs */}
+        <div style={{ position:"absolute", top:-60, right:-40, width:220, height:220, borderRadius:"50%", background:"rgba(255,255,255,0.14)", filter:"blur(2px)" }} />
+        <div style={{ position:"absolute", bottom:-80, right:120, width:180, height:180, borderRadius:"50%", background:"rgba(255,255,255,0.08)" }} />
+        <div style={{ position:"absolute", top:40, left:-50, width:120, height:120, borderRadius:"50%", background:"rgba(255,255,255,0.10)" }} />
+
+        <div style={{ position:"relative", zIndex:1 }}>
+          <div style={{ display:"flex", alignItems:"center", gap:14, marginBottom:10, flexWrap:"wrap" }}>
+            <div style={{
+              width:54, height:54, borderRadius:16,
+              background:"rgba(255,255,255,0.22)", backdropFilter:"blur(6px)",
+              border:"1px solid rgba(255,255,255,0.35)",
+              display:"flex", alignItems:"center", justifyContent:"center",
+              fontSize:26,
+            }}>📊</div>
+            <div>
+              <h1 style={{ margin:0, fontSize:28, fontWeight:900, letterSpacing:"-0.02em" }}>Preparation Analytics</h1>
+              <p style={{ margin:"4px 0 0", color:"rgba(255,255,255,0.85)", fontSize:14 }}>{roleName}</p>
+            </div>
+          </div>
+
+          <div style={{ display:"flex", flexWrap:"wrap", gap:8, marginTop:12 }}>
+            {viewingLabel ? (
+              <span style={{
+                display:"inline-flex", alignItems:"center", gap:8,
+                background:"rgba(255,255,255,0.22)",
+                border:"1px solid rgba(255,255,255,0.35)",
+                backdropFilter:"blur(6px)",
+                borderRadius:999, padding:"6px 14px", fontSize:13, fontWeight:700,
+              }}>
+                <span style={{ fontSize:14 }}>👤</span> {viewingLabel}
+              </span>
+            ) : null}
+            <span style={{
+              display:"inline-flex", alignItems:"center", gap:8,
+              background:"rgba(255,255,255,0.22)",
+              border:"1px solid rgba(255,255,255,0.35)",
+              backdropFilter:"blur(6px)",
+              borderRadius:999, padding:"6px 14px", fontSize:13, fontWeight:800,
+            }}>
+              {pct}% complete
+            </span>
+            {analytics.totalSkills ? (
+              <span style={{
+                display:"inline-flex", alignItems:"center", gap:8,
+                background:"rgba(255,255,255,0.22)",
+                border:"1px solid rgba(255,255,255,0.35)",
+                backdropFilter:"blur(6px)",
+                borderRadius:999, padding:"6px 14px", fontSize:13, fontWeight:700,
+              }}>
+                {analytics.completedSkills ?? 0}/{analytics.totalSkills} skills done
+              </span>
+            ) : null}
+          </div>
+        </div>
       </div>
 
-      {/* stats grid */}
+      {/* stats grid — gradient accent cards */}
       <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(160px,1fr))", gap:12, marginBottom:24 }}>
         {[
-          { label:"Total Skills", val: analytics.totalSkills ?? 0, icon:"🎯", color:"#3b82f6" },
-          { label:"Completed", val: analytics.completedSkills ?? 0, icon:"✅", color:"#22c55e" },
-          { label:"Remaining", val: analytics.remainingSkills ?? 0, icon:"⏳", color:"#f59e0b" },
-          { label:"Technical Done", val: `${techDone}/${techSkills.length}`, icon:"💻", color:"#6366f1" },
-          { label:"Soft Skills Done", val: `${softDone}/${softSkills.length}`, icon:"🎯", color:"#a855f7" },
+          { label:"Total Skills",     val: analytics.totalSkills ?? 0,                       icon:"🎯", from:"#3b82f6", to:"#0ea5e9" },
+          { label:"Completed",        val: analytics.completedSkills ?? 0,                   icon:"✅", from:"#22c55e", to:"#16a34a" },
+          { label:"Remaining",        val: analytics.remainingSkills ?? 0,                   icon:"⏳", from:"#f59e0b", to:"#ea580c" },
+          { label:"Technical Done",   val: `${techDone}/${techSkills.length}`,               icon:"💻", from:"#6366f1", to:"#4f46e5" },
+          { label:"Soft Skills Done", val: `${softDone}/${softSkills.length}`,               icon:"🌟", from:"#a855f7", to:"#db2777" },
         ].map(s => (
-          <div key={s.label} style={{ ...card, textAlign:"center", borderTop:`4px solid ${s.color}` }}>
-            <div style={{ fontSize:22 }}>{s.icon}</div>
-            <div style={{ fontSize:26, fontWeight:900, color:s.color, marginTop:2 }}>{s.val}</div>
-            <div style={{ fontSize:12, color:"#64748b", marginTop:2 }}>{s.label}</div>
+          <div key={s.label} style={{
+            background:"#fff",
+            borderRadius:16, border:"1px solid #e2e8f0",
+            padding:"16px 14px",
+            position:"relative", overflow:"hidden",
+            boxShadow:"0 1px 6px rgba(0,0,0,.05)",
+          }}>
+            <div style={{ position:"absolute", inset:0, background:`linear-gradient(135deg, ${s.from}10, ${s.to}05 60%, transparent)`, pointerEvents:"none" }} />
+            <div style={{ position:"absolute", left:0, top:0, bottom:0, width:4, background:`linear-gradient(180deg, ${s.from}, ${s.to})` }} />
+            <div style={{ position:"relative", textAlign:"center" }}>
+              <div style={{ fontSize:22 }}>{s.icon}</div>
+              <div style={{ fontSize:26, fontWeight:900, marginTop:2, background:`linear-gradient(135deg, ${s.from}, ${s.to})`, WebkitBackgroundClip:"text", WebkitTextFillColor:"transparent", backgroundClip:"text" }}>{s.val}</div>
+              <div style={{ fontSize:12, color:"#64748b", marginTop:2, fontWeight:700 }}>{s.label}</div>
+            </div>
           </div>
         ))}
       </div>
@@ -730,8 +806,18 @@ export default function AnalyticsPage() {
 
       {/* Full skill table */}
       <div style={{ ...card, marginBottom:24, padding:0, overflow:"hidden" }}>
-        <div style={{ padding:"16px 20px", borderBottom:"1px solid #e2e8f0" }}>
-          <h3 style={{ margin:0, fontSize:16 }}>All Skills Status</h3>
+        <div style={{
+          padding:"14px 20px",
+          background:"linear-gradient(135deg,#eef2ff,#fdf2f8)",
+          borderBottom:"1px solid #e2e8f0",
+          display:"flex", justifyContent:"space-between", alignItems:"center", flexWrap:"wrap", gap:8,
+        }}>
+          <h3 style={{ margin:0, fontSize:16, color:"#0f172a", display:"flex", alignItems:"center", gap:8 }}>
+            <span style={{ fontSize:18 }}>📚</span> All Skills Status
+          </h3>
+          <span style={{ fontSize:12, fontWeight:700, color:"#475569", background:"white", border:"1px solid #e2e8f0", borderRadius:999, padding:"4px 10px" }}>
+            {skills.length} skill{skills.length !== 1 ? "s" : ""}
+          </span>
         </div>
         <div style={{ overflowX:"auto" }}>
           <table style={{ width:"100%", borderCollapse:"collapse" }}>
@@ -779,12 +865,17 @@ export default function AnalyticsPage() {
       </div>
 
       <div style={{ display:"flex", gap:10, flexWrap:"wrap", alignItems:"center" }}>
-        <Link href={`/role/${encodeURIComponent(roleName)}`} style={{ textDecoration:"none" }}>
-          <button style={{ padding:"10px 20px", borderRadius:10, background:"#6366f1", color:"white", border:"none", cursor:"pointer", fontWeight:700 }}>
-            ← Back to Role
+        <Link href={inManagerTrack ? "/dashboard/manager" : `/role/${encodeURIComponent(roleName)}`} style={{ textDecoration:"none" }}>
+          <button style={{
+            padding:"10px 20px", borderRadius:10,
+            background:"linear-gradient(135deg,#6366f1,#8b5cf6)",
+            color:"white", border:"none", cursor:"pointer", fontWeight:800,
+            boxShadow:"0 6px 18px -8px rgba(99,102,241,0.6)",
+          }}>
+            {inManagerTrack ? "← Back to dashboard" : "← Back to Role"}
           </button>
         </Link>
-        {prep?.isActive && (
+        {prep?.isActive && !inManagerTrack && (
           <button
             onClick={async () => {
               if (!confirm("Leave this preparation? Your progress will be lost and the chart will be unlocked.")) return;
@@ -796,11 +887,62 @@ export default function AnalyticsPage() {
               router.push(`/role/${encodeURIComponent(roleName)}`);
             }}
             disabled={leaving}
-            style={{ padding:"10px 20px", borderRadius:10, background:"#fef2f2", color:"#dc2626", border:"1.5px solid #fca5a5", cursor:"pointer", fontWeight:700 }}
+            style={{ padding:"10px 20px", borderRadius:10, background:"#fef2f2", color:"#dc2626", border:"1.5px solid #fca5a5", cursor:"pointer", fontWeight:800 }}
           >
             {leaving ? "Leaving…" : "🚪 Leave Preparation"}
           </button>
         )}
+      </div>
+
+      {/* footer */}
+      <div style={{
+        marginTop: 28,
+        borderRadius: 20,
+        padding: "20px 24px",
+        background: "linear-gradient(135deg,#0f172a 0%,#312e81 50%,#581c87 100%)",
+        color: "white",
+        position: "relative",
+        overflow: "hidden",
+        boxShadow: "0 10px 30px -16px rgba(15,23,42,0.6)",
+      }}>
+        <div style={{ position:"absolute", top:-40, right:-30, width:160, height:160, borderRadius:"50%", background:"rgba(168,85,247,0.25)", filter:"blur(2px)" }} />
+        <div style={{ position:"absolute", bottom:-50, right:80, width:120, height:120, borderRadius:"50%", background:"rgba(236,72,153,0.18)" }} />
+
+        <div style={{ position:"relative", display:"flex", justifyContent:"space-between", gap:16, flexWrap:"wrap", alignItems:"center" }}>
+          <div style={{ display:"flex", alignItems:"center", gap:12 }}>
+            <div style={{
+              width:40, height:40, borderRadius:12,
+              background:"rgba(255,255,255,0.15)",
+              border:"1px solid rgba(255,255,255,0.25)",
+              display:"flex", alignItems:"center", justifyContent:"center",
+              fontSize:20,
+            }}>🚀</div>
+            <div>
+              <div style={{ fontWeight:900, fontSize:15 }}>Saarthi · Career Preparation</div>
+              <div style={{ fontSize:12, color:"rgba(255,255,255,0.7)" }}>Track skills, take tests, and grow into the role you want.</div>
+            </div>
+          </div>
+          <div style={{ display:"flex", gap:10, flexWrap:"wrap" }}>
+            <span style={{
+              display:"inline-flex", alignItems:"center", gap:8,
+              padding:"6px 12px", borderRadius:999,
+              background:"rgba(255,255,255,0.14)",
+              border:"1px solid rgba(255,255,255,0.25)",
+              fontSize:12, fontWeight:700,
+            }}>
+              {prep?.isActive ? "🟢 Preparation active" : "⚪ Not preparing yet"}
+            </span>
+            <span style={{
+              display:"inline-flex", alignItems:"center", gap:8,
+              padding:"6px 12px", borderRadius:999,
+              background:"rgba(255,255,255,0.14)",
+              border:"1px solid rgba(255,255,255,0.25)",
+              fontSize:12, fontWeight:700,
+            }}>
+              📅 {new Date().toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}
+            </span>
+          </div>
+        </div>
       </div>
     </div>
   );
