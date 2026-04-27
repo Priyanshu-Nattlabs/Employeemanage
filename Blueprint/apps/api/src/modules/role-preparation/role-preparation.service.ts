@@ -11,6 +11,10 @@ export class RolePreparationService {
     @InjectModel(SkillTest.name) private readonly skillTestModel: Model<SkillTestDocument>
   ) {}
 
+  private uniq(items: string[]) {
+    return Array.from(new Set((items || []).map((x) => String(x || "").trim()).filter(Boolean)));
+  }
+
   async start(studentId: string, roleName: string, ganttChartData?: Record<string, unknown>) {
     let prep = await this.prepModel.findOne({ studentId, roleName });
 
@@ -60,6 +64,54 @@ export class RolePreparationService {
       }
       await prep.save();
     }
+    return prep;
+  }
+
+  async configureKnownSkills(
+    studentId: string,
+    roleName: string,
+    knownSkills: string[],
+    ganttChartData?: Record<string, unknown>
+  ) {
+    const roleDoc: any = await this.blueprintModel
+      .findOne({
+        type: { $regex: "^role$", $options: "i" },
+        name: { $regex: `^${String(roleName || "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`, $options: "i" },
+      })
+      .lean();
+    const roleSkills: string[] = ((roleDoc?.skillRequirements || []) as any[]).map((s: any) => s.skillName).filter(Boolean);
+    const requestedKnown = this.uniq(knownSkills);
+    const filteredKnown = roleSkills.length ? requestedKnown.filter((s) => roleSkills.includes(s)) : requestedKnown;
+    const known = filteredKnown.length ? filteredKnown : requestedKnown;
+    const knownSet = new Set(known);
+
+    let filteredChart = ganttChartData;
+    if (ganttChartData && typeof ganttChartData === "object") {
+      const gc: any = JSON.parse(JSON.stringify(ganttChartData));
+      if (Array.isArray(gc?.skillRequirements)) {
+        gc.skillRequirements = gc.skillRequirements.filter((s: any) => !knownSet.has(String(s?.skillName || "")));
+      }
+      if (Array.isArray(gc?.plan?.tasks)) {
+        gc.plan.tasks = gc.plan.tasks.filter((t: any) => !knownSet.has(String(t?.name || "")));
+      }
+      filteredChart = gc;
+    }
+
+    await this.start(studentId, roleName, filteredChart);
+    const prep = await this.prepModel.findOne({ studentId, roleName });
+    if (!prep) throw new NotFoundException("Preparation not found");
+
+    prep.knownSkillsForTest = this.uniq([...(prep.knownSkillsForTest || []), ...known]);
+    prep.passedKnownSkills = this.uniq(prep.passedKnownSkills || []);
+    prep.failedKnownSkills = this.uniq((prep.failedKnownSkills || []).filter((x) => !knownSet.has(x)));
+    prep.earnedBadges = Array.isArray(prep.earnedBadges) ? prep.earnedBadges : [];
+
+    prep.skillProgress = prep.skillProgress || {};
+    for (const k of prep.knownSkillsForTest) {
+      delete prep.skillProgress[k];
+    }
+    prep.markModified("skillProgress");
+    await prep.save();
     return prep;
   }
 
@@ -113,6 +165,67 @@ export class RolePreparationService {
     prep.skillProgress[skillName] = { ...(prep.skillProgress[skillName] || {}), completed: true, score, completedDate: new Date().toISOString().slice(0, 10) };
     prep.isActive = true;
     prep.markModified("skillProgress");
+    await prep.save();
+    return prep;
+  }
+
+  async markKnownSkillPassed(studentId: string, roleName: string, skillName: string, score: number) {
+    const prep = await this.prepModel.findOne({ studentId, roleName });
+    if (!prep) return null;
+    prep.knownSkillsForTest = this.uniq((prep.knownSkillsForTest || []).filter((s) => s !== skillName));
+    prep.passedKnownSkills = this.uniq([...(prep.passedKnownSkills || []), skillName]);
+    prep.failedKnownSkills = this.uniq((prep.failedKnownSkills || []).filter((s) => s !== skillName));
+    prep.earnedBadges = Array.isArray(prep.earnedBadges) ? prep.earnedBadges : [];
+    prep.earnedBadges.push({
+      skillName,
+      roleName,
+      score,
+      earnedAt: new Date().toISOString(),
+      type: "SKILL_TEST_PASS",
+    });
+    await prep.save();
+    return prep;
+  }
+
+  async markKnownSkillFailed(studentId: string, roleName: string, skillName: string) {
+    const prep = await this.prepModel.findOne({ studentId, roleName });
+    if (!prep) return null;
+
+    prep.knownSkillsForTest = this.uniq((prep.knownSkillsForTest || []).filter((s) => s !== skillName));
+    prep.failedKnownSkills = this.uniq([...(prep.failedKnownSkills || []), skillName]);
+    prep.passedKnownSkills = this.uniq((prep.passedKnownSkills || []).filter((s) => s !== skillName));
+
+    prep.skillProgress = prep.skillProgress || {};
+    if (!prep.skillProgress[skillName]) {
+      prep.skillProgress[skillName] = { completed: false, subtopicCompletion: {} } as any;
+    } else {
+      prep.skillProgress[skillName] = { ...prep.skillProgress[skillName], completed: false };
+    }
+    prep.markModified("skillProgress");
+
+    const gc: any = prep.ganttChartData || {};
+    if (Array.isArray(gc?.plan?.tasks)) {
+      const exists = gc.plan.tasks.some((t: any) => String(t?.name || "") === skillName);
+      if (!exists) {
+        const totalMonths = Number(gc?.plan?.totalMonths || 12);
+        gc.plan.tasks.push({
+          id: `skill_${skillName.replace(/\s+/g, "_").replace(/[^a-zA-Z0-9_]/g, "")}`,
+          name: skillName,
+          start: totalMonths,
+          end: totalMonths,
+          difficulty: "intermediate",
+          importance: "Important",
+          type: "technical",
+          description: "Added back to blueprint after failed validation test",
+          timeRequired: 1,
+          progress: 0,
+          isOptional: false,
+        });
+      }
+      prep.ganttChartData = gc;
+      prep.markModified("ganttChartData");
+    }
+
     await prep.save();
     return prep;
   }

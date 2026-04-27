@@ -10,6 +10,20 @@ export class RolePreparationController {
     return this.service.start(studentId, decodeURIComponent(roleName), body?.ganttChartData);
   }
 
+  @Put("known-skills/:roleName")
+  setKnownSkills(
+    @Param("roleName") roleName: string,
+    @Query("studentId") studentId: string,
+    @Body() body?: { knownSkills?: string[]; ganttChartData?: Record<string, unknown> }
+  ) {
+    return this.service.configureKnownSkills(
+      studentId,
+      decodeURIComponent(roleName),
+      body?.knownSkills || [],
+      body?.ganttChartData
+    );
+  }
+
   @Put("skill/:roleName/:skillName")
   updateSkill(
     @Param("roleName") roleName: string,

@@ -19,13 +19,29 @@ export class BlueprintService {
   ) {}
 
   getAllBlueprints() { return this.blueprintModel.find().lean(); }
-  getByType(type: string) { return this.blueprintModel.find({ type }).lean(); }
+  getByType(type: string) {
+    const t = String(type || "").trim();
+    return this.blueprintModel.find({ type: { $regex: `^${this.escapeRegex(t)}$`, $options: "i" } }).lean();
+  }
   async getNamesByType(type: string) { return (await this.getByType(type)).map((d) => d.name); }
   async getDocByTypeAndName(type: string, name: string) {
-    return this.blueprintModel.findOne({ type, name }).lean();
+    const t = String(type || "").trim();
+    const n = String(name || "").trim();
+    return this.blueprintModel
+      .findOne({
+        type: { $regex: `^${this.escapeRegex(t)}$`, $options: "i" },
+        name: { $regex: `^${this.escapeRegex(n)}$`, $options: "i" },
+      })
+      .lean();
   }
   async getRole(roleName: string) {
-    const role: any = await this.blueprintModel.findOne({ type: "role", name: roleName }).lean();
+    const rn = String(roleName || "").trim();
+    const role: any = await this.blueprintModel
+      .findOne({
+        type: { $regex: "^role$", $options: "i" },
+        name: { $regex: `^${this.escapeRegex(rn)}$`, $options: "i" },
+      })
+      .lean();
     if (!role) return null;
     const skillRequirements = (role.skillRequirements || []).length
       ? (role.skillRequirements || [])
@@ -875,6 +891,10 @@ Return ONLY the JSON object.`;
       }
     ]);
     return { inserted: 4 };
+  }
+
+  private escapeRegex(value: string): string {
+    return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   }
 }
 

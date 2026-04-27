@@ -32,17 +32,23 @@ export class SkillTestService {
   private async generateQuestions(roleName: string, skillName: string) {
     const fallback = this.buildFallback(skillName);
 
-    const system = `You are a technical interviewer. Return ONLY a valid JSON array of exactly 10 MCQ objects. No markdown, no extra text.
+    const system = `You are a technical interviewer. Return ONLY a valid JSON array of exactly 20 MCQ objects. No markdown, no extra text.
 Each object must have exactly these keys:
-  "questionNumber": integer (1-10)
+  "questionNumber": integer (1-20)
   "questionText": string (the question)
   "options": array of exactly 4 strings (the answer choices, not labeled A/B/C/D)
   "correctAnswer": string (must exactly match one of the options strings)
 Example:
 [{"questionNumber":1,"questionText":"What is X?","options":["Option1","Option2","Option3","Option4"],"correctAnswer":"Option1"}]`;
 
-    const prompt = `Generate 10 MCQ questions to assess proficiency in "${skillName}" for the role of "${roleName}".
-The questions should be practical, real-world scenarios ranging from beginner to intermediate difficulty.
+    const prompt = `Generate exactly 20 purely ${skillName}-focused MCQ questions for the role "${roleName}".
+Do not ask generic aptitude, communication, or unrelated role questions.
+Difficulty split must be exact:
+- 5 easy questions
+- 10 medium questions
+- 5 tough questions
+Questions should be practical and directly test ${skillName} knowledge and application.
+Set question numbers from 1 to 20 in ascending order.
 Return ONLY the JSON array, nothing else.`;
 
     const raw = await this.ai.chatJson<any>(prompt, system, null);
@@ -76,31 +82,54 @@ Return ONLY the JSON array, nothing else.`;
           correctAnswer: correct
         };
       })
-      .slice(0, 10);
+      .slice(0, 20);
 
-    // Pad to 10 if AI returned fewer
-    while (cleaned.length < 10) cleaned.push(fallback[cleaned.length]);
+    // Pad to 20 if AI returned fewer
+    while (cleaned.length < 20) cleaned.push(fallback[cleaned.length]);
 
     return cleaned;
   }
 
   private buildFallback(skillName: string) {
-    const topics = [
-      "core concept", "best practice", "common pattern", "debugging approach",
-      "performance consideration", "design principle", "real-world application",
-      "security aspect", "testing strategy", "tooling knowledge"
+    const plan = [
+      ...Array.from({ length: 5 }, () => "easy"),
+      ...Array.from({ length: 10 }, () => "medium"),
+      ...Array.from({ length: 5 }, () => "tough"),
     ];
-    return topics.map((topic, i) => ({
+    const easyTopics = ["fundamentals", "basic syntax", "simple use-case", "core definitions", "intro setup"];
+    const mediumTopics = [
+      "best practices",
+      "debugging approach",
+      "common implementation pattern",
+      "real-world scenario",
+      "testing strategy",
+      "error handling",
+      "code organization",
+      "performance basics",
+      "edge cases",
+      "integration usage",
+    ];
+    const toughTopics = ["advanced optimization", "architecture trade-offs", "security hardening", "complex debugging", "scalability design"];
+    return plan.map((level, i) => {
+      const idx = i + 1;
+      const topic =
+        level === "easy"
+          ? easyTopics[i % easyTopics.length]
+          : level === "medium"
+          ? mediumTopics[(i - 5) % mediumTopics.length]
+          : toughTopics[(i - 15) % toughTopics.length];
+      return ({
       questionNumber: i + 1,
-      questionText: `Regarding ${skillName}: which statement best describes its ${topic}?`,
+      questionText: `[${level.toUpperCase()}] In ${skillName}, which option best addresses ${topic}?`,
       options: [
-        `Correct understanding of ${skillName} ${topic}`,
+        `Best-practice answer for ${skillName} ${topic}`,
         `Partially correct understanding`,
         `Incorrect understanding A`,
         `Incorrect understanding B`
       ],
-      correctAnswer: `Correct understanding of ${skillName} ${topic}`
-    }));
+      correctAnswer: `Best-practice answer for ${skillName} ${topic}`
+    });
+    });
   }
 
   getById(testId: string) { return this.testModel.findById(testId); }
@@ -172,8 +201,15 @@ Return ONLY the JSON array, nothing else.`;
     if (test.passed) {
       try {
         await this.prepService.markCompletedAfterTest(test.studentId, test.roleName, test.skillName, score);
+        await this.prepService.markKnownSkillPassed(test.studentId, test.roleName, test.skillName, score);
       } catch (e: any) {
         this.logger.warn(`Passed test could not sync to preparation: ${e?.message || e}`);
+      }
+    } else {
+      try {
+        await this.prepService.markKnownSkillFailed(test.studentId, test.roleName, test.skillName);
+      } catch (e: any) {
+        this.logger.warn(`Failed test could not sync back to blueprint: ${e?.message || e}`);
       }
     }
     return test;
