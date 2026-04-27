@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   clearOrgAuthInStorage,
   getOrgAuthFromStorage,
@@ -8,6 +9,7 @@ import {
   orgListEmployeesManagerSummary,
   type OrgManagerActivity,
 } from "@/lib/orgAuth";
+import { SiteFooter } from "@/app/components/SiteFooter";
 
 type EmployeeRow = {
   employee: any;
@@ -31,6 +33,31 @@ export default function ManagerDashboardPage() {
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<"ALL" | "ACTIVE" | "NOT_STARTED">("ALL");
   const [sortKey, setSortKey] = useState<"NAME" | "PROGRESS_DESC" | "PROGRESS_ASC" | "RECENT_TEST">("PROGRESS_DESC");
+
+  // Success banner shown after a recommendation has been sent (we redirect back here).
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const recommendedRole = searchParams?.get("recommended") || "";
+  const recommendedFor = searchParams?.get("for") || "";
+  const [recoBanner, setRecoBanner] = useState<{ role: string; employee: string } | null>(null);
+  useEffect(() => {
+    if (recommendedRole) {
+      setRecoBanner({ role: recommendedRole, employee: recommendedFor });
+      // Clear query string so the banner doesn't re-appear on refresh.
+      router.replace("/dashboard/manager");
+      const t = window.setTimeout(() => setRecoBanner(null), 8000);
+      return () => window.clearTimeout(t);
+    }
+  }, [recommendedRole, recommendedFor, router]);
+
+  const openRecommendFlow = (e: any) => {
+    const params = new URLSearchParams();
+    params.set("recommendFor", String(e?._id || e?.id || ""));
+    if (e?.fullName) params.set("recommendName", String(e.fullName));
+    if (e?.email) params.set("recommendEmail", String(e.email));
+    if (e?.department) params.set("recommendDept", String(e.department));
+    router.push(`/role?${params.toString()}`);
+  };
 
   useEffect(() => {
     const onChange = () => setAuth(getOrgAuthFromStorage());
@@ -133,6 +160,27 @@ export default function ManagerDashboardPage() {
 
   return (
     <div style={wrap}>
+      {recoBanner ? (
+        <div style={recoBannerStyle}>
+          <span style={{ fontSize: 18 }}>✅</span>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 13, fontWeight: 900, color: "#065f46" }}>
+              Role recommendation sent
+            </div>
+            <div style={{ fontSize: 12, color: "#047857", marginTop: 2 }}>
+              <b>{recoBanner.role}</b>
+              {recoBanner.employee ? <> has been suggested to <b>{recoBanner.employee}</b></> : null}
+              . They'll see a notification on their portal.
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => setRecoBanner(null)}
+            aria-label="Dismiss"
+            style={{ background: "transparent", border: "none", color: "#065f46", fontWeight: 900, fontSize: 18, cursor: "pointer", padding: 4 }}
+          >×</button>
+        </div>
+      ) : null}
       {/* Soft page-level tinted background */}
       <div aria-hidden style={{
         position: "fixed",
@@ -142,35 +190,48 @@ export default function ManagerDashboardPage() {
         pointerEvents: "none",
       }} />
 
-      {/* ─── Welcome strip (single in-page header) ─── */}
-      <div style={welcomeRow}>
-        <div style={{ display: "flex", alignItems: "center", gap: 12, minWidth: 0 }}>
-          <div style={profileChip} title={user.fullName || user.email}>{initials}</div>
-          <div style={{ minWidth: 0 }}>
-            <h1 style={welcomeH1}>
-              {greeting}, {firstName} <span style={{ marginLeft: 4 }}>👋</span>
-            </h1>
-            <div style={welcomeSub}>
-              {isHR ? "HR view · " : "Manager view · "}
-              Viewing <b style={{ color: "#0f172a" }}>{scopeLabel}</b>
-              <span style={{ color: "#94a3b8" }}> · {stats.total} employees · {stats.active} actively preparing</span>
+      {/* ─── Hero banner (matches /dashboard/manager/track/[role] banner) ─── */}
+      <div style={banner}>
+        <div style={blobA} />
+        <div style={blobB} />
+
+        <div style={{ position: "relative", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 14 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 14, minWidth: 0 }}>
+            <div style={iconTile} title={user.fullName || user.email}>{initials}</div>
+            <div style={{ minWidth: 0 }}>
+              <div style={breadcrumb}>
+                <span style={crumbCur}>Dashboard</span>
+                <span style={crumbSep}>›</span>
+                <span style={crumbCur}>{isHR ? "HR view" : "Manager view"}</span>
+                <span style={crumbSep}>›</span>
+                <span style={crumbCur}>{scopeLabel}</span>
+              </div>
+              <h1 style={bannerTitle}>
+                {greeting}, <span style={{ color: "#fef3c7" }}>{firstName}</span> <span style={{ marginLeft: 4 }}>👋</span>
+              </h1>
+              <div style={bannerSub}>
+                {isHR ? "HR view · " : "Manager view · "}
+                Viewing <b style={{ color: "#fff" }}>{scopeLabel}</b>
+                <span style={{ opacity: 0.6 }}> · {stats.total} employees · {stats.active} actively preparing</span>
+              </div>
             </div>
           </div>
-        </div>
-        <div style={welcomeChips}>
-          <span style={isHR ? badgeHR : badgeManager}>{isHR ? "HR" : "MANAGER"}</span>
-          {lastRefreshed ? (
-            <span style={liveChip}>
-              <span style={{ width: 7, height: 7, borderRadius: 999, background: "#22c55e", boxShadow: "0 0 6px #22c55e" }} />
-              Live · {lastRefreshed.toLocaleTimeString()}
-            </span>
-          ) : null}
-          <button
-            onClick={() => window.location.reload()}
-            style={refreshBtn}
-            title="Refresh"
-            aria-label="Refresh"
-          >↻ Refresh</button>
+
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+            <span style={chipManager}>{isHR ? "HR view" : "Manager view"}</span>
+            {lastRefreshed ? (
+              <span style={chipLive}>
+                <span style={{ width: 7, height: 7, borderRadius: 999, background: "#22c55e", boxShadow: "0 0 6px #22c55e" }} />
+                Live · {lastRefreshed.toLocaleTimeString()}
+              </span>
+            ) : null}
+            <button
+              onClick={() => window.location.reload()}
+              style={btnSolid}
+              title="Refresh"
+              aria-label="Refresh"
+            >↻ Refresh</button>
+          </div>
         </div>
       </div>
 
@@ -280,16 +341,16 @@ export default function ManagerDashboardPage() {
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
             <thead>
               <tr style={{ background: "#f8fafc" }}>
-                {["Employee", "Department", "Designation", "Active prep", "Avg progress", "Latest test", "Track"].map((h) => (
+                {["Employee", "Department", "Designation", "Active prep", "Avg progress", "Latest test", "Track", "Recommend"].map((h) => (
                   <th key={h} style={th}>{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {loading ? (
-                <tr><td colSpan={7} style={{ padding: 14, color: "#64748b" }}>Loading…</td></tr>
+                <tr><td colSpan={8} style={{ padding: 14, color: "#64748b" }}>Loading…</td></tr>
               ) : filteredRows.length === 0 ? (
-                <tr><td colSpan={7} style={{ padding: 14, color: "#64748b" }}>
+                <tr><td colSpan={8} style={{ padding: 14, color: "#64748b" }}>
                   {rows.length === 0
                     ? `No employees found yet for ${scopeLabel}.`
                     : "No employees match the current filters."}
@@ -306,7 +367,8 @@ export default function ManagerDashboardPage() {
                     qs.set("studentId", String(e._id || e.id || ""));
                     if (e.email) qs.set("employeeEmail", String(e.email));
                     if (e.fullName) qs.set("employeeName", String(e.fullName));
-                    window.open(`/role/${encodeURIComponent(roleName)}/analytics?${qs.toString()}`, "_blank", "noopener,noreferrer");
+                    // Manager-scoped tracking page (separate URL from /role/.../analytics, same data underneath).
+                    window.open(`/dashboard/manager/track/${encodeURIComponent(roleName)}?${qs.toString()}`, "_blank", "noopener,noreferrer");
                   };
                   return (
                     <tr key={e._id || e.email} style={{ borderTop: "1px solid #e5e7eb" }}>
@@ -351,6 +413,15 @@ export default function ManagerDashboardPage() {
                           </div>
                         )}
                       </td>
+                      <td style={td}>
+                        <button
+                          onClick={() => openRecommendFlow(e)}
+                          style={btnRecommend}
+                          title="Pick a role to recommend to this employee"
+                        >
+                          💡 Recommend role
+                        </button>
+                      </td>
                     </tr>
                   );
                 })
@@ -360,25 +431,16 @@ export default function ManagerDashboardPage() {
         </div>
       </div>
 
-      {/* Footer */}
-      <div style={footerCard}>
-        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <div style={brandSquare}>S</div>
-          <div>
-            <div style={{ fontWeight: 900, fontSize: 14, color: "#0f172a" }}>Saarthi · Workforce Preparation</div>
-            <div style={{ fontSize: 12, color: "#64748b" }}>
-              Real-time monitoring of {isHR ? "every employee in the company" : "your department"}.
-            </div>
-          </div>
-        </div>
-        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-          <span style={footerChip}>
-            <span style={{ width: 7, height: 7, borderRadius: 999, background: "#22c55e", boxShadow: "0 0 6px #22c55e" }} />
-            Live · refreshes every 30s
-          </span>
-          <span style={footerChip}>📅 {new Date().toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}</span>
-          <span style={footerChip}>🔒 {user.companyDomain}</span>
-        </div>
+      {/* Footer — same SiteFooter as homepage, full-bleed */}
+      <div
+        style={{
+          width: "100vw",
+          marginLeft: "calc(50% - 50vw)",
+          marginRight: "calc(50% - 50vw)",
+          marginTop: 28,
+        }}
+      >
+        <SiteFooter />
       </div>
     </div>
   );
@@ -396,22 +458,40 @@ function KpiCard({ label, value, hint, icon, accent }: { label: string; value: s
       display: "flex",
       alignItems: "center",
       gap: 14,
-      boxShadow: "0 1px 10px rgba(15,23,42,0.04)",
+      boxShadow: "0 6px 20px -10px rgba(15,23,42,0.10)",
+      position: "relative",
+      overflow: "hidden",
     }}>
+      {/* top gradient stripe */}
+      <div aria-hidden style={{
+        position: "absolute", top: 0, left: 0, right: 0, height: 4,
+        background: `linear-gradient(90deg, ${accent}, ${accent}99)`,
+      }} />
+      {/* soft accent blob in the corner */}
+      <div aria-hidden style={{
+        position: "absolute", top: -36, right: -36, width: 120, height: 120, borderRadius: "50%",
+        background: `${accent}12`,
+        pointerEvents: "none",
+      }} />
+
       {icon ? (
         <div style={{
-          width: 50, height: 50, borderRadius: 14,
-          background: `${accent}14`,
+          width: 52, height: 52, borderRadius: 14,
+          background: `linear-gradient(135deg, ${accent}26, ${accent}10)`,
+          border: `1px solid ${accent}22`,
           color: accent,
           display: "flex", alignItems: "center", justifyContent: "center",
           fontSize: 22,
           flex: "0 0 auto",
+          boxShadow: `0 6px 16px -8px ${accent}55`,
+          position: "relative",
+          zIndex: 1,
         }}>{icon}</div>
       ) : null}
-      <div style={{ minWidth: 0 }}>
+      <div style={{ minWidth: 0, position: "relative", zIndex: 1 }}>
         <div style={{ fontSize: 28, fontWeight: 900, color: "#0f172a", lineHeight: 1, letterSpacing: "-0.01em" }}>{value}</div>
-        <div style={{ fontSize: 13, color: "#475569", fontWeight: 700, marginTop: 6 }}>{label}</div>
-        {hint ? <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 2 }}>{hint}</div> : null}
+        <div style={{ fontSize: 13, color: "#334155", fontWeight: 800, marginTop: 6 }}>{label}</div>
+        {hint ? <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 2, fontWeight: 600 }}>{hint}</div> : null}
       </div>
     </div>
   );
@@ -422,8 +502,14 @@ function ProgressBar({ pct }: { pct: number }) {
   const color = safe >= 75 ? "#16a34a" : safe >= 40 ? "#0b5fe8" : "#ea580c";
   return (
     <div>
-      <div style={{ height: 8, background: "#f1f5f9", borderRadius: 999, overflow: "hidden" }}>
-        <div style={{ width: `${safe}%`, background: color, height: "100%", transition: "width .3s ease" }} />
+      <div style={{ height: 9, background: "#f1f5f9", borderRadius: 999, overflow: "hidden", boxShadow: "inset 0 1px 2px rgba(15,23,42,0.05)" }}>
+        <div style={{
+          width: `${safe}%`,
+          background: `linear-gradient(90deg, ${color}, ${color}cc)`,
+          height: "100%",
+          transition: "width .35s ease",
+          borderRadius: 999,
+        }} />
       </div>
       <div style={{ fontSize: 12, color: "#0f172a", marginTop: 4, fontWeight: 800 }}>{safe}%</div>
     </div>
@@ -434,12 +520,23 @@ function BucketBar({ label, count, total, color }: { label: string; count: numbe
   const pct = total > 0 ? Math.round((count / total) * 100) : 0;
   return (
     <div>
-      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "#0f172a", fontWeight: 800, marginBottom: 4 }}>
-        <span>{label}</span>
-        <span style={{ color: "#475569" }}>{count} · {pct}%</span>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 12, color: "#0f172a", fontWeight: 800, marginBottom: 6 }}>
+        <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
+          <span style={{ width: 9, height: 9, borderRadius: 999, background: color, boxShadow: `0 0 0 3px ${color}22` }} />
+          {label}
+        </span>
+        <span style={{ color: "#475569", fontWeight: 700 }}>
+          <b style={{ color: "#0f172a" }}>{count}</b> <span style={{ color: "#94a3b8" }}>·</span> {pct}%
+        </span>
       </div>
-      <div style={{ height: 10, background: "#f1f5f9", borderRadius: 999, overflow: "hidden" }}>
-        <div style={{ width: `${pct}%`, background: color, height: "100%", transition: "width .3s ease" }} />
+      <div style={{ height: 12, background: "#f1f5f9", borderRadius: 999, overflow: "hidden", boxShadow: "inset 0 1px 2px rgba(15,23,42,0.04)" }}>
+        <div style={{
+          width: `${pct}%`,
+          background: `linear-gradient(90deg, ${color}, ${color}cc)`,
+          height: "100%", transition: "width .35s ease",
+          borderRadius: 999,
+          boxShadow: `0 1px 4px ${color}66`,
+        }} />
       </div>
     </div>
   );
@@ -457,22 +554,58 @@ function TopVsLagging({ rows }: { rows: EmployeeRow[] }) {
 
   return (
     <div style={{ marginTop: 12, display: "grid", gap: 14 }}>
-      <RankedList title="Top performers" rows={top} accent="#16a34a" />
-      {sorted.length > 3 ? <RankedList title="Needs attention" rows={lag} accent="#ea580c" /> : null}
+      <RankedList title="Top performers" rows={top} accent="#16a34a" icon="🏆" tone="positive" />
+      {sorted.length > 3 ? (
+        <RankedList title="Needs attention" rows={lag} accent="#ea580c" icon="⚠️" tone="warn" />
+      ) : null}
     </div>
   );
 }
 
-function RankedList({ title, rows, accent }: { title: string; rows: EmployeeRow[]; accent: string }) {
+function RankedList({
+  title, rows, accent, icon, tone,
+}: { title: string; rows: EmployeeRow[]; accent: string; icon?: string; tone?: "positive" | "warn" }) {
+  // Medal palette for top performers, warm palette for needs-attention.
+  const medals = tone === "warn"
+    ? ["#ea580c", "#f97316", "#fb923c"]
+    : ["#f59e0b", "#94a3b8", "#b45309"];
+
   return (
     <div>
-      <div style={{ fontSize: 12, fontWeight: 900, color: "#0f172a", letterSpacing: 0.4, textTransform: "uppercase", marginBottom: 6 }}>{title}</div>
+      <div style={{
+        fontSize: 12, fontWeight: 900, color: "#0f172a",
+        letterSpacing: 0.4, textTransform: "uppercase",
+        marginBottom: 8,
+        display: "inline-flex", alignItems: "center", gap: 8,
+      }}>
+        {icon ? (
+          <span style={{
+            display: "inline-flex", alignItems: "center", justifyContent: "center",
+            width: 22, height: 22, borderRadius: 8,
+            background: `${accent}18`, border: `1px solid ${accent}33`,
+            fontSize: 12,
+          }}>{icon}</span>
+        ) : null}
+        {title}
+      </div>
       <div style={{ display: "grid", gap: 8 }}>
         {rows.map((r, i) => {
           const e = r.employee || {};
+          const medal = medals[i] || accent;
           return (
-            <div key={(e._id || e.email || i) + title} style={rankRow}>
-              <div style={{ ...rankBadge, background: accent }}>{i + 1}</div>
+            <div
+              key={(e._id || e.email || i) + title}
+              style={{
+                ...rankRow,
+                background: `linear-gradient(180deg, #ffffff 0%, ${accent}07 100%)`,
+                borderColor: `${accent}22`,
+              }}
+            >
+              <div style={{
+                ...rankBadge,
+                background: `linear-gradient(135deg, ${medal}, ${medal}cc)`,
+                boxShadow: `0 4px 10px -4px ${medal}99`,
+              }}>{i + 1}</div>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontWeight: 800, color: "#0f172a", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{e.fullName || e.email || "—"}</div>
                 <div style={{ fontSize: 12, color: "#64748b", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{e.designation || "—"}</div>
@@ -547,23 +680,48 @@ function EngagementStrip({ activity }: { activity: OrgManagerActivity | null }) 
   const pct = (n: number) => (total > 0 ? Math.round((n / total) * 100) : 0);
   return (
     <div style={engagementGrid}>
-      <EngagementCard label="Active in last 7 days" value={`${a7}`} sub={`${pct(a7)}% of team`} accent="#16a34a" />
-      <EngagementCard label="Active in last 30 days" value={`${a30}`} sub={`${pct(a30)}% of team`} accent="#0b5fe8" />
-      <EngagementCard label="Dormant" value={`${dormant}`} sub={`${pct(dormant)}% no activity in 30d`} accent="#ea580c" />
-      <EngagementCard label="Team size" value={`${total}`} sub={total > 0 ? "Across visible scope" : "—"} accent="#7c3aed" />
+      <EngagementCard label="Active in last 7 days"  value={`${a7}`}      sub={`${pct(a7)}% of team`}                        accent="#16a34a" icon="⚡" />
+      <EngagementCard label="Active in last 30 days" value={`${a30}`}     sub={`${pct(a30)}% of team`}                       accent="#0b5fe8" icon="📅" />
+      <EngagementCard label="Dormant"                value={`${dormant}`} sub={`${pct(dormant)}% no activity in 30d`}        accent="#ea580c" icon="💤" />
+      <EngagementCard label="Team size"              value={`${total}`}   sub={total > 0 ? "Across visible scope" : "—"}     accent="#7c3aed" icon="👥" />
     </div>
   );
 }
 
-function EngagementCard({ label, value, sub, accent }: { label: string; value: string; sub: string; accent: string }) {
+function EngagementCard({ label, value, sub, accent, icon }: { label: string; value: string; sub: string; accent: string; icon?: string }) {
   return (
-    <div style={engagementCard}>
-      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-        <div style={{ width: 8, height: 8, borderRadius: 999, background: accent }} />
+    <div style={{
+      ...engagementCard,
+      position: "relative",
+      overflow: "hidden",
+      boxShadow: "0 6px 18px -10px rgba(15,23,42,0.10)",
+    }}>
+      {/* gradient stripe at the top */}
+      <div aria-hidden style={{
+        position: "absolute", top: 0, left: 0, right: 0, height: 3,
+        background: `linear-gradient(90deg, ${accent}, ${accent}99)`,
+      }} />
+      <div aria-hidden style={{
+        position: "absolute", top: -28, right: -28, width: 90, height: 90, borderRadius: "50%",
+        background: `${accent}10`,
+        pointerEvents: "none",
+      }} />
+
+      <div style={{ display: "flex", alignItems: "center", gap: 10, position: "relative", zIndex: 1 }}>
+        <div style={{
+          width: 32, height: 32, borderRadius: 10,
+          background: `linear-gradient(135deg, ${accent}26, ${accent}10)`,
+          border: `1px solid ${accent}22`,
+          color: accent,
+          display: "inline-flex", alignItems: "center", justifyContent: "center",
+          fontSize: 15,
+          flex: "0 0 auto",
+          boxShadow: `0 4px 10px -6px ${accent}66`,
+        }}>{icon || "•"}</div>
         <div style={{ fontSize: 11, color: "#64748b", fontWeight: 800, letterSpacing: 0.4, textTransform: "uppercase" }}>{label}</div>
       </div>
-      <div style={{ fontSize: 24, fontWeight: 900, color: "#0f172a", marginTop: 6 }}>{value}</div>
-      <div style={{ fontSize: 12, color: "#475569" }}>{sub}</div>
+      <div style={{ fontSize: 24, fontWeight: 900, color: "#0f172a", marginTop: 8, position: "relative", zIndex: 1 }}>{value}</div>
+      <div style={{ fontSize: 12, color: "#475569", position: "relative", zIndex: 1 }}>{sub}</div>
     </div>
   );
 }
@@ -832,88 +990,86 @@ function computeStats(rows: EmployeeRow[]) {
 
 const wrap: React.CSSProperties = {
   maxWidth: 1200,
-  margin: "20px auto",
-  padding: "0 14px 28px",
+  margin: "20px auto 0",
+  padding: "0 14px 0",
   display: "grid",
   gap: 14,
   position: "relative",
 };
 
-// ─── Brand square + profile chip (used in welcome row + footer) ───
-const brandSquare: React.CSSProperties = {
-  width: 38, height: 38, borderRadius: 12,
-  background: "linear-gradient(135deg,#3b82f6,#6366f1)",
+// ─── Hero banner (matches /dashboard/manager/track/[role] banner) ───
+const banner: React.CSSProperties = {
+  borderRadius: 22,
+  padding: "22px 24px",
+  background: "linear-gradient(135deg,#0f172a 0%,#1e293b 30%,#312e81 65%,#7c3aed 100%)",
   color: "#fff",
+  position: "relative",
+  overflow: "hidden",
+  boxShadow: "0 16px 36px -22px rgba(99,102,241,0.55)",
+};
+const blobA: React.CSSProperties = {
+  position: "absolute", top: -50, right: -30, width: 200, height: 200,
+  borderRadius: "50%", background: "rgba(168,85,247,0.28)", filter: "blur(2px)",
+  pointerEvents: "none",
+};
+const blobB: React.CSSProperties = {
+  position: "absolute", bottom: -60, right: 110, width: 140, height: 140,
+  borderRadius: "50%", background: "rgba(236,72,153,0.20)",
+  pointerEvents: "none",
+};
+const iconTile: React.CSSProperties = {
+  width: 50, height: 50, borderRadius: 14,
+  background: "rgba(255,255,255,0.16)",
+  border: "1px solid rgba(255,255,255,0.28)",
   display: "flex", alignItems: "center", justifyContent: "center",
-  fontWeight: 900, fontSize: 16, letterSpacing: 0.5,
+  fontSize: 16, fontWeight: 900, color: "#fff", letterSpacing: 0.4,
   flex: "0 0 auto",
-  boxShadow: "0 6px 16px -8px rgba(99,102,241,0.6)",
 };
-const profileChip: React.CSSProperties = {
-  width: 44, height: 44, borderRadius: "50%",
-  background: "linear-gradient(135deg,#0ea5e9,#6366f1)",
+const breadcrumb: React.CSSProperties = {
+  display: "flex", alignItems: "center", gap: 6,
+  fontSize: 12, color: "rgba(255,255,255,0.75)", fontWeight: 700,
+  marginBottom: 6,
+};
+const crumbSep: React.CSSProperties = { color: "rgba(255,255,255,0.5)" };
+const crumbCur: React.CSSProperties = { color: "#fff" };
+const bannerTitle: React.CSSProperties = {
+  margin: 0,
+  fontSize: 22,
+  fontWeight: 900,
+  letterSpacing: "-0.01em",
+  lineHeight: 1.15,
   color: "#fff",
+};
+const bannerSub: React.CSSProperties = {
+  marginTop: 4,
+  fontSize: 13,
+  color: "rgba(255,255,255,0.78)",
+};
+const chipManager: React.CSSProperties = {
+  display: "inline-flex", alignItems: "center", gap: 8,
+  padding: "5px 12px", borderRadius: 999,
+  background: "rgba(255,255,255,0.16)",
+  border: "1px solid rgba(255,255,255,0.28)",
+  color: "#fff", fontWeight: 800, fontSize: 12,
+  letterSpacing: 0.3,
+};
+const chipLive: React.CSSProperties = {
+  display: "inline-flex", alignItems: "center", gap: 8,
+  padding: "5px 12px", borderRadius: 999,
+  background: "rgba(255,255,255,0.16)",
+  border: "1px solid rgba(255,255,255,0.28)",
+  color: "#fff", fontWeight: 700, fontSize: 12,
+};
+const btnSolid: React.CSSProperties = {
   display: "inline-flex", alignItems: "center", justifyContent: "center",
-  fontSize: 14, fontWeight: 900,
-  letterSpacing: 0.4,
-  boxShadow: "0 6px 16px -8px rgba(14,165,233,0.6)",
-  flex: "0 0 auto",
-};
-const refreshBtn: React.CSSProperties = {
-  display: "inline-flex", alignItems: "center", gap: 6,
-  padding: "5px 12px", borderRadius: 999,
-  background: "#fff", border: "1px solid #e5e7eb",
-  fontSize: 12, fontWeight: 800, color: "#0f172a",
-  cursor: "pointer",
-  boxShadow: "0 1px 4px rgba(15,23,42,0.04)",
+  padding: "8px 14px", borderRadius: 10,
+  background: "#fff", color: "#0f172a",
+  border: "none", fontWeight: 800, fontSize: 13,
+  cursor: "pointer", boxShadow: "0 1px 4px rgba(15,23,42,0.18)",
 };
 
-// ─── Welcome strip ───
-const welcomeRow: React.CSSProperties = {
-  display: "flex",
-  justifyContent: "space-between",
-  alignItems: "flex-end",
-  gap: 12,
-  flexWrap: "wrap",
-  padding: "6px 8px 0",
-};
-const welcomeH1: React.CSSProperties = {
-  margin: 0, fontSize: 24, fontWeight: 900, color: "#0f172a", letterSpacing: "-0.02em",
-};
-const welcomeSub: React.CSSProperties = {
-  fontSize: 13, color: "#475569", marginTop: 4,
-};
-const welcomeChips: React.CSSProperties = { display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" };
-const liveChip: React.CSSProperties = {
-  display: "inline-flex", alignItems: "center", gap: 8,
-  padding: "5px 12px", borderRadius: 999,
-  background: "#fff", border: "1px solid #e5e7eb",
-  fontSize: 12, fontWeight: 700, color: "#0f172a",
-  boxShadow: "0 1px 4px rgba(15,23,42,0.04)",
-};
-
-// ─── Footer ───
-const footerCard: React.CSSProperties = {
-  display: "flex",
-  justifyContent: "space-between",
-  alignItems: "center",
-  gap: 16,
-  flexWrap: "wrap",
-  background: "#fff",
-  border: "1px solid #e5e7eb",
-  borderRadius: 18,
-  padding: "14px 18px",
-  boxShadow: "0 1px 10px rgba(15,23,42,0.04)",
-};
-const footerChip: React.CSSProperties = {
-  display: "inline-flex", alignItems: "center", gap: 8,
-  padding: "6px 12px", borderRadius: 999,
-  background: "#f8fafc", border: "1px solid #e5e7eb",
-  fontSize: 12, fontWeight: 700, color: "#334155",
-};
-
-const headerCard: React.CSSProperties = { background: "#fff", border: "1px solid #e5e7eb", borderRadius: 18, padding: 18 };
-const card: React.CSSProperties = { background: "#fff", border: "1px solid #e5e7eb", borderRadius: 16, padding: 18 };
+const headerCard: React.CSSProperties = { background: "#fff", border: "1px solid #e5e7eb", borderRadius: 18, padding: 18, boxShadow: "0 4px 18px -10px rgba(15,23,42,0.08)" };
+const card: React.CSSProperties = { background: "#fff", border: "1px solid #e5e7eb", borderRadius: 16, padding: 18, boxShadow: "0 4px 18px -10px rgba(15,23,42,0.08)" };
 const h1: React.CSSProperties = { margin: 0, fontSize: 22, fontWeight: 900, color: "#0f172a" };
 const sub: React.CSSProperties = { marginTop: 6, color: "#475569", fontSize: 13 };
 const cardTitle: React.CSSProperties = { fontSize: 15, fontWeight: 900, color: "#0f172a", display: "flex", alignItems: "center", gap: 10 };
@@ -936,8 +1092,6 @@ const errorStyle: React.CSSProperties = { padding: "10px 12px", borderRadius: 10
 const inputStyle: React.CSSProperties = { minHeight: 40, borderRadius: 10, border: "1px solid #cbd5e1", padding: "8px 12px", outline: "none", fontSize: 13, background: "#fff" };
 const kpiGrid: React.CSSProperties = { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 12 };
 const twoCol: React.CSSProperties = { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(360px, 1fr))", gap: 16 };
-const badgeManager: React.CSSProperties = { fontSize: 11, fontWeight: 900, color: "#1d4ed8", background: "#dbeafe", padding: "3px 8px", borderRadius: 999, letterSpacing: 0.4 };
-const badgeHR: React.CSSProperties = { fontSize: 11, fontWeight: 900, color: "#7c2d12", background: "#fed7aa", padding: "3px 8px", borderRadius: 999, letterSpacing: 0.4 };
 const rankRow: React.CSSProperties = { display: "flex", alignItems: "center", gap: 10, border: "1px solid #e5e7eb", borderRadius: 12, padding: "8px 10px", background: "#fff" };
 const rankBadge: React.CSSProperties = { width: 24, height: 24, borderRadius: 999, color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 900, flex: "0 0 auto" };
 const emptyHint: React.CSSProperties = { fontSize: 13, color: "#64748b", padding: "10px 12px", border: "1px dashed #e2e8f0", borderRadius: 10, background: "#f8fafc" };
@@ -945,3 +1099,28 @@ const engagementGrid: React.CSSProperties = { display: "grid", gridTemplateColum
 const engagementCard: React.CSSProperties = { background: "#fff", border: "1px solid #e5e7eb", borderRadius: 14, padding: 14 };
 const feedRow: React.CSSProperties = { display: "flex", alignItems: "flex-start", gap: 10, padding: "8px 10px", border: "1px solid #f1f5f9", borderRadius: 10, background: "#fff" };
 const feedDot: React.CSSProperties = { width: 8, height: 8, borderRadius: 999, marginTop: 6, flex: "0 0 auto" };
+
+const btnRecommend: React.CSSProperties = {
+  border: "1px solid rgba(124, 58, 237, 0.35)",
+  background: "linear-gradient(135deg, #ede9fe 0%, #fae8ff 100%)",
+  color: "#5b21b6",
+  padding: "8px 12px",
+  borderRadius: 10,
+  fontWeight: 900,
+  fontSize: 12,
+  cursor: "pointer",
+  whiteSpace: "nowrap",
+  boxShadow: "0 2px 8px -4px rgba(124, 58, 237, 0.4)",
+};
+
+const recoBannerStyle: React.CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  gap: 12,
+  padding: "10px 14px",
+  borderRadius: 12,
+  background: "linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%)",
+  border: "1px solid #6ee7b7",
+  marginBottom: 14,
+  boxShadow: "0 4px 16px -10px rgba(16,185,129,0.5)",
+};

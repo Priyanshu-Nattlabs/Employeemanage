@@ -6,12 +6,17 @@ import * as jwt from "jsonwebtoken";
 import crypto from "crypto";
 import nodemailer from "nodemailer";
 import {
+  CompanyOrgStructure,
+  type CompanyOrgStructureDocument,
   CompanyUser,
   type CompanyUserDocument,
   type OrgAccountType,
   type OrgCurrentRole,
   RolePreparation,
   type RolePreparationDocument,
+  RoleRecommendation,
+  type RoleRecommendationDocument,
+  type RoleRecommendationStatus,
   SkillTest,
   type SkillTestDocument,
 } from "../shared/schemas";
@@ -42,6 +47,8 @@ export class OrgAuthService {
     @InjectModel(CompanyUser.name) private readonly companyUserModel: Model<CompanyUserDocument>,
     @InjectModel(RolePreparation.name) private readonly prepModel: Model<RolePreparationDocument>,
     @InjectModel(SkillTest.name) private readonly testModel: Model<SkillTestDocument>,
+    @InjectModel(CompanyOrgStructure.name) private readonly orgStructureModel: Model<CompanyOrgStructureDocument>,
+    @InjectModel(RoleRecommendation.name) private readonly recommendationModel: Model<RoleRecommendationDocument>,
   ) {}
 
   private otpHash(email: string, otp: string): string {
@@ -682,6 +689,233 @@ export class OrgAuthService {
       const avgPct = ongoing.length ? Math.round(ongoing.reduce((s, x) => s + (x.pct || 0), 0) / ongoing.length) : 0;
       return { employee: e, ongoing, avgPct, latestTest: latestTestByStudent.get(id) ?? null };
     });
+  }
+
+  // ────────────────────────────────────────────────────────────────────────────
+  // Organization structure (per company domain)
+  // ────────────────────────────────────────────────────────────────────────────
+
+  async getOrgStructure(companyDomain: string) {
+    const domain = (companyDomain || "").trim().toLowerCase();
+    if (!domain) return null;
+    return this.orgStructureModel.findOne({ companyDomain: domain }).lean();
+  }
+
+  async upsertOrgStructure(input: {
+    companyDomain: string;
+    companyName?: string;
+    setupByEmail?: string;
+    setupByName?: string;
+    departments: Array<{ name: string; roles: string[]; description?: string }>;
+  }) {
+    const domain = (input.companyDomain || "").trim().toLowerCase();
+    if (!domain) throw new BadRequestException("Missing companyDomain");
+
+    const cleaned = (input.departments || [])
+      .map((d) => ({
+        name: String(d?.name || "").trim(),
+        roles: Array.from(
+          new Set(
+            (Array.isArray(d?.roles) ? d.roles : [])
+              .map((r) => String(r || "").trim())
+              .filter(Boolean),
+          ),
+        ),
+        description: d?.description ? String(d.description).trim() : undefined,
+      }))
+      .filter((d) => d.name.length > 0);
+
+    if (!cleaned.length) {
+      throw new BadRequestException("Provide at least one department with roles");
+    }
+
+    const updated = await this.orgStructureModel
+      .findOneAndUpdate(
+        { companyDomain: domain },
+        {
+          $set: {
+            companyDomain: domain,
+            companyName: input.companyName,
+            setupByEmail: input.setupByEmail,
+            setupByName: input.setupByName,
+            departments: cleaned,
+          },
+        },
+        { new: true, upsert: true },
+      )
+      .lean();
+    return updated;
+  }
+
+  /**
+   * Roles a manager can recommend to the given employee. Looks up the employee's
+   * department, then returns roles tied to that department in the company's
+   * org-structure document. Falls back to the global role list (intersected with
+   * the structure when present).
+   */
+  async listRecommendableRolesForEmployee(input: {
+    companyDomain: string;
+    managerDepartment?: string;
+    managerRole: OrgCurrentRole | string;
+    employeeId: string;
+  }) {
+    const domain = (input.companyDomain || "").trim().toLowerCase();
+    if (!domain) throw new BadRequestException("Missing companyDomain");
+    if (!input.employeeId) throw new BadRequestException("Missing employeeId");
+
+    const employee = await this.companyUserModel
+      .findOne({ _id: input.employeeId, companyDomain: domain })
+      .select("-passwordHash")
+      .lean();
+    if (!employee) throw new NotFoundException("Employee not found");
+
+    const empDept = String((employee as any).department || "").trim();
+
+    // Managers may only recommend within their own department; HR can recommend to any.
+    if (input.managerRole === "MANAGER") {
+      const mgrDept = String(input.managerDepartment || "").trim();
+      if (!mgrDept || !empDept || mgrDept.toLowerCase() !== empDept.toLowerCase()) {
+        throw new UnauthorizedException("Managers can only recommend roles to their own department");
+      }
+    }
+
+    const structure = await this.orgStructureModel.findOne({ companyDomain: domain }).lean();
+    const all = (structure?.departments || []) as Array<{ name: string; roles: string[]; description?: string }>;
+
+    // Match the employee's department case-insensitively.
+    const match = all.find((d) => String(d.name || "").trim().toLowerCase() === empDept.toLowerCase());
+
+    return {
+      employee: {
+        id: String((employee as any)._id || ""),
+        email: (employee as any).email,
+        fullName: (employee as any).fullName,
+        department: empDept || null,
+        designation: (employee as any).designation || null,
+      },
+      hasStructure: Boolean(structure),
+      department: match?.name || empDept || null,
+      roles: match?.roles || [],
+      allDepartments: all,
+    };
+  }
+
+  // ────────────────────────────────────────────────────────────────────────────
+  // Role recommendations (manager → employee notifications)
+  // ────────────────────────────────────────────────────────────────────────────
+
+  async createRecommendation(input: {
+    companyDomain: string;
+    manager: { id: string; email: string; name?: string; role: OrgCurrentRole | string; department?: string };
+    employeeId: string;
+    roleName: string;
+    note?: string;
+  }) {
+    const domain = (input.companyDomain || "").trim().toLowerCase();
+    if (!domain) throw new BadRequestException("Missing companyDomain");
+    const role = String(input.roleName || "").trim();
+    if (!role) throw new BadRequestException("Missing roleName");
+
+    const employee = await this.companyUserModel
+      .findOne({ _id: input.employeeId, companyDomain: domain })
+      .select("-passwordHash")
+      .lean();
+    if (!employee) throw new NotFoundException("Employee not found");
+
+    const empDept = String((employee as any).department || "").trim();
+
+    if (input.manager.role === "MANAGER") {
+      const mgrDept = String(input.manager.department || "").trim();
+      if (!mgrDept || !empDept || mgrDept.toLowerCase() !== empDept.toLowerCase()) {
+        throw new UnauthorizedException("Managers can only recommend roles within their own department");
+      }
+    }
+
+    // If the company has explicitly mapped roles for the employee's department,
+    // enforce that the suggested role lives in that mapping. When no mapping is
+    // defined for that department we accept any role so the manager isn't blocked.
+    const structure = await this.orgStructureModel.findOne({ companyDomain: domain }).lean();
+    if (structure) {
+      const match = (structure.departments || []).find(
+        (d: any) => String(d.name || "").trim().toLowerCase() === empDept.toLowerCase(),
+      );
+      const mappedRoles: string[] = (match?.roles || []) as string[];
+      if (mappedRoles.length > 0) {
+        const ok = mappedRoles.some((r) => r.trim().toLowerCase() === role.toLowerCase());
+        if (!ok) {
+          throw new BadRequestException(`Role "${role}" is not part of the ${empDept || "employee's"} department`);
+        }
+      }
+    }
+
+    // De-duplicate: if there is already a non-dismissed PENDING/SEEN suggestion for the same role,
+    // refresh its timestamp instead of creating a new one.
+    const existing = await this.recommendationModel.findOne({
+      companyDomain: domain,
+      recommendedToId: String((employee as any)._id),
+      roleName: role,
+      status: { $in: ["PENDING", "SEEN"] },
+    });
+    if (existing) {
+      existing.recommendedById = input.manager.id;
+      existing.recommendedByEmail = input.manager.email;
+      existing.recommendedByName = input.manager.name;
+      existing.recommendedByRole = input.manager.role as OrgCurrentRole;
+      existing.note = input.note;
+      existing.status = "PENDING";
+      existing.seenAt = undefined;
+      await existing.save();
+      return existing.toObject();
+    }
+
+    const created = await this.recommendationModel.create({
+      companyDomain: domain,
+      recommendedById: input.manager.id,
+      recommendedByEmail: input.manager.email,
+      recommendedByName: input.manager.name,
+      recommendedByRole: input.manager.role as OrgCurrentRole,
+      recommendedToId: String((employee as any)._id),
+      recommendedToEmail: (employee as any).email,
+      recommendedToName: (employee as any).fullName,
+      recommendedToDepartment: empDept || undefined,
+      roleName: role,
+      note: input.note?.trim() || undefined,
+      status: "PENDING",
+    });
+    return created.toObject();
+  }
+
+  async listRecommendationsForEmployee(employeeId: string) {
+    if (!employeeId) return [];
+    return this.recommendationModel
+      .find({ recommendedToId: employeeId })
+      .sort({ createdAt: -1 })
+      .lean();
+  }
+
+  async listRecommendationsByManager(managerId: string) {
+    if (!managerId) return [];
+    return this.recommendationModel
+      .find({ recommendedById: managerId })
+      .sort({ createdAt: -1 })
+      .lean();
+  }
+
+  async setRecommendationStatus(input: { recommendationId: string; employeeId: string; status: RoleRecommendationStatus }) {
+    if (!input.recommendationId) throw new BadRequestException("Missing recommendationId");
+    const allowed: RoleRecommendationStatus[] = ["PENDING", "SEEN", "DISMISSED", "ACCEPTED"];
+    if (!allowed.includes(input.status)) throw new BadRequestException("Invalid status");
+
+    const rec = await this.recommendationModel.findById(input.recommendationId);
+    if (!rec) throw new NotFoundException("Recommendation not found");
+    if (String(rec.recommendedToId) !== String(input.employeeId)) {
+      throw new UnauthorizedException("You cannot modify someone else's recommendation");
+    }
+    rec.status = input.status;
+    if (input.status === "SEEN") rec.seenAt = new Date();
+    if (input.status === "ACCEPTED" || input.status === "DISMISSED") rec.respondedAt = new Date();
+    await rec.save();
+    return rec.toObject();
   }
 }
 

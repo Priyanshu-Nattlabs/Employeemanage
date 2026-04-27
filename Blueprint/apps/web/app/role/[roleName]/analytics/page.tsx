@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, usePathname, useRouter } from "next/navigation";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 
@@ -326,6 +326,10 @@ export default function AnalyticsPage() {
   const params   = useParams<{ roleName: string }>();
   const router   = useRouter();
   const searchParams = useSearchParams();
+  const pathname = usePathname() || "";
+  // When this component is mounted via the manager tracking route, suppress the
+  // employee-facing breadcrumb and destructive "Leave Preparation" action.
+  const inManagerTrack = pathname.startsWith("/dashboard/manager/track");
   const roleName = decodeURIComponent(params.roleName);
 
   const [userId,      setUserId]      = useState("demo-student-1");
@@ -477,14 +481,16 @@ export default function AnalyticsPage() {
 
   return (
     <div style={{ padding: "8px 0 0 4px", marginRight: -20 }}>
-      {/* breadcrumb */}
-      <p style={{ color:"#64748b", fontSize:13, marginBottom:14 }}>
-        <Link href="/" style={{ color:"#6366f1", fontWeight:700, textDecoration:"none" }}>Home</Link>
-        <span style={{ color:"#cbd5e1", margin:"0 6px" }}>›</span>
-        <Link href={`/role/${encodeURIComponent(roleName)}`} style={{ color:"#6366f1", fontWeight:700, textDecoration:"none" }}>{roleName}</Link>
-        <span style={{ color:"#cbd5e1", margin:"0 6px" }}>›</span>
-        <span style={{ color:"#0f172a", fontWeight:700 }}>Analytics</span>
-      </p>
+      {/* breadcrumb (hidden in manager-tracking mode — that route has its own header) */}
+      {!inManagerTrack && (
+        <p style={{ color:"#64748b", fontSize:13, marginBottom:14 }}>
+          <Link href="/" style={{ color:"#6366f1", fontWeight:700, textDecoration:"none" }}>Home</Link>
+          <span style={{ color:"#cbd5e1", margin:"0 6px" }}>›</span>
+          <Link href={`/role/${encodeURIComponent(roleName)}`} style={{ color:"#6366f1", fontWeight:700, textDecoration:"none" }}>{roleName}</Link>
+          <span style={{ color:"#cbd5e1", margin:"0 6px" }}>›</span>
+          <span style={{ color:"#0f172a", fontWeight:700 }}>Analytics</span>
+        </p>
+      )}
 
       {/* hero — colorful gradient with decorative blobs */}
       <div style={{
@@ -859,17 +865,17 @@ export default function AnalyticsPage() {
       </div>
 
       <div style={{ display:"flex", gap:10, flexWrap:"wrap", alignItems:"center" }}>
-        <Link href={`/role/${encodeURIComponent(roleName)}`} style={{ textDecoration:"none" }}>
+        <Link href={inManagerTrack ? "/dashboard/manager" : `/role/${encodeURIComponent(roleName)}`} style={{ textDecoration:"none" }}>
           <button style={{
             padding:"10px 20px", borderRadius:10,
             background:"linear-gradient(135deg,#6366f1,#8b5cf6)",
             color:"white", border:"none", cursor:"pointer", fontWeight:800,
             boxShadow:"0 6px 18px -8px rgba(99,102,241,0.6)",
           }}>
-            ← Back to Role
+            {inManagerTrack ? "← Back to dashboard" : "← Back to Role"}
           </button>
         </Link>
-        {prep?.isActive && (
+        {prep?.isActive && !inManagerTrack && (
           <button
             onClick={async () => {
               if (!confirm("Leave this preparation? Your progress will be lost and the chart will be unlocked.")) return;
