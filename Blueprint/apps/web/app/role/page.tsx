@@ -1,7 +1,9 @@
 "use client";
-import { useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
 import { getApiPrefix } from "@/lib/apiBase";
+import { getOrgAuthFromStorage, orgGetOrgStructure } from "@/lib/orgAuth";
 
 const API = getApiPrefix();
 
@@ -29,10 +31,43 @@ function getRoleCategory(name: string): string {
 }
 
 export default function RolesPage() {
+  return (
+    <Suspense>
+      <RolesPageContent />
+    </Suspense>
+  );
+}
+
+function RolesPageContent() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+
+  // Manager → "recommend role" flow context (passed via querystring from /dashboard/manager).
+  const recommendFor = searchParams?.get("recommendFor") || "";
+  const recommendName = searchParams?.get("recommendName") || "";
+  const recommendEmail = searchParams?.get("recommendEmail") || "";
+  const recommendDept = searchParams?.get("recommendDept") || "";
+  const isRecommendMode = !!recommendFor;
+
   const [roles, setRoles] = useState<string[]>([]);
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
   const [activeCategory, setActiveCategory] = useState("All");
+
+  // Department-scoped role list resolved from the company's org structure (when present).
+  const [deptRoles, setDeptRoles] = useState<string[] | null>(null);
+  const [deptResolved, setDeptResolved] = useState(false);
+
+  // Build the querystring suffix that role cards need to keep recommend-mode alive.
+  const recommendQuery = useMemo(() => {
+    if (!isRecommendMode) return "";
+    const params = new URLSearchParams();
+    params.set("recommendFor", recommendFor);
+    if (recommendName) params.set("recommendName", recommendName);
+    if (recommendEmail) params.set("recommendEmail", recommendEmail);
+    if (recommendDept) params.set("recommendDept", recommendDept);
+    return `?${params.toString()}`;
+  }, [isRecommendMode, recommendFor, recommendName, recommendEmail, recommendDept]);
 
   useEffect(() => {
     fetch(`${API}/api/blueprint/roles`)
@@ -40,17 +75,66 @@ export default function RolesPage() {
       .then(d => { setRoles(d || []); setLoading(false); });
   }, []);
 
+  // When the manager reaches this page in recommend mode, look up the company's
+  // org structure and pull out the role list for the employee's (or manager's)
+  // department. If nothing is mapped, we fall back to showing all roles below.
+  useEffect(() => {
+    if (!isRecommendMode) {
+      setDeptRoles(null);
+      setDeptResolved(true);
+      return;
+    }
+    const auth = getOrgAuthFromStorage();
+    if (!auth?.token) {
+      setDeptRoles(null);
+      setDeptResolved(true);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const structure = await orgGetOrgStructure(auth.token);
+        if (cancelled) return;
+        const targetDept = (recommendDept || (auth.user as any)?.department || "").trim();
+        if (!targetDept || !structure || !Array.isArray(structure.departments)) {
+          setDeptRoles(null);
+        } else {
+          const match = structure.departments.find(
+            (d) => String(d.name || "").trim().toLowerCase() === targetDept.toLowerCase(),
+          );
+          const list = (match?.roles || []).filter(Boolean);
+          setDeptRoles(list.length > 0 ? list : null);
+        }
+      } catch {
+        if (!cancelled) setDeptRoles(null);
+      } finally {
+        if (!cancelled) setDeptResolved(true);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [isRecommendMode, recommendDept]);
+
+  // When recommend mode is on, narrow the visible role pool to the department's roles
+  // (if mapped). Otherwise show every role in the catalog so the manager isn't blocked.
+  const recommendableRoles = useMemo(() => {
+    if (!isRecommendMode || !deptRoles || deptRoles.length === 0) return null;
+    const lower = new Set(deptRoles.map((r) => r.toLowerCase()));
+    return roles.filter((r) => lower.has(r.toLowerCase()));
+  }, [isRecommendMode, deptRoles, roles]);
+
+  const visibleRoles = recommendableRoles ?? roles;
+
   const categoryCounts = useMemo(() => {
-    const counts: Record<string, number> = { All: roles.length };
-    roles.forEach(r => {
+    const counts: Record<string, number> = { All: visibleRoles.length };
+    visibleRoles.forEach(r => {
       const cat = getRoleCategory(r);
       if (cat !== "All") counts[cat] = (counts[cat] || 0) + 1;
     });
     return counts;
-  }, [roles]);
+  }, [visibleRoles]);
 
   const filtered = useMemo(() => {
-    let list = roles;
+    let list = visibleRoles;
     if (activeCategory !== "All") {
       list = list.filter(r => getRoleCategory(r) === activeCategory);
     }
@@ -58,7 +142,7 @@ export default function RolesPage() {
       list = list.filter(r => r.toLowerCase().includes(search.toLowerCase()));
     }
     return list;
-  }, [roles, search, activeCategory]);
+  }, [visibleRoles, search, activeCategory]);
 
   /* alphabetical groups */
   const groups = useMemo(() => {
@@ -97,7 +181,7 @@ export default function RolesPage() {
           </div>
 
           {ROLE_CATEGORIES.map((cat) => {
-            const count = cat.label === "All" ? roles.length : (categoryCounts[cat.label] || 0);
+            const count = cat.label === "All" ? visibleRoles.length : (categoryCounts[cat.label] || 0);
             const isActive = activeCategory === cat.label;
             return (
               <button
@@ -164,6 +248,45 @@ export default function RolesPage() {
 
       {/* ── MAIN CONTENT ─────────────────────────────────── */}
       <main style={{ flex: 1, padding: "24px 28px", overflowX: "hidden", minWidth: 0 }}>
+
+        {isRecommendMode ? (
+          <div style={{
+            display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap",
+            padding: "16px 20px", marginBottom: 18,
+            borderRadius: 14,
+            background: "linear-gradient(135deg, #ede9fe 0%, #fae8ff 100%)",
+            border: "1px solid rgba(124, 58, 237, 0.3)",
+            boxShadow: "0 4px 18px -10px rgba(124,58,237,0.45)",
+          }}>
+            <span style={{ fontSize: 26, lineHeight: 1 }}>💡</span>
+            <div style={{ flex: 1, minWidth: 240 }}>
+              <div style={{ fontSize: 11, fontWeight: 800, color: "#6d28d9", textTransform: "uppercase", letterSpacing: "0.12em", marginBottom: 2 }}>
+                Recommend a role
+              </div>
+              <div style={{ fontSize: 14, fontWeight: 800, color: "#0B1723" }}>
+                {recommendName ? <>Pick a role for <span style={{ color: "#7c3aed" }}>{recommendName}</span></> : "Pick a role to recommend"}
+              </div>
+              <div style={{ fontSize: 12, color: "#475569", marginTop: 2 }}>
+                {recommendableRoles && recommendableRoles.length > 0 && recommendDept
+                  ? <>Showing <b>{recommendableRoles.length}</b> role{recommendableRoles.length === 1 ? "" : "s"} mapped to <b>{recommendDept}</b>. Click a role to view its job description, then send the recommendation.</>
+                  : deptResolved && recommendDept
+                    ? <>No roles are mapped to <b>{recommendDept}</b> yet — showing all roles. Click any role to open its JD and recommend.</>
+                    : <>Loading recommendable roles…</>
+                }
+              </div>
+            </div>
+            <button
+              onClick={() => router.push("/dashboard/manager")}
+              style={{
+                background: "white", border: "1px solid rgba(124,58,237,0.4)",
+                color: "#5b21b6", fontWeight: 800, fontSize: 13,
+                padding: "8px 16px", borderRadius: 999, cursor: "pointer",
+              }}
+            >
+              Cancel
+            </button>
+          </div>
+        ) : null}
 
         {/* Header */}
         <div style={{ marginBottom: 20 }}>
@@ -259,7 +382,7 @@ export default function RolesPage() {
             </div>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: 8 }}>
               {items.map((role) => (
-                <Link key={role} href={`/role/${encodeURIComponent(role)}`} style={{ textDecoration: "none" }}>
+                <Link key={role} href={`/role/${encodeURIComponent(role)}${recommendQuery}`} style={{ textDecoration: "none" }}>
                   <RoleRow role={role} />
                 </Link>
               ))}

@@ -1,11 +1,11 @@
 "use client";
 import React, { Suspense, useEffect, useMemo, useState, useRef } from "react";
 import { createPortal } from "react-dom";
-import { useParams, useSearchParams } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 
 import { getApiPrefix } from "@/lib/apiBase";
-import { getOrgAuthFromStorage } from "@/lib/orgAuth";
+import { getOrgAuthFromStorage, orgCreateRecommendation } from "@/lib/orgAuth";
 
 const API = getApiPrefix();
 
@@ -344,12 +344,49 @@ export default function RolePage() {
 function RolePageContent() {
   const params       = useParams<{ roleName: string }>();
   const searchParams = useSearchParams();
+  const router       = useRouter();
   const roleName     = decodeURIComponent(params.roleName);
 
   /* context passed from industry / education pages */
   const ctxIndustry  = searchParams.get("industry")  ?? "";
   const ctxEducation = searchParams.get("education") ?? "";
   const ctxSpecialization = searchParams.get("specialization") ?? "";
+
+  /* manager → "recommend role" flow context (passed via querystring from /dashboard/manager) */
+  const recommendFor   = searchParams.get("recommendFor")   ?? "";
+  const recommendName  = searchParams.get("recommendName")  ?? "";
+  const recommendEmail = searchParams.get("recommendEmail") ?? "";
+  const recommendDept  = searchParams.get("recommendDept")  ?? "";
+  const isRecommendMode = !!recommendFor;
+
+  const [recommendNote, setRecommendNote] = useState("");
+  const [recommendSending, setRecommendSending] = useState(false);
+  const [recommendError, setRecommendError] = useState<string | null>(null);
+
+  const submitRecommendation = async () => {
+    if (!isRecommendMode) return;
+    const auth = getOrgAuthFromStorage();
+    if (!auth?.token) {
+      setRecommendError("Your session expired — please log in again.");
+      return;
+    }
+    setRecommendSending(true);
+    setRecommendError(null);
+    try {
+      await orgCreateRecommendation(auth.token, {
+        employeeId: recommendFor,
+        role: roleName,
+        note: recommendNote.trim() || undefined,
+      });
+      const params = new URLSearchParams();
+      params.set("recommended", roleName);
+      if (recommendName) params.set("for", recommendName);
+      router.push(`/dashboard/manager?${params.toString()}`);
+    } catch (e: any) {
+      setRecommendError(e?.message || "Could not send the recommendation. Please try again.");
+      setRecommendSending(false);
+    }
+  };
 
   const [mounted,         setMounted]         = useState(false);
   const [userId,          setUserId]          = useState("demo-student-1");
@@ -933,9 +970,92 @@ function RolePageContent() {
         <Link href="/" style={{ color:"#3b82f6" }}>Home</Link> {" › "}
         {ctxIndustry && <><Link href={`/industry/${enc(ctxIndustry)}`} style={{ color:"#3b82f6" }}>{ctxIndustry}</Link>{" › "}</>}
         {ctxEducation && <><Link href={`/education/${enc(ctxEducation)}${ctxIndustry?`?industry=${enc(ctxIndustry)}`:""}`} style={{ color:"#3b82f6" }}>{ctxEducation}</Link>{" › "}</>}
-        {!ctxIndustry && !ctxEducation && <><Link href="/role" style={{ color:"#3b82f6" }}>Roles</Link>{" › "}</>}
+        {!ctxIndustry && !ctxEducation && <><Link href={`/role${isRecommendMode ? `?recommendFor=${enc(recommendFor)}${recommendName?`&recommendName=${enc(recommendName)}`:""}${recommendEmail?`&recommendEmail=${enc(recommendEmail)}`:""}${recommendDept?`&recommendDept=${enc(recommendDept)}`:""}` : ""}`} style={{ color:"#3b82f6" }}>Roles</Link>{" › "}</>}
         {roleName}
       </p>
+
+      {/* ── RECOMMEND-MODE BANNER (manager flow) ──────────────── */}
+      {isRecommendMode && (
+        <div style={{
+          background:"linear-gradient(135deg, #ede9fe 0%, #fae8ff 100%)",
+          border:"1px solid rgba(124,58,237,0.35)",
+          borderRadius:14, padding:"18px 22px", marginBottom:18,
+          boxShadow:"0 6px 24px -14px rgba(124,58,237,0.55)",
+        }}>
+          <div style={{ display:"flex", alignItems:"flex-start", justifyContent:"space-between", gap:14, flexWrap:"wrap" }}>
+            <div style={{ flex:1, minWidth:260 }}>
+              <div style={{ fontSize:11, fontWeight:800, color:"#6d28d9", textTransform:"uppercase", letterSpacing:".12em", marginBottom:4 }}>
+                Recommend a role
+              </div>
+              <div style={{ fontSize:18, fontWeight:900, color:"#0B1723", lineHeight:1.3 }}>
+                Recommend <span style={{ color:"#7c3aed" }}>{roleName}</span>
+                {recommendName ? <> to <span style={{ color:"#7c3aed" }}>{recommendName}</span></> : null}
+                ?
+              </div>
+              <p style={{ margin:"6px 0 0", fontSize:13, color:"#475569" }}>
+                Review the job description below, optionally add a note, and send the recommendation.
+                {recommendName ? <> {recommendName} will see it as a notification on their portal.</> : null}
+              </p>
+            </div>
+            <div style={{ display:"flex", gap:8, flexWrap:"wrap", alignItems:"center" }}>
+              <button
+                type="button"
+                onClick={() => router.back()}
+                disabled={recommendSending}
+                style={{
+                  background:"white", border:"1px solid rgba(124,58,237,0.35)",
+                  color:"#5b21b6", fontWeight:700, fontSize:13,
+                  padding:"9px 16px", borderRadius:10, cursor:recommendSending?"not-allowed":"pointer",
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={submitRecommendation}
+                disabled={recommendSending}
+                style={{
+                  background:"linear-gradient(135deg,#7c3aed 0%,#a855f7 100%)",
+                  color:"white", border:"none", fontWeight:900, fontSize:14,
+                  padding:"10px 20px", borderRadius:10,
+                  cursor:recommendSending?"not-allowed":"pointer",
+                  boxShadow:"0 8px 22px -10px rgba(124,58,237,0.7)",
+                  display:"inline-flex", alignItems:"center", gap:8,
+                  opacity:recommendSending?0.7:1,
+                }}
+              >
+                {recommendSending ? "Sending…" : <>💡 Recommend this role</>}
+              </button>
+            </div>
+          </div>
+
+          <div style={{ marginTop:14 }}>
+            <label style={{ display:"block", fontSize:11, fontWeight:800, color:"#5b21b6", textTransform:"uppercase", letterSpacing:".1em", marginBottom:6 }}>
+              Note (optional)
+            </label>
+            <textarea
+              value={recommendNote}
+              onChange={(e) => setRecommendNote(e.target.value)}
+              placeholder={`Add a short message for ${recommendName || "the employee"} (e.g. "I think this fits your skillset — give it a look!")`}
+              maxLength={500}
+              rows={2}
+              style={{
+                width:"100%", boxSizing:"border-box",
+                border:"1px solid rgba(124,58,237,0.25)", borderRadius:10,
+                padding:"10px 12px", fontSize:13, fontFamily:"inherit",
+                resize:"vertical", background:"white", color:"#0B1723",
+                outline:"none",
+              }}
+            />
+          </div>
+
+          {recommendError ? (
+            <p style={{ margin:"10px 0 0", fontSize:12, color:"#b91c1c", fontWeight:700 }}>
+              ⚠ {recommendError}
+            </p>
+          ) : null}
+        </div>
+      )}
 
       {/* ── HERO ─────────────────────────────────────────────── */}
       <div style={{
