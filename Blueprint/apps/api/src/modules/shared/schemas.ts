@@ -87,7 +87,7 @@ export class UserProfile {
 }
 
 export type OrgAccountType = "EMPLOYEE" | "ADMIN";
-export type OrgCurrentRole = "EMPLOYEE" | "MANAGER";
+export type OrgCurrentRole = "EMPLOYEE" | "MANAGER" | "HR";
 
 @Schema({ collection: "company_users", timestamps: true })
 export class CompanyUser {
@@ -96,6 +96,7 @@ export class CompanyUser {
 
   @Prop({ required: true }) fullName!: string;
   @Prop() designation?: string;
+  @Prop() department?: string;
 
   @Prop({ required: true }) companyName!: string;
   @Prop({ required: true, lowercase: true, trim: true }) companyDomain!: string; // e.g. nattlabs.com

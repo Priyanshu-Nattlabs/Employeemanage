@@ -21,6 +21,7 @@ const JWT_EXPIRES_IN = process.env.ORG_AUTH_JWT_EXPIRES_IN || "7d";
 const OTP_SECRET = process.env.ORG_EMAIL_OTP_SECRET || process.env.OTP_SECRET || "dev-only-change-me";
 const OTP_TTL_MINUTES = Number(process.env.ORG_EMAIL_OTP_TTL_MINUTES || "10");
 const OTP_RESEND_COOLDOWN_SECONDS = Number(process.env.ORG_EMAIL_OTP_RESEND_COOLDOWN_SECONDS || "30");
+const OTP_DEBUG = String(process.env.ORG_EMAIL_OTP_DEBUG || "").trim() === "true";
 
 function normalizeEmail(email: string): string {
   return (email || "").trim().toLowerCase();
@@ -55,18 +56,27 @@ export class OrgAuthService {
     return String(n).padStart(6, "0");
   }
 
-  private async sendOtpEmail(email: string, otp: string) {
+  private async sendOtpEmail(email: string, otp: string): Promise<null | { messageId?: string; accepted?: any; rejected?: any; response?: string }> {
     const host = (process.env.SMTP_HOST || "").trim();
     const port = Number(process.env.SMTP_PORT || "0");
     const user = (process.env.SMTP_USER || "").trim();
     const pass = (process.env.SMTP_PASS || "").trim();
     const from = (process.env.SMTP_FROM || user || "no-reply@example.com").trim();
 
+    // eslint-disable-next-line no-console
+    console.log("[ORG AUTH] SMTP config", {
+      host,
+      port,
+      user: user ? `${user.slice(0, 2)}***${user.slice(-8)}` : "",
+      from,
+      hasPass: Boolean(pass),
+    });
+
     // If SMTP is not configured, don't fail the signup flow in dev; just log it.
     if (!host || !port || !user || !pass) {
       // eslint-disable-next-line no-console
       console.log(`[ORG AUTH] OTP for ${email}: ${otp} (SMTP not configured)`);
-      return;
+      return null;
     }
 
     const secure = port === 465;
@@ -75,9 +85,11 @@ export class OrgAuthService {
       port,
       secure,
       auth: { user, pass },
+      // Gmail on 587 uses STARTTLS. This makes failures more deterministic.
+      requireTLS: !secure,
     });
 
-    await transport.sendMail({
+    const info = await transport.sendMail({
       from,
       to: normalizeEmail(email),
       subject: "Your verification code",
@@ -91,6 +103,25 @@ export class OrgAuthService {
         </div>
       `,
     });
+
+    // eslint-disable-next-line no-console
+    console.log("[ORG AUTH] OTP email sent", {
+      to: normalizeEmail(email),
+      via: `${host}:${port}`,
+      from,
+      messageId: (info as any)?.messageId,
+      accepted: (info as any)?.accepted,
+      rejected: (info as any)?.rejected,
+      response: (info as any)?.response,
+    });
+
+    if (!OTP_DEBUG) return null;
+    return {
+      messageId: (info as any)?.messageId,
+      accepted: (info as any)?.accepted,
+      rejected: (info as any)?.rejected,
+      response: (info as any)?.response,
+    };
   }
 
   private async setAndSendEmailOtp(user: CompanyUserDocument) {
@@ -100,7 +131,7 @@ export class OrgAuthService {
     user.emailOtpExpiresAt = new Date(Date.now() + OTP_TTL_MINUTES * 60_000);
     user.emailOtpLastSentAt = new Date();
     await user.save();
-    await this.sendOtpEmail(user.email, otp);
+    return await this.sendOtpEmail(user.email, otp);
   }
 
   private signToken(user: CompanyUserDocument) {
@@ -130,6 +161,7 @@ export class OrgAuthService {
     password: string;
     fullName: string;
     designation: string;
+    department?: string;
     companyName: string;
     companyDomain?: string;
     employeeId: string;
@@ -151,6 +183,13 @@ export class OrgAuthService {
       throw new BadRequestException("Reporting manager email must be in the same company domain");
     }
 
+    // HR doesn't need a department. Everyone else (EMPLOYEE / MANAGER) does.
+    const isHR = input.currentRole === "HR";
+    const department = (input.department || "").trim();
+    if (!isHR && !department) {
+      throw new BadRequestException("Department is required");
+    }
+
     const existing = await this.companyUserModel.findOne({ email }).lean();
     if (existing) throw new BadRequestException("An account with this email already exists");
 
@@ -160,6 +199,7 @@ export class OrgAuthService {
       passwordHash,
       fullName: input.fullName?.trim(),
       designation: input.designation?.trim(),
+      department: isHR ? undefined : department,
       companyName: input.companyName?.trim(),
       companyDomain,
       employeeId: input.employeeId?.trim(),
@@ -170,8 +210,8 @@ export class OrgAuthService {
       emailVerified: false,
     });
 
-    await this.setAndSendEmailOtp(created);
-    return { verificationRequired: true, email: created.email };
+    const debugMail = await this.setAndSendEmailOtp(created);
+    return OTP_DEBUG ? { verificationRequired: true, email: created.email, debugMail } : { verificationRequired: true, email: created.email };
   }
 
   async registerAdmin(input: { email: string; password: string; fullName: string; companyName: string; companyDomain?: string }) {
@@ -199,8 +239,8 @@ export class OrgAuthService {
       emailVerified: false,
     });
 
-    await this.setAndSendEmailOtp(created);
-    return { verificationRequired: true, email: created.email };
+    const debugMail = await this.setAndSendEmailOtp(created);
+    return OTP_DEBUG ? { verificationRequired: true, email: created.email, debugMail } : { verificationRequired: true, email: created.email };
   }
 
   async login(emailRaw: string, password: string) {
@@ -218,6 +258,7 @@ export class OrgAuthService {
         email: user.email,
         fullName: user.fullName,
         designation: user.designation,
+        department: (user as any).department,
         companyName: user.companyName,
         companyDomain: user.companyDomain,
         employeeId: user.employeeId,
@@ -242,8 +283,8 @@ export class OrgAuthService {
       throw new BadRequestException(`Please wait ${wait}s before requesting another OTP`);
     }
 
-    await this.setAndSendEmailOtp(user);
-    return { ok: true };
+    const debugMail = await this.setAndSendEmailOtp(user);
+    return OTP_DEBUG ? { ok: true, debugMail } : { ok: true };
   }
 
   async verifyEmailOtp(emailRaw: string, otpRaw: string) {
@@ -260,6 +301,7 @@ export class OrgAuthService {
           email: user.email,
           fullName: user.fullName,
           designation: user.designation,
+          department: (user as any).department,
           companyName: user.companyName,
           companyDomain: user.companyDomain,
           employeeId: user.employeeId,
@@ -295,6 +337,7 @@ export class OrgAuthService {
         email: user.email,
         fullName: user.fullName,
         designation: user.designation,
+        department: (user as any).department,
         companyName: user.companyName,
         companyDomain: user.companyDomain,
         employeeId: user.employeeId,
@@ -306,10 +349,16 @@ export class OrgAuthService {
     };
   }
 
-  async getEmployeesForManager(companyDomain: string) {
+  async getEmployeesForManager(companyDomain: string, department?: string) {
     const domain = normalizeDomain(companyDomain);
+    const filter: any = { companyDomain: domain, accountType: "EMPLOYEE" };
+    const dept = (department || "").trim();
+    if (dept) {
+      // Match the manager's department case-insensitively, ignoring trailing spaces.
+      filter.department = new RegExp(`^${dept.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`, "i");
+    }
     return this.companyUserModel
-      .find({ companyDomain: domain, accountType: "EMPLOYEE" })
+      .find(filter)
       .select("-passwordHash")
       .sort({ createdAt: -1 })
       .lean();
@@ -408,8 +457,195 @@ export class OrgAuthService {
     });
   }
 
-  async getEmployeesPrepSummaryForManager(companyDomain: string) {
-    const employees = await this.getEmployeesForManager(companyDomain);
+  async getEmployeesActivityForManager(companyDomain: string, department?: string) {
+    const employees = await this.getEmployeesForManager(companyDomain, department);
+    const ids = employees.map((e: any) => String(e._id || e.id || "")).filter(Boolean);
+    const empById = new Map<string, any>();
+    for (const e of employees as any[]) empById.set(String(e._id || e.id || ""), e);
+
+    const empty = {
+      activityFeed: [] as any[],
+      dailySeries: [] as any[],
+      topSkills: [] as any[],
+      roleAggregates: [] as any[],
+      engagement: { active7d: 0, active30d: 0, dormant: 0, total: 0 },
+    };
+    if (!ids.length) return empty;
+
+    // Recent tests across the team (last 60 days for trend; activity feed uses top N anyway)
+    const sinceTrend = new Date();
+    sinceTrend.setDate(sinceTrend.getDate() - 60);
+    const tests = await this.testModel
+      .find({ studentId: { $in: ids }, status: { $in: ["COMPLETED", "FAILED"] } })
+      .sort({ createdAt: -1 })
+      .lean();
+
+    const preps = await this.prepModel.find({ studentId: { $in: ids } }).lean();
+
+    // ---- Activity feed: tests + completed skills ----
+    const feed: any[] = [];
+    for (const t of tests as any[]) {
+      const sid = String(t.studentId || "");
+      const e = empById.get(sid) || {};
+      const at = t.completedAt || t.createdAt;
+      feed.push({
+        type: t.passed === true ? "TEST_PASSED" : "TEST_FAILED",
+        at,
+        employeeId: sid,
+        employeeName: e.fullName || e.email || "Unknown",
+        employeeEmail: e.email || "",
+        employeeDepartment: e.department || null,
+        roleName: t.roleName,
+        skillName: t.skillName,
+        score: typeof t.score === "number" ? t.score : null,
+      });
+    }
+    for (const p of preps as any[]) {
+      const sid = String(p.studentId || "");
+      const e = empById.get(sid) || {};
+      const sp = p.skillProgress || {};
+      for (const [skillName, raw] of Object.entries(sp)) {
+        const pr: any = raw;
+        if (pr?.completed && pr.completedDate) {
+          feed.push({
+            type: "SKILL_COMPLETED",
+            at: pr.completedDate,
+            employeeId: sid,
+            employeeName: e.fullName || e.email || "Unknown",
+            employeeEmail: e.email || "",
+            employeeDepartment: e.department || null,
+            roleName: p.roleName,
+            skillName,
+            score: typeof pr.score === "number" ? pr.score : null,
+          });
+        }
+      }
+      // also surface "started prep" events
+      if (p.preparationStartDate) {
+        feed.push({
+          type: "PREP_STARTED",
+          at: p.preparationStartDate,
+          employeeId: sid,
+          employeeName: e.fullName || e.email || "Unknown",
+          employeeEmail: e.email || "",
+          employeeDepartment: e.department || null,
+          roleName: p.roleName,
+          skillName: null,
+          score: null,
+        });
+      }
+    }
+    feed.sort((a, b) => {
+      const ad = a.at ? new Date(a.at).getTime() : 0;
+      const bd = b.at ? new Date(b.at).getTime() : 0;
+      return bd - ad;
+    });
+    const activityFeed = feed.slice(0, 25);
+
+    // ---- 14-day daily series for tests ----
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const dailySeries: any[] = [];
+    for (let i = 13; i >= 0; i--) {
+      const d = new Date(today);
+      d.setDate(d.getDate() - i);
+      const next = new Date(d);
+      next.setDate(d.getDate() + 1);
+      const dayTests = (tests as any[]).filter((t) => {
+        const ts = t.completedAt ? new Date(t.completedAt).getTime() : (t.createdAt ? new Date(t.createdAt).getTime() : 0);
+        return ts >= d.getTime() && ts < next.getTime();
+      });
+      const scores = dayTests.map((t) => t.score).filter((s: any) => typeof s === "number") as number[];
+      const avg = scores.length ? Math.round(scores.reduce((s: number, x: number) => s + x, 0) / scores.length) : null;
+      const passed = dayTests.filter((t) => t.passed === true).length;
+      dailySeries.push({
+        date: d.toISOString().slice(0, 10),
+        count: dayTests.length,
+        avgScore: avg,
+        passed,
+        failed: dayTests.length - passed,
+      });
+    }
+
+    // ---- Top skills (most attempted in window) with team pass rate ----
+    const skillMap = new Map<string, { attempts: number; passed: number; sum: number; n: number }>();
+    for (const t of tests as any[]) {
+      const name = String(t.skillName || "Unknown");
+      const cur = skillMap.get(name) || { attempts: 0, passed: 0, sum: 0, n: 0 };
+      cur.attempts += 1;
+      if (t.passed === true) cur.passed += 1;
+      if (typeof t.score === "number") {
+        cur.sum += t.score;
+        cur.n += 1;
+      }
+      skillMap.set(name, cur);
+    }
+    const topSkills = Array.from(skillMap.entries())
+      .map(([name, s]) => ({
+        name,
+        attempts: s.attempts,
+        passRate: s.attempts > 0 ? Math.round((s.passed / s.attempts) * 100) : 0,
+        avgScore: s.n > 0 ? Math.round(s.sum / s.n) : null,
+      }))
+      .sort((a, b) => b.attempts - a.attempts)
+      .slice(0, 8);
+
+    // ---- Per-role aggregates (active preps only) ----
+    const roleMap = new Map<string, { learners: Set<string>; sum: number; n: number }>();
+    for (const p of preps as any[]) {
+      if (!p.isActive) continue;
+      const name = String(p.roleName || "Unknown");
+      const cur = roleMap.get(name) || { learners: new Set<string>(), sum: 0, n: 0 };
+      cur.learners.add(String(p.studentId || ""));
+      cur.sum += this.prepPct(p);
+      cur.n += 1;
+      roleMap.set(name, cur);
+    }
+    const roleAggregates = Array.from(roleMap.entries())
+      .map(([name, s]) => ({
+        name,
+        learners: s.learners.size,
+        avgPct: s.n > 0 ? Math.round(s.sum / s.n) : 0,
+      }))
+      .sort((a, b) => b.learners - a.learners)
+      .slice(0, 8);
+
+    // ---- Engagement: who interacted in last 7d / 30d ----
+    const now = Date.now();
+    const d7 = now - 7 * 24 * 60 * 60 * 1000;
+    const d30 = now - 30 * 24 * 60 * 60 * 1000;
+    const active7 = new Set<string>();
+    const active30 = new Set<string>();
+    const touch = (sid: string, ts: number) => {
+      if (!sid || !ts) return;
+      if (ts >= d7) active7.add(sid);
+      if (ts >= d30) active30.add(sid);
+    };
+    for (const t of tests as any[]) {
+      const ts = t.completedAt ? new Date(t.completedAt).getTime() : (t.createdAt ? new Date(t.createdAt).getTime() : 0);
+      touch(String(t.studentId || ""), ts);
+    }
+    for (const p of preps as any[]) {
+      const ts = p.updatedAt ? new Date(p.updatedAt).getTime() : (p.createdAt ? new Date(p.createdAt).getTime() : 0);
+      touch(String(p.studentId || ""), ts);
+    }
+
+    return {
+      activityFeed,
+      dailySeries,
+      topSkills,
+      roleAggregates,
+      engagement: {
+        active7d: active7.size,
+        active30d: active30.size,
+        dormant: Math.max(0, ids.length - active30.size),
+        total: ids.length,
+      },
+    };
+  }
+
+  async getEmployeesPrepSummaryForManager(companyDomain: string, department?: string) {
+    const employees = await this.getEmployeesForManager(companyDomain, department);
     const ids = employees.map((e: any) => String(e._id || e.id || "")).filter(Boolean);
     if (!ids.length) return [];
 

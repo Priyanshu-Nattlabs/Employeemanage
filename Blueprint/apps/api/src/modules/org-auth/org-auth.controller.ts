@@ -61,20 +61,26 @@ export class OrgAuthController {
     return this.service.updateProfileById(me?.sub, body || {});
   }
 
-  /** Manager view: list employees for the manager's company domain. */
+  /** Manager / HR view: list employees for the user's company domain. Manager scoped to their department, HR sees all. */
   @Get("employees")
   async employees(@Headers("authorization") authorization?: string, @Query("companyDomain") companyDomain?: string) {
     const token = getBearerToken(authorization);
     if (!token) throw new UnauthorizedException("Missing token");
     const me = this.service.verifyToken(token);
 
-    if (me?.accountType !== "EMPLOYEE" || me?.currentRole !== "MANAGER") {
-      throw new UnauthorizedException("Only managers can access employee listings");
+    const isManager = me?.accountType === "EMPLOYEE" && me?.currentRole === "MANAGER";
+    const isHR = me?.accountType === "EMPLOYEE" && me?.currentRole === "HR";
+    if (!isManager && !isHR) {
+      throw new UnauthorizedException("Only managers or HR can access employee listings");
     }
 
     const domain = (companyDomain || me.companyDomain || "").trim().toLowerCase();
     if (!domain) throw new UnauthorizedException("Missing companyDomain");
-    return this.service.getEmployeesForManager(domain);
+
+    if (isHR) return this.service.getEmployeesForManager(domain);
+    const profile = await this.service.getProfileById(me?.sub);
+    const department = (profile as any)?.department || "";
+    return this.service.getEmployeesForManager(domain, department);
   }
 
   /** Admin view: list employees for admin's company name + domain. */
@@ -107,18 +113,44 @@ export class OrgAuthController {
     return this.service.getEmployeesPrepSummaryForAdmin(domain, companyName);
   }
 
-  /** Manager view: employees + preparation/test summary. */
+  /** Manager / HR view: aggregated activity feed, trends, skill + role stats. Manager is scoped to their department. */
+  @Get("employees-activity")
+  async managerEmployeesActivity(@Headers("authorization") authorization?: string) {
+    const token = getBearerToken(authorization);
+    if (!token) throw new UnauthorizedException("Missing token");
+    const me = this.service.verifyToken(token);
+    const isManager = me?.accountType === "EMPLOYEE" && me?.currentRole === "MANAGER";
+    const isHR = me?.accountType === "EMPLOYEE" && me?.currentRole === "HR";
+    if (!isManager && !isHR) {
+      throw new UnauthorizedException("Only managers or HR can access employee activity");
+    }
+    const domain = (me.companyDomain || "").trim().toLowerCase();
+    if (!domain) throw new UnauthorizedException("Missing companyDomain");
+
+    if (isHR) return this.service.getEmployeesActivityForManager(domain);
+    const profile = await this.service.getProfileById(me?.sub);
+    const department = (profile as any)?.department || "";
+    return this.service.getEmployeesActivityForManager(domain, department);
+  }
+
+  /** Manager / HR view: employees + preparation/test summary. Manager is scoped to their department. */
   @Get("employees-summary")
   async managerEmployeesSummary(@Headers("authorization") authorization?: string) {
     const token = getBearerToken(authorization);
     if (!token) throw new UnauthorizedException("Missing token");
     const me = this.service.verifyToken(token);
-    if (me?.accountType !== "EMPLOYEE" || me?.currentRole !== "MANAGER") {
-      throw new UnauthorizedException("Only managers can access employee summaries");
+    const isManager = me?.accountType === "EMPLOYEE" && me?.currentRole === "MANAGER";
+    const isHR = me?.accountType === "EMPLOYEE" && me?.currentRole === "HR";
+    if (!isManager && !isHR) {
+      throw new UnauthorizedException("Only managers or HR can access employee summaries");
     }
     const domain = (me.companyDomain || "").trim().toLowerCase();
     if (!domain) throw new UnauthorizedException("Missing companyDomain");
-    return this.service.getEmployeesPrepSummaryForManager(domain);
+
+    if (isHR) return this.service.getEmployeesPrepSummaryForManager(domain);
+    const profile = await this.service.getProfileById(me?.sub);
+    const department = (profile as any)?.department || "";
+    return this.service.getEmployeesPrepSummaryForManager(domain, department);
   }
 }
 

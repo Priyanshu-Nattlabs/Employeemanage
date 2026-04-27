@@ -14,6 +14,10 @@ export class RegisterEmployeeDto {
   @IsString()
   designation!: string;
 
+  @IsOptional()
+  @IsString()
+  department?: string;
+
   @IsString()
   companyName!: string;
 
@@ -25,8 +29,8 @@ export class RegisterEmployeeDto {
   @IsString()
   employeeId!: string;
 
-  @IsIn(["EMPLOYEE", "MANAGER"])
-  currentRole!: "EMPLOYEE" | "MANAGER";
+  @IsIn(["EMPLOYEE", "MANAGER", "HR"])
+  currentRole!: "EMPLOYEE" | "MANAGER" | "HR";
 
   @IsString()
   mobileNo!: string;
