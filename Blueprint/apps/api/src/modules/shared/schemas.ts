@@ -46,6 +46,8 @@ export class RolePreparation {
   @Prop({ default: true }) isActive!: boolean;
   @Prop({ type: Object, default: {} }) skillProgress!: Record<string, SkillProgress>;
   @Prop({ type: Object }) ganttChartData?: Record<string, unknown>;
+  @Prop({ default: false }) knownSkillsConfigured!: boolean;
+  @Prop({ default: false }) knownSkillsTestSubmitted!: boolean;
   @Prop({ type: [String], default: [] }) knownSkillsForTest!: string[];
   @Prop({ type: [String], default: [] }) passedKnownSkills!: string[];
   @Prop({ type: [String], default: [] }) failedKnownSkills!: string[];
@@ -65,6 +67,8 @@ export class SkillTest {
   @Prop() studentId!: string;
   @Prop() roleName!: string;
   @Prop() skillName!: string;
+  @Prop({ default: "SINGLE_SKILL" }) testType!: string;
+  @Prop({ type: [String], default: [] }) selectedSkills!: string[];
   @Prop({ type: [Object], default: [] }) questions!: SkillQuestion[];
   @Prop({ type: Object, default: {} }) answers!: Record<string, string>;
   @Prop() score?: number;

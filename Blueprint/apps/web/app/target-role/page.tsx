@@ -43,6 +43,8 @@ export default function TargetRolePage() {
   const [search, setSearch] = useState("");
   const [savingRole, setSavingRole] = useState("");
   const [error, setError] = useState("");
+  const [targetStartDate, setTargetStartDate] = useState("");
+  const [targetEndDate, setTargetEndDate] = useState("");
 
   useEffect(() => {
     const auth = getOrgAuthFromStorage();
@@ -103,14 +105,22 @@ export default function TargetRolePage() {
       window.location.href = "/auth/employee/login";
       return;
     }
+    if (!targetStartDate || !targetEndDate) {
+      setError("Please select both start date and completion date.");
+      return;
+    }
+    if (targetEndDate < targetStartDate) {
+      setError("Completion date must be after start date.");
+      return;
+    }
     setSavingRole(roleName);
     setError("");
     try {
-      await fetch(
-        `${API}/api/role-preparation/start/${encodeURIComponent(roleName)}?studentId=${encodeURIComponent(auth.user.id)}`,
-        { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({}) }
-      );
-      window.location.href = `/role/${encodeURIComponent(roleName)}`;
+      const q = new URLSearchParams({
+        targetStartDate,
+        targetCompletionDate: targetEndDate,
+      });
+      window.location.href = `/role/${encodeURIComponent(roleName)}?${q.toString()}`;
     } catch (e: any) {
       setError(e?.message || "Could not save target role.");
       setSavingRole("");
@@ -131,6 +141,17 @@ export default function TargetRolePage() {
           Step 1 after login: select the next role you are targeting. We will track your journey and prepare your
           blueprint from this role.
         </p>
+
+        <div style={dateRow}>
+          <label style={dateField}>
+            <span style={dateLabel}>From (start date)</span>
+            <input type="date" value={targetStartDate} onChange={(e) => setTargetStartDate(e.target.value)} style={dateInput} />
+          </label>
+          <label style={dateField}>
+            <span style={dateLabel}>To (target completion)</span>
+            <input type="date" value={targetEndDate} onChange={(e) => setTargetEndDate(e.target.value)} style={dateInput} />
+          </label>
+        </div>
 
         <input
           value={search}
@@ -158,7 +179,7 @@ export default function TargetRolePage() {
               >
                 <span style={{ fontWeight: 700, color: "#0f172a", textAlign: "left" }}>{role}</span>
                 <span style={{ fontSize: 12, color: "#2563eb", fontWeight: 700 }}>
-                  {savingRole === role ? "Saving..." : "Select"}
+                  {savingRole === role ? "Opening..." : "Open Blueprint"}
                 </span>
               </button>
             ))
@@ -221,3 +242,7 @@ const err: React.CSSProperties = {
 const crumb: React.CSSProperties = { margin: "0 0 8px", color: "#64748b", fontSize: 13 };
 const link: React.CSSProperties = { color: "#2563eb", textDecoration: "none", fontWeight: 700 };
 const muted: React.CSSProperties = { color: "#64748b", textAlign: "center", padding: "18px 8px", fontSize: 14 };
+const dateRow: React.CSSProperties = { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 12 };
+const dateField: React.CSSProperties = { display: "grid", gap: 6 };
+const dateLabel: React.CSSProperties = { fontSize: 12, color: "#475569", fontWeight: 700 };
+const dateInput: React.CSSProperties = { borderRadius: 8, border: "1px solid #cbd5e1", minHeight: 40, padding: "8px 10px", fontSize: 14 };

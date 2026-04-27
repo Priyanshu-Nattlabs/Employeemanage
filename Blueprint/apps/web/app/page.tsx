@@ -120,16 +120,16 @@ export default function HomePage() {
         .jb-explore-card { transition: box-shadow 0.2s, transform 0.2s; }
         .jb-explore-card:hover { box-shadow: 0 8px 32px rgba(0,0,0,0.13) !important; transform: translateY(-3px); }
         .jb-explore-btn { transition: background 0.18s, color 0.18s; }
-        .jb-explore-btn:hover { background: #0d1b2a !important; color: #fff !important; border-color: #0d1b2a !important; }
+        .jb-explore-btn:hover { background: #3f1d8f !important; color: #fff !important; border-color: #3f1d8f !important; }
         .jb-feature-row { transition: background 0.18s; }
-        .jb-feature-row:hover { background: #dbeafe !important; }
+        .jb-feature-row:hover { background: #f3e8ff !important; }
         .jb-cta-btn { transition: background 0.18s, color 0.18s, transform 0.18s; }
         .jb-cta-btn:hover { background: #f3f4f6 !important; transform: scale(1.03); }
         .jb-search-dropdown { position:absolute; top:calc(100% + 4px); left:0; right:0; background:#fff; border:1.5px solid #e5e7eb; border-radius:10px; box-shadow:0 8px 24px rgba(0,0,0,0.12); max-height:220px; overflow-y:auto; z-index:50; }
         .jb-search-item { padding:10px 14px; font-size:14px; color:#374151; cursor:pointer; }
-        .jb-search-item:hover { background:#f3f4f6; }
+        .jb-search-item:hover { background:#f5f3ff; }
         .jb-hero-ref-panel { background:rgba(217,217,217,0.2); border:1px solid rgba(0,0,0,0.1); border-radius:10px; }
-        .jb-hero-ref-title { background:linear-gradient(90deg,#050F20 0%,#4A680A 100%); -webkit-background-clip:text; background-clip:text; color:transparent; -webkit-text-fill-color:transparent; }
+        .jb-hero-ref-title { background:linear-gradient(90deg,#3f1d8f 0%,#0f766e 100%); -webkit-background-clip:text; background-clip:text; color:transparent; -webkit-text-fill-color:transparent; }
         @media (max-width: 900px) {
           .jb-hero-ref-row { flex-direction:column !important; align-items:stretch !important; }
           .jb-hero-ref-images { justify-content:center !important; margin-top:8px; pointer-events:none; }
@@ -140,7 +140,7 @@ export default function HomePage() {
       {/* ══ HERO (matches UI Reference / Job Blue Print.svg) ═══════════ */}
       <div
         style={{
-          background: "linear-gradient(180deg, #ABDFE7 0%, #F0D3D3 100%)",
+          background: "linear-gradient(180deg, #ddd6fe 0%, #cffafe 100%)",
           overflow: "hidden",
           minHeight: 545,
         }}
@@ -187,17 +187,17 @@ export default function HomePage() {
                   letterSpacing: "-0.03em",
                 }}
               >
-                Your Career,
+                Employee Growth,
                 <br />
-                Clearly Mapped
+                Clearly Tracked
               </h1>
               <p className="jb-fade2" style={{ margin: "0 0 22px", fontSize: 15, color: "#2a2a2a", lineHeight: 1.65, maxWidth: 620 }}>
-                SaarthiX Job Blueprint will guide you to know your position, skills, and direction to take, without wasting time, without guesses, without confusion.
+                This platform helps every employee plan their next role, learn required skills, complete assessments, and track progress with clear visibility for both employee and company authority.
               </p>
               <div className="jb-fade3" style={{ position: "relative", maxWidth: 400 }}>
                 <input
                   type="text"
-                  placeholder="Search for a career role..."
+                  placeholder="Search target roles and growth paths..."
                   value={search}
                   onChange={e => setSearch(e.target.value)}
                   style={{
@@ -284,64 +284,11 @@ export default function HomePage() {
         </div>
       </div>
 
-      {/* ══ START YOUR JOURNEY ════════════════════════════════════════ */}
-      <div style={{ background: "#fff", padding: "72px 32px" }}>
-        <div style={{ maxWidth: 1100, margin: "0 auto" }}>
-          <h2 style={{ textAlign: "center", margin: "0 0 48px", fontSize: 30, fontWeight: 800, color: "#0d1b2a", letterSpacing: "-0.5px" }}>
-            Start Your Journey
-          </h2>
-          <div style={{ display: "grid", gridTemplateColumns: "minmax(280px, 420px)", gap: 24, justifyContent: "center" }}>
-            {[
-              {
-                num: "1",
-                title: "By Role",
-                desc: "Find out particular work positions, know what to expect and pursue transparent career advancement step by step.",
-                href: "/role/",
-                count: roles.length,
-              },
-            ].map(card => (
-              <div key={card.num} className="jb-explore-card" style={{ background: "#fff", borderRadius: 16, border: "1px solid #e5e7eb", padding: "28px 28px 24px", boxShadow: "0 2px 10px rgba(0,0,0,0.05)" }}>
-                {/* Icon */}
-                <div style={{ width: 48, height: 48, borderRadius: 10, background: "#dbeafe", display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 18 }}>
-                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M12 12C14.21 12 16 10.21 16 8C16 5.79 14.21 4 12 4C9.79 4 8 5.79 8 8C8 10.21 9.79 12 12 12ZM12 14C9.33 14 4 15.34 4 18V20H20V18C20 15.34 14.67 14 12 14Z" fill="#3b82f6"/>
-                  </svg>
-                </div>
-                <h3 style={{ margin: "0 0 10px", fontSize: 17, fontWeight: 700, color: "#0d1b2a" }}>
-                  {card.num}. {card.title}
-                  {card.count > 0 && <span style={{ fontWeight: 400, fontSize: 13, color: "#9ca3af", marginLeft: 6 }}>({card.count})</span>}
-                </h3>
-                <p style={{ margin: "0 0 24px", fontSize: 14, color: "#6b7280", lineHeight: 1.7 }}>{card.desc}</p>
-                <Link
-                  href={card.href}
-                  className="jb-explore-btn"
-                  style={{
-                    display: "inline-block",
-                    padding: "9px 22px",
-                    borderRadius: 8,
-                    border: "1.5px solid #d1d5db",
-                    background: "#fff",
-                    fontSize: 13,
-                    fontWeight: 600,
-                    color: "#374151",
-                    cursor: "pointer",
-                    textDecoration: "none",
-                    textAlign: "center",
-                  }}
-                >
-                  Explore Now
-                </Link>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-
       {/* ══ WHY CHOOSE JOB BLUEPRINT? ════════════════════════════════ */}
-      <div style={{ background: "#eaf0f8", padding: "72px 32px" }}>
+      <div style={{ background: "#f5f3ff", padding: "72px 32px" }}>
         <div style={{ maxWidth: 1100, margin: "0 auto" }}>
-          <h2 style={{ textAlign: "center", margin: "0 0 40px", fontSize: 30, fontWeight: 800, color: "#7b1a1a", letterSpacing: "-0.5px" }}>
-            Why Choose Job Blueprint ?
+          <h2 style={{ textAlign: "center", margin: "0 0 40px", fontSize: 30, fontWeight: 800, color: "#4c1d95", letterSpacing: "-0.5px" }}>
+            Why Teams Choose Job Blueprint
           </h2>
 
           {/* Feature visual / placeholder */}
@@ -355,19 +302,19 @@ export default function HomePage() {
             overflow: "hidden",
             boxShadow: "0 2px 12px rgba(0,0,0,0.06)",
           }}>
-            <div style={{ height: 8, background: "linear-gradient(90deg,#3b82f6,#06b6d4,#10b981)" }} />
+            <div style={{ height: 8, background: "linear-gradient(90deg,#7c3aed,#14b8a6,#f59e0b)" }} />
             <div style={{ padding: "40px 32px", display: "grid", gridTemplateColumns: "1fr 1fr", gap: 24, alignItems: "center" }}>
               <div>
-                <div style={{ fontSize: 13, fontWeight: 700, color: "#3b82f6", textTransform: "uppercase", letterSpacing: ".06em", marginBottom: 10 }}>Your Personalized Path</div>
-                <h3 style={{ margin: "0 0 12px", fontSize: 20, fontWeight: 800, color: "#0d1b2a" }}>From confusion to clarity in minutes</h3>
-                <p style={{ margin: 0, fontSize: 14, color: "#6b7280", lineHeight: 1.7 }}>Answer a few questions about your goals and background. Get a month-by-month Gantt roadmap tailored to your target role.</p>
+                <div style={{ fontSize: 13, fontWeight: 700, color: "#6d28d9", textTransform: "uppercase", letterSpacing: ".06em", marginBottom: 10 }}>Your Personalized Path</div>
+                <h3 style={{ margin: "0 0 12px", fontSize: 20, fontWeight: 800, color: "#312e81" }}>From current role to next role with clarity</h3>
+                <p style={{ margin: 0, fontSize: 14, color: "#6b7280", lineHeight: 1.7 }}>Set a target role, identify skill gaps, complete assessments, and follow a tracked development plan that aligns employee ambition with company growth goals.</p>
               </div>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
                 {[
-                  { color: "#dbeafe", text: "Month 1–2", sub: "Foundation Skills" },
-                  { color: "#dcfce7", text: "Month 3–4", sub: "Core Practice" },
-                  { color: "#fef9c3", text: "Month 5–6", sub: "Specialization" },
-                  { color: "#fce7f3", text: "Month 7+", sub: "Job Readiness" },
+                  { color: "#dbeafe", text: "Stage 1", sub: "Role Selection" },
+                  { color: "#dcfce7", text: "Stage 2", sub: "Skill Assessment" },
+                  { color: "#fef9c3", text: "Stage 3", sub: "Learning Plan" },
+                  { color: "#fce7f3", text: "Stage 4", sub: "Promotion Readiness" },
                 ].map(block => (
                   <div key={block.text} style={{ background: block.color, borderRadius: 10, padding: "14px 12px" }}>
                     <div style={{ fontSize: 11, fontWeight: 700, color: "#374151", marginBottom: 4 }}>{block.text}</div>
@@ -385,51 +332,51 @@ export default function HomePage() {
                 icon: (
                   <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><rect x="3" y="12" width="4" height="9" rx="1" fill="#374151"/><rect x="10" y="7" width="4" height="14" rx="1" fill="#374151"/><rect x="17" y="3" width="4" height="18" rx="1" fill="#374151"/></svg>
                 ),
-                title: "Personalized Roadmap",
-                desc: "Not fixed, it can change with you.",
+                title: "Role-Based Development Roadmap",
+                desc: "Every employee gets a dynamic roadmap based on target role and skill gap.",
               },
               {
                 icon: (
                   <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M3 17L9 11L13 15L21 7" stroke="#374151" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/><path d="M17 7H21V11" stroke="#374151" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
                 ),
-                title: "Track Progress",
-                desc: "Notice what's getting better.",
+                title: "Progress Tracking",
+                desc: "Track learning completion, tests, and readiness milestones in one place.",
               },
               {
                 icon: (
                   <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="8" r="5" stroke="#374151" strokeWidth="2"/><path d="M12 13v8M9 18l3 3 3-3" stroke="#374151" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
                 ),
-                title: "Earn Badges",
-                desc: "Marks of your progress.",
+                title: "Assessment & Badges",
+                desc: "Validate known skills through tests and reward successful outcomes.",
               },
               {
                 icon: (
                   <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="#374151" strokeWidth="2"/><circle cx="12" cy="12" r="4" stroke="#374151" strokeWidth="2"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3" stroke="#374151" strokeWidth="2" strokeLinecap="round"/></svg>
                 ),
-                title: "Industry Insights",
-                desc: "Get a sense of what's happening out there.",
+                title: "Leadership Visibility",
+                desc: "Managers and company authority can monitor employee growth and outcomes.",
               },
               {
                 icon: (
                   <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="#374151" strokeWidth="2"/><path d="M12 7v5l3 3" stroke="#374151" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
                 ),
-                title: "Time Management",
-                desc: "Set it up, then just start.",
+                title: "Timeline-Based Planning",
+                desc: "Set target dates and complete role transition plans within defined timelines.",
               },
               {
                 icon: (
                   <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="#374151" strokeWidth="2"/><circle cx="12" cy="12" r="5" stroke="#374151" strokeWidth="2"/><circle cx="12" cy="12" r="1.5" fill="#374151"/></svg>
                 ),
-                title: "Career Success",
-                desc: "Get set for real roles, step by step.",
+                title: "Interview Readiness",
+                desc: "Prepare for internal assessments and interviews for higher or new roles.",
               },
             ].map(f => (
               <div key={f.title} className="jb-feature-row" style={{ display: "flex", alignItems: "flex-start", gap: 14, padding: "16px 20px", background: "#fff", borderRadius: 12, border: "1px solid #e5e7eb" }}>
-                <div style={{ width: 40, height: 40, borderRadius: 8, background: "#f1f5f9", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                <div style={{ width: 40, height: 40, borderRadius: 8, background: "#ede9fe", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
                   {f.icon}
                 </div>
                 <div>
-                  <div style={{ fontWeight: 700, fontSize: 14, color: "#0d1b2a", marginBottom: 4 }}>{f.title}</div>
+                  <div style={{ fontWeight: 700, fontSize: 14, color: "#312e81", marginBottom: 4 }}>{f.title}</div>
                   <div style={{ fontSize: 13, color: "#6b7280", lineHeight: 1.55 }}>{f.desc}</div>
                 </div>
               </div>
@@ -445,35 +392,35 @@ export default function HomePage() {
             <svg width="32" height="32" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
               <path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58a.49.49 0 0 0 .12-.61l-1.92-3.32a.49.49 0 0 0-.59-.22l-2.39.96a6.97 6.97 0 0 0-1.62-.94l-.36-2.54a.484.484 0 0 0-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96a.48.48 0 0 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58a.49.49 0 0 0-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z" fill="#0d1b2a"/>
             </svg>
-            <h2 style={{ margin: 0, fontSize: 30, fontWeight: 800, color: "#0d1b2a", letterSpacing: "-0.5px" }}>How It Works</h2>
+            <h2 style={{ margin: 0, fontSize: 30, fontWeight: 800, color: "#312e81", letterSpacing: "-0.5px" }}>How It Works</h2>
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 32 }}>
             {[
               {
                 step: "01",
-                title: "Choose Your Role",
-                desc: "Select your target job role to begin your personalised journey.",
-                color: "#dbeafe",
-                accent: "#3b82f6",
+                title: "Choose Current & Target Role",
+                desc: "Employee selects the role they want to move into and defines completion timeline.",
+                color: "#ede9fe",
+                accent: "#6d28d9",
               },
               {
                 step: "02",
-                title: "Get Your Blueprint",
-                desc: "Receive a personalised month-by-month Gantt roadmap with clear milestones, skill goals and learning resources.",
-                color: "#dcfce7",
-                accent: "#16a34a",
+                title: "Assess, Learn, and Improve",
+                desc: "Known skills go to assessment, unknown skills go to learning blueprint with clear milestones.",
+                color: "#ccfbf1",
+                accent: "#0f766e",
               },
               {
                 step: "03",
-                title: "Track & Grow",
-                desc: "Take skill tests, earn achievement badges, and monitor your readiness progress toward your dream career role.",
-                color: "#fef9c3",
-                accent: "#d97706",
+                title: "Track Growth with Leadership",
+                desc: "Progress, test outcomes, badges, and readiness are tracked for employee and company authority.",
+                color: "#fee2e2",
+                accent: "#b91c1c",
               },
             ].map(s => (
               <div key={s.step} style={{ padding: "32px 28px", borderRadius: 16, background: s.color, border: `1.5px solid ${s.color}` }}>
                 <div style={{ fontSize: 36, fontWeight: 900, color: s.accent, marginBottom: 16, lineHeight: 1 }}>{s.step}</div>
-                <h3 style={{ margin: "0 0 10px", fontSize: 17, fontWeight: 700, color: "#0d1b2a" }}>{s.title}</h3>
+                <h3 style={{ margin: "0 0 10px", fontSize: 17, fontWeight: 700, color: "#312e81" }}>{s.title}</h3>
                 <p style={{ margin: 0, fontSize: 14, color: "#4b5563", lineHeight: 1.7 }}>{s.desc}</p>
               </div>
             ))}
@@ -486,7 +433,7 @@ export default function HomePage() {
         <div style={{
           maxWidth: 1100,
           margin: "0 auto",
-          background: "#4472a8",
+          background: "#5b21b6",
           borderRadius: 20,
           padding: "56px 48px",
           textAlign: "center",
@@ -498,10 +445,10 @@ export default function HomePage() {
           <div style={{ position:"absolute", bottom:-40, left:-30, width:160, height:160, borderRadius:"50%", background:"rgba(255,255,255,0.06)", pointerEvents:"none" }} />
           <div style={{ position:"relative", zIndex:1 }}>
             <h2 style={{ margin: "0 0 14px", fontSize: 28, fontWeight: 800, color: "#fff", letterSpacing: "-0.5px" }}>
-              Are You Ready to Embark on Your Career?
+              Ready to Build Stronger Employees and Future Leaders?
             </h2>
             <p style={{ margin: "0 0 32px", fontSize: 15, color: "rgba(255,255,255,0.85)", maxWidth: 520, marginLeft: "auto", marginRight: "auto", lineHeight: 1.7 }}>
-              Join thousands of already existing students who are implementing their future with SaarthiX.
+              Start structured employee development with role-based learning, assessments, and leadership-level tracking.
             </p>
             <Link
               href="/role/"
@@ -512,14 +459,14 @@ export default function HomePage() {
                 borderRadius: 9,
                 border: "2px solid #fff",
                 background: "#fff",
-                color: "#0d1b2a",
+                color: "#4c1d95",
                 fontSize: 15,
                 fontWeight: 700,
                 cursor: "pointer",
                 textDecoration: "none",
               }}
             >
-              Get Started
+              Start Employee Development
             </Link>
           </div>
         </div>

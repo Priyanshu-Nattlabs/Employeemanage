@@ -351,6 +351,8 @@ function RolePageContent() {
   const ctxIndustry  = searchParams.get("industry")  ?? "";
   const ctxEducation = searchParams.get("education") ?? "";
   const ctxSpecialization = searchParams.get("specialization") ?? "";
+  const targetStartDate = searchParams.get("targetStartDate") ?? "";
+  const targetCompletionDate = searchParams.get("targetCompletionDate") ?? "";
 
   /* manager → "recommend role" flow context (passed via querystring from /dashboard/manager) */
   const recommendFor   = searchParams.get("recommendFor")   ?? "";
@@ -668,7 +670,11 @@ function RolePageContent() {
     const snapshot = { ...data, topicsCache, savedAt: new Date().toISOString() };
     const res = await fetch(`${API}/api/role-preparation/start/${enc(roleName)}?studentId=${enc(userId)}`, {
       method: "POST", headers: { "content-type": "application/json" },
-      body: JSON.stringify({ ganttChartData: snapshot }),
+      body: JSON.stringify({
+        ganttChartData: snapshot,
+        targetStartDate: targetStartDate || undefined,
+        targetCompletionDate: targetCompletionDate || undefined,
+      }),
     });
     setSavedMsg("Preparation locked & saved!"); setTimeout(() => setSavedMsg(""), 3000);
     await load();
@@ -700,7 +706,7 @@ function RolePageContent() {
           }),
         }
       );
-      setSavedMsg("Known skills saved. Test section is ready.");
+      setSavedMsg("Known skills saved. Complete the combined test to unlock preparation start.");
       setTimeout(() => setSavedMsg(""), 3000);
       await load();
     } finally {
@@ -813,6 +819,8 @@ function RolePageContent() {
   const knownSkillsSet = new Set(knownSkillsSelection || []);
   const testQueueSkills: string[] = Array.isArray(prep?.knownSkillsForTest) ? prep.knownSkillsForTest : [];
   const passedKnownSkills: string[] = Array.isArray(prep?.passedKnownSkills) ? prep.passedKnownSkills : [];
+  const knownSkillsTestSubmitted = !!prep?.knownSkillsTestSubmitted;
+  const canActivatePreparation = testQueueSkills.length === 0 || knownSkillsTestSubmitted;
 
   /* Build skill-requirement cards directly from Gantt tasks (source of truth).
      Augment with prerequisites / description from skillRequirements where names match.
@@ -882,6 +890,70 @@ function RolePageContent() {
     ? (topicsCache[tooltip.topKey]?.[tooltip.month] ?? null)
     : null;
   const tooltipIsLoading = tooltip ? !!topicsLoading[tooltip.topKey] : false;
+  const showSkillSelectionOnly = !prep?.knownSkillsConfigured;
+
+  if (showSkillSelectionOnly) {
+    return (
+      <div style={{ maxWidth: 1200 }}>
+        <p style={{ color:"#64748b", fontSize:13, marginBottom:14 }}>
+          <Link href="/" style={{ color:"#3b82f6" }}>Home</Link> {" › "}
+          {ctxIndustry && <><Link href={`/industry/${enc(ctxIndustry)}`} style={{ color:"#3b82f6" }}>{ctxIndustry}</Link>{" › "}</>}
+          {ctxEducation && <><Link href={`/education/${enc(ctxEducation)}${ctxIndustry?`?industry=${enc(ctxIndustry)}`:""}`} style={{ color:"#3b82f6" }}>{ctxEducation}</Link>{" › "}</>}
+          {!ctxIndustry && !ctxEducation && <><Link href="/role" style={{ color:"#3b82f6" }}>Roles</Link>{" › "}</>}
+          {roleName}
+        </p>
+
+        <div style={{
+          background:"linear-gradient(135deg, #0F1724 0%, #0F2B43 55%, #2C6099 100%)",
+          borderRadius:12, padding:"24px 28px", marginBottom:16,
+          boxShadow:"0 8px 32px rgba(15,23,36,.35)"
+        }}>
+          <h1 style={{ margin:0, fontSize:28, fontWeight:900, color:"white", letterSpacing:"-.5px" }}>{roleName}</h1>
+          <p style={{ margin:"8px 0 0", color:"rgba(255,255,255,.78)", fontSize:14 }}>
+            Step 1: select skills you already know. Step 2: take one combined test. Then start preparation.
+          </p>
+        </div>
+
+        {allRoleSkillNames.length > 0 && (
+          <div style={{ ...card, marginBottom: 16, borderLeft: "4px solid #3170A5" }}>
+            <h3 style={{ margin: "0 0 6px", fontSize: 16, color: "#0F1724" }}>Step 2: Skills you already know</h3>
+            <p style={{ margin: "0 0 10px", fontSize: 13, color: "#64748b" }}>
+              Select skills you already know. These move to the test section and are removed from the learning blueprint for now.
+            </p>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 8, marginBottom: 12 }}>
+              {allRoleSkillNames.map((skill) => {
+                const checked = knownSkillsSet.has(skill);
+                return (
+                  <label key={skill} style={{ display: "flex", gap: 8, alignItems: "center", border: "1px solid #e2e8f0", borderRadius: 8, padding: "8px 10px", background: checked ? "#EFF6FF" : "white" }}>
+                    <input
+                      type="checkbox"
+                      checked={checked}
+                      onChange={(e) => {
+                        setKnownSkillsSelection((prev) => {
+                          const next = new Set(prev);
+                          if (e.target.checked) next.add(skill);
+                          else next.delete(skill);
+                          return Array.from(next);
+                        });
+                      }}
+                    />
+                    <span style={{ fontSize: 13, color: "#0f172a" }}>{skill}</span>
+                  </label>
+                );
+              })}
+            </div>
+            <button
+              onClick={saveKnownSkillsAndStart}
+              disabled={savingKnownSkills}
+              style={{ ...btn("white", "#3170A5", "#3170A5"), border: "none" as any }}
+            >
+              {savingKnownSkills ? "Saving..." : "Save Skills & Open Blueprint"}
+            </button>
+          </div>
+        )}
+      </div>
+    );
+  }
 
   /* ══ RENDER ═══════════════════════════════════════════════ */
   return (
@@ -1092,8 +1164,15 @@ function RolePageContent() {
               ) : (
                 <button
                   style={{ background:"#3170A5", border:"none", color:"white", fontWeight:800, fontSize:14, padding:"11px 24px", borderRadius:8, cursor:"pointer", display:"inline-flex", alignItems:"center", gap:8, boxShadow:"0 4px 14px rgba(49,112,165,.5)", transition:"opacity .15s" }}
-                  onClick={startPrep} disabled={saving || !data?.plan}
-                  title={!data?.plan ? "Wait for chart to load" : "Lock this chart and start tracking progress"}
+                  onClick={startPrep}
+                  disabled={saving || !data?.plan || !canActivatePreparation}
+                  title={
+                    !data?.plan
+                      ? "Wait for chart to load"
+                      : !canActivatePreparation
+                      ? "Submit the combined known-skills test first"
+                      : "Lock this chart and start tracking progress"
+                  }
                 >
                   {saving ? "Saving…" : "▶ Start Preparation"}
                 </button>
@@ -1140,7 +1219,7 @@ function RolePageContent() {
         </div>
       )}
 
-      {!prep?.isActive && allRoleSkillNames.length > 0 && (
+      {(!prep?.knownSkillsConfigured) && allRoleSkillNames.length > 0 && (
         <div style={{ ...card, marginBottom: 16, borderLeft: "4px solid #3170A5" }}>
           <h3 style={{ margin: "0 0 6px", fontSize: 16, color: "#0F1724" }}>Step 2: Skills you already know</h3>
           <p style={{ margin: "0 0 10px", fontSize: 13, color: "#64748b" }}>
@@ -1201,25 +1280,33 @@ function RolePageContent() {
         ))}
       </div>
 
-      {prep?.isActive && (
+      {prep?.knownSkillsConfigured && (
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 20 }}>
           <div style={{ ...card, borderTop: "3px solid #2563EB" }}>
-            <h3 style={{ margin: "0 0 8px", fontSize: 15, color: "#0F1724" }}>🧠 Test Section</h3>
+            <h3 style={{ margin: "0 0 8px", fontSize: 15, color: "#0F1724" }}>🧠 Combined Test Section</h3>
             <p style={{ margin: "0 0 10px", fontSize: 12, color: "#64748b" }}>
-              Skills selected as known. Pass test to earn badge and mark completed.
+              One medium-hard test is generated for all selected known skills (20-30 questions).
             </p>
             {testQueueSkills.length === 0 ? (
-              <p style={{ margin: 0, fontSize: 13, color: "#94a3b8" }}>No pending test skills.</p>
+              <p style={{ margin: 0, fontSize: 13, color: "#94a3b8" }}>No known skills selected for test.</p>
             ) : (
               <div style={{ display: "grid", gap: 8 }}>
-                {testQueueSkills.map((skill) => (
-                  <Link key={skill} href={`/role/${enc(roleName)}/test/${enc(skill)}`} style={{ textDecoration: "none" }}>
-                    <div style={{ border: "1px solid #dbeafe", borderRadius: 8, padding: "9px 10px", color: "#1e3a8a", fontWeight: 700, background: "#EFF6FF" }}>
-                      {skill} · Take test
+                <div style={{ border: "1px solid #dbeafe", borderRadius: 8, padding: "10px", background: "#EFF6FF" }}>
+                  <p style={{ margin: "0 0 8px", fontSize: 12, color: "#1e3a8a", fontWeight: 700 }}>
+                    Included skills: {testQueueSkills.join(", ")}
+                  </p>
+                  <Link href={`/role/${enc(roleName)}/test/known-skills`} style={{ textDecoration: "none" }}>
+                    <div style={{ border: "1px solid #93c5fd", borderRadius: 8, padding: "9px 10px", color: "#1e3a8a", fontWeight: 800, background: "white", textAlign: "center" }}>
+                      {knownSkillsTestSubmitted ? "Retake Combined Test" : "Take Combined Test"}
                     </div>
                   </Link>
-                ))}
+                </div>
               </div>
+            )}
+            {!canActivatePreparation && (
+              <p style={{ margin: "10px 0 0", fontSize: 12, color: "#b45309" }}>
+                Submit this combined test to unlock Start Preparation.
+              </p>
             )}
           </div>
           <div style={{ ...card, borderTop: "3px solid #16A34A" }}>
