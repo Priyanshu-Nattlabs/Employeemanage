@@ -46,6 +46,10 @@ export class RolePreparation {
   @Prop({ default: true }) isActive!: boolean;
   @Prop({ type: Object, default: {} }) skillProgress!: Record<string, SkillProgress>;
   @Prop({ type: Object }) ganttChartData?: Record<string, unknown>;
+  @Prop({ type: [String], default: [] }) knownSkillsForTest!: string[];
+  @Prop({ type: [String], default: [] }) passedKnownSkills!: string[];
+  @Prop({ type: [String], default: [] }) failedKnownSkills!: string[];
+  @Prop({ type: [Object], default: [] }) earnedBadges!: Array<Record<string, unknown>>;
 }
 
 @Schema({ _id: false })

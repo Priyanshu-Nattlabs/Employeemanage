@@ -18,7 +18,7 @@ export default function EmployeeLoginPage() {
       const r = await orgLogin({ email, password });
       if (r.user.accountType !== "EMPLOYEE") throw new Error("Please use Admin login.");
       setOrgAuthInStorage(r.token, r.user);
-      window.location.href = r.user.currentRole === "MANAGER" ? "/dashboard/manager" : "/";
+      window.location.href = r.user.currentRole === "MANAGER" ? "/dashboard/manager" : "/target-role";
     } catch (err: any) {
       setError(err?.message || "Login failed");
     } finally {
