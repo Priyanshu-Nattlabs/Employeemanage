@@ -27,9 +27,11 @@ export function NavBar() {
   const isLoggedIn = mounted && Boolean(orgAuth.token);
   const isAdmin = Boolean(user && user.accountType === "ADMIN");
   const isManager = Boolean(user && user.accountType === "EMPLOYEE" && user.currentRole === "MANAGER");
-  const isEmployee = Boolean(user && user.accountType === "EMPLOYEE" && !isManager);
+  const isHR = Boolean(user && user.accountType === "EMPLOYEE" && user.currentRole === "HR");
+  const isManagerOrHR = isManager || isHR;
+  const isEmployee = Boolean(user && user.accountType === "EMPLOYEE" && !isManagerOrHR);
 
-  const dashboardHref = isAdmin ? "/dashboard/admin" : isManager ? "/dashboard/manager" : "/";
+  const dashboardHref = isAdmin ? "/dashboard/admin" : isManagerOrHR ? "/dashboard/manager" : "/";
   const profileHref = isAdmin ? "/profile/admin" : "/profile/employee";
   const profileLabel = isAdmin ? "Admin Profile" : "Employee Profile";
 
@@ -66,7 +68,7 @@ export function NavBar() {
 
         {isLoggedIn ? (
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            {(isAdmin || isManager) ? (
+            {(isAdmin || isManagerOrHR) ? (
               <Link href={dashboardHref} style={portalDashStyle}>
                 Dashboard
               </Link>
@@ -83,8 +85,8 @@ export function NavBar() {
             <Link href="/auth/employee/login" style={portalLoginStyle}>
               Login / Signup
             </Link>
-            <Link href="/auth/admin/login" style={portalCreateStyle}>
-              Admin
+            <Link href="/auth/manager/login" style={portalCreateStyle}>
+              Manager/HR
             </Link>
           </div>
         ) : null}

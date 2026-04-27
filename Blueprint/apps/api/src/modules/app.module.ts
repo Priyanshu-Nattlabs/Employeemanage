@@ -1,6 +1,7 @@
 import { Module } from "@nestjs/common";
 import { ConfigModule, ConfigService } from "@nestjs/config";
 import { MongooseModule } from "@nestjs/mongoose";
+import path from "path";
 import { BlueprintModule } from "./blueprint/blueprint.module";
 import { SkillTestModule } from "./skill-test/skill-test.module";
 import { RolePreparationModule } from "./role-preparation/role-preparation.module";
@@ -10,7 +11,15 @@ import { OrgAuthModule } from "./org-auth/org-auth.module";
 
 @Module({
   imports: [
-    ConfigModule.forRoot({ isGlobal: true }),
+    ConfigModule.forRoot({
+      isGlobal: true,
+      // Load root ".env" (repo) + API ".env" (apps/api) for all run modes.
+      // This makes SMTP/Gmail settings in the root ".env" available to the backend.
+      envFilePath: [
+        path.resolve(__dirname, "../../../../.env"),
+        path.resolve(__dirname, "../../../.env"),
+      ],
+    }),
     MongooseModule.forRootAsync({
       inject: [ConfigService],
       useFactory: (config: ConfigService) => ({

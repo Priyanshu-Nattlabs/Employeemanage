@@ -1,7 +1,7 @@
 import { getApiPrefix } from "@/lib/apiBase";
 
 export type OrgAccountType = "EMPLOYEE" | "ADMIN";
-export type OrgCurrentRole = "EMPLOYEE" | "MANAGER";
+export type OrgCurrentRole = "EMPLOYEE" | "MANAGER" | "HR";
 
 export type OrgUser = {
   id: string;
@@ -12,10 +12,13 @@ export type OrgUser = {
   accountType: OrgAccountType;
   currentRole: OrgCurrentRole;
   designation?: string;
+  department?: string;
   employeeId?: string;
   mobileNo?: string;
   reportingManagerEmail?: string;
 };
+
+export type OrgRegisterResponse = { verificationRequired: true; email: string };
 
 const TOKEN_KEY = "jbv2_org_token";
 const USER_KEY = "jbv2_org_user";
@@ -61,6 +64,7 @@ export async function orgRegisterEmployee(body: {
   password: string;
   fullName: string;
   designation: string;
+  department?: string;
   companyName: string;
   companyDomain?: string;
   employeeId: string;
@@ -68,7 +72,7 @@ export async function orgRegisterEmployee(body: {
   mobileNo: string;
   reportingManagerEmail: string;
 }) {
-  return apiJson<{ token: string; user: OrgUser }>("/api/org-auth/register/employee", {
+  return apiJson<OrgRegisterResponse>("/api/org-auth/register/employee", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body)
@@ -76,10 +80,26 @@ export async function orgRegisterEmployee(body: {
 }
 
 export async function orgRegisterAdmin(body: { email: string; password: string; fullName: string; companyName: string; companyDomain?: string }) {
-  return apiJson<{ token: string; user: OrgUser }>("/api/org-auth/register/admin", {
+  return apiJson<OrgRegisterResponse>("/api/org-auth/register/admin", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body)
+  });
+}
+
+export async function orgVerifyEmailOtp(body: { email: string; otp: string }) {
+  return apiJson<{ token: string; user: OrgUser }>("/api/org-auth/verify-email-otp", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+}
+
+export async function orgResendEmailOtp(body: { email: string }) {
+  return apiJson<{ ok: true; message?: string }>("/api/org-auth/resend-email-otp", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
   });
 }
 
@@ -112,6 +132,30 @@ export async function orgListEmployeesAdminSummary(token: string) {
 
 export async function orgListEmployeesManagerSummary(token: string) {
   return apiJson<any[]>(`/api/org-auth/employees-summary`, {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+}
+
+export type OrgManagerActivity = {
+  activityFeed: Array<{
+    type: "TEST_PASSED" | "TEST_FAILED" | "SKILL_COMPLETED" | "PREP_STARTED";
+    at: string | null;
+    employeeId: string;
+    employeeName: string;
+    employeeEmail: string;
+    employeeDepartment: string | null;
+    roleName?: string | null;
+    skillName?: string | null;
+    score?: number | null;
+  }>;
+  dailySeries: Array<{ date: string; count: number; avgScore: number | null; passed: number; failed: number }>;
+  topSkills: Array<{ name: string; attempts: number; passRate: number; avgScore: number | null }>;
+  roleAggregates: Array<{ name: string; learners: number; avgPct: number }>;
+  engagement: { active7d: number; active30d: number; dormant: number; total: number };
+};
+
+export async function orgGetEmployeesActivity(token: string) {
+  return apiJson<OrgManagerActivity>(`/api/org-auth/employees-activity`, {
     headers: { Authorization: `Bearer ${token}` }
   });
 }

@@ -14,6 +14,10 @@ export class RegisterEmployeeDto {
   @IsString()
   designation!: string;
 
+  @IsOptional()
+  @IsString()
+  department?: string;
+
   @IsString()
   companyName!: string;
 
@@ -25,8 +29,8 @@ export class RegisterEmployeeDto {
   @IsString()
   employeeId!: string;
 
-  @IsIn(["EMPLOYEE", "MANAGER"])
-  currentRole!: "EMPLOYEE" | "MANAGER";
+  @IsIn(["EMPLOYEE", "MANAGER", "HR"])
+  currentRole!: "EMPLOYEE" | "MANAGER" | "HR";
 
   @IsString()
   mobileNo!: string;
@@ -60,5 +64,19 @@ export class LoginDto {
 
   @IsString()
   password!: string;
+}
+
+export class VerifyEmailOtpDto {
+  @IsEmail()
+  email!: string;
+
+  @IsString()
+  @Matches(/^\d{6}$/, { message: "otp must be a 6-digit code" })
+  otp!: string;
+}
+
+export class ResendEmailOtpDto {
+  @IsEmail()
+  email!: string;
 }
 
