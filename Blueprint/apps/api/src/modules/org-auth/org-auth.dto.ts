@@ -62,3 +62,17 @@ export class LoginDto {
   password!: string;
 }
 
+export class VerifyEmailOtpDto {
+  @IsEmail()
+  email!: string;
+
+  @IsString()
+  @Matches(/^\d{6}$/, { message: "otp must be a 6-digit code" })
+  otp!: string;
+}
+
+export class ResendEmailOtpDto {
+  @IsEmail()
+  email!: string;
+}
+

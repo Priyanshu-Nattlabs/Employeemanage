@@ -1,6 +1,6 @@
 import { Body, Controller, Get, Headers, Patch, Post, Query, UnauthorizedException } from "@nestjs/common";
 import { OrgAuthService } from "./org-auth.service";
-import { LoginDto, RegisterAdminDto, RegisterEmployeeDto } from "./org-auth.dto";
+import { LoginDto, RegisterAdminDto, RegisterEmployeeDto, ResendEmailOtpDto, VerifyEmailOtpDto } from "./org-auth.dto";
 
 function getBearerToken(authHeader?: string): string {
   const h = (authHeader || "").trim();
@@ -21,6 +21,16 @@ export class OrgAuthController {
   @Post("register/admin")
   registerAdmin(@Body() body: RegisterAdminDto) {
     return this.service.registerAdmin(body as any);
+  }
+
+  @Post("verify-email-otp")
+  verifyEmailOtp(@Body() body: VerifyEmailOtpDto) {
+    return this.service.verifyEmailOtp(body.email, body.otp);
+  }
+
+  @Post("resend-email-otp")
+  resendEmailOtp(@Body() body: ResendEmailOtpDto) {
+    return this.service.resendEmailOtp(body.email);
   }
 
   @Post("login")

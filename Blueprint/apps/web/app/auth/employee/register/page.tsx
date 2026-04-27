@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
-import { orgRegisterEmployee, setOrgAuthInStorage, type OrgCurrentRole } from "@/lib/orgAuth";
+import { orgRegisterEmployee, type OrgCurrentRole } from "@/lib/orgAuth";
 
 function domainFromEmail(email: string) {
   const v = email.trim().toLowerCase();
@@ -50,8 +50,8 @@ export default function EmployeeRegisterPage() {
         companyDomain: inferredDomain
       });
 
-      setOrgAuthInStorage(r.token, r.user);
-      window.location.href = r.user.currentRole === "MANAGER" ? "/dashboard/manager" : "/";
+      const next = currentRole === "MANAGER" ? "/dashboard/manager" : "/";
+      window.location.href = `/auth/verify-otp?email=${encodeURIComponent(r.email)}&next=${encodeURIComponent(next)}`;
     } catch (err: any) {
       setError(err?.message || "Registration failed");
     } finally {

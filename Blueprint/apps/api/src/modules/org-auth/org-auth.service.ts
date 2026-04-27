@@ -3,6 +3,8 @@ import { InjectModel } from "@nestjs/mongoose";
 import type { Model } from "mongoose";
 import bcrypt from "bcryptjs";
 import * as jwt from "jsonwebtoken";
+import crypto from "crypto";
+import nodemailer from "nodemailer";
 import {
   CompanyUser,
   type CompanyUserDocument,
@@ -16,6 +18,9 @@ import {
 
 const JWT_SECRET = process.env.ORG_AUTH_JWT_SECRET || process.env.JWT_SECRET || "dev-only-change-me";
 const JWT_EXPIRES_IN = process.env.ORG_AUTH_JWT_EXPIRES_IN || "7d";
+const OTP_SECRET = process.env.ORG_EMAIL_OTP_SECRET || process.env.OTP_SECRET || "dev-only-change-me";
+const OTP_TTL_MINUTES = Number(process.env.ORG_EMAIL_OTP_TTL_MINUTES || "10");
+const OTP_RESEND_COOLDOWN_SECONDS = Number(process.env.ORG_EMAIL_OTP_RESEND_COOLDOWN_SECONDS || "30");
 
 function normalizeEmail(email: string): string {
   return (email || "").trim().toLowerCase();
@@ -38,6 +43,66 @@ export class OrgAuthService {
     @InjectModel(SkillTest.name) private readonly testModel: Model<SkillTestDocument>,
   ) {}
 
+  private otpHash(email: string, otp: string): string {
+    const h = crypto.createHash("sha256");
+    h.update(`${normalizeEmail(email)}:${otp}:${OTP_SECRET}`);
+    return h.digest("hex");
+  }
+
+  private generateOtp(): string {
+    // 6-digit numeric code (000000-999999)
+    const n = crypto.randomInt(0, 1_000_000);
+    return String(n).padStart(6, "0");
+  }
+
+  private async sendOtpEmail(email: string, otp: string) {
+    const host = (process.env.SMTP_HOST || "").trim();
+    const port = Number(process.env.SMTP_PORT || "0");
+    const user = (process.env.SMTP_USER || "").trim();
+    const pass = (process.env.SMTP_PASS || "").trim();
+    const from = (process.env.SMTP_FROM || user || "no-reply@example.com").trim();
+
+    // If SMTP is not configured, don't fail the signup flow in dev; just log it.
+    if (!host || !port || !user || !pass) {
+      // eslint-disable-next-line no-console
+      console.log(`[ORG AUTH] OTP for ${email}: ${otp} (SMTP not configured)`);
+      return;
+    }
+
+    const secure = port === 465;
+    const transport = nodemailer.createTransport({
+      host,
+      port,
+      secure,
+      auth: { user, pass },
+    });
+
+    await transport.sendMail({
+      from,
+      to: normalizeEmail(email),
+      subject: "Your verification code",
+      text: `Your email verification code is ${otp}. It expires in ${OTP_TTL_MINUTES} minutes.`,
+      html: `
+        <div style="font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial; line-height:1.5">
+          <h2 style="margin:0 0 10px">Verify your email</h2>
+          <p style="margin:0 0 14px">Use this code to verify your email address:</p>
+          <div style="font-size:28px; font-weight:800; letter-spacing:6px; margin:0 0 14px">${otp}</div>
+          <p style="margin:0; color:#475569">This code expires in ${OTP_TTL_MINUTES} minutes.</p>
+        </div>
+      `,
+    });
+  }
+
+  private async setAndSendEmailOtp(user: CompanyUserDocument) {
+    const otp = this.generateOtp();
+    user.emailVerified = false;
+    user.emailOtpHash = this.otpHash(user.email, otp);
+    user.emailOtpExpiresAt = new Date(Date.now() + OTP_TTL_MINUTES * 60_000);
+    user.emailOtpLastSentAt = new Date();
+    await user.save();
+    await this.sendOtpEmail(user.email, otp);
+  }
+
   private signToken(user: CompanyUserDocument) {
     const payload = {
       sub: user._id.toString(),
@@ -45,7 +110,7 @@ export class OrgAuthService {
       companyName: user.companyName,
       companyDomain: user.companyDomain,
       accountType: user.accountType,
-      currentRole: user.currentRole
+      currentRole: user.currentRole,
     };
     const secret: jwt.Secret = JWT_SECRET;
     const expiresIn: jwt.SignOptions["expiresIn"] = JWT_EXPIRES_IN as any;
@@ -101,26 +166,12 @@ export class OrgAuthService {
       currentRole: input.currentRole,
       accountType: "EMPLOYEE" as OrgAccountType,
       mobileNo: input.mobileNo?.trim(),
-      reportingManagerEmail: mgrEmail
+      reportingManagerEmail: mgrEmail,
+      emailVerified: false,
     });
 
-    const token = this.signToken(created);
-    return {
-      token,
-      user: {
-        id: created._id.toString(),
-        email: created.email,
-        fullName: created.fullName,
-        designation: created.designation,
-        companyName: created.companyName,
-        companyDomain: created.companyDomain,
-        employeeId: created.employeeId,
-        currentRole: created.currentRole,
-        accountType: created.accountType,
-        mobileNo: created.mobileNo,
-        reportingManagerEmail: created.reportingManagerEmail
-      }
-    };
+    await this.setAndSendEmailOtp(created);
+    return { verificationRequired: true, email: created.email };
   }
 
   async registerAdmin(input: { email: string; password: string; fullName: string; companyName: string; companyDomain?: string }) {
@@ -144,28 +195,19 @@ export class OrgAuthService {
       companyName: input.companyName?.trim(),
       companyDomain,
       currentRole: "EMPLOYEE",
-      accountType: "ADMIN" as OrgAccountType
+      accountType: "ADMIN" as OrgAccountType,
+      emailVerified: false,
     });
 
-    const token = this.signToken(created);
-    return {
-      token,
-      user: {
-        id: created._id.toString(),
-        email: created.email,
-        fullName: created.fullName,
-        companyName: created.companyName,
-        companyDomain: created.companyDomain,
-        currentRole: created.currentRole,
-        accountType: created.accountType
-      }
-    };
+    await this.setAndSendEmailOtp(created);
+    return { verificationRequired: true, email: created.email };
   }
 
   async login(emailRaw: string, password: string) {
     const email = normalizeEmail(emailRaw);
     const user = await this.companyUserModel.findOne({ email });
     if (!user) throw new UnauthorizedException("Invalid email or password");
+    if (!user.emailVerified) throw new UnauthorizedException("Email not verified. Please verify your email with OTP.");
     const ok = await bcrypt.compare(password, user.passwordHash);
     if (!ok) throw new UnauthorizedException("Invalid email or password");
     const token = this.signToken(user);
@@ -182,8 +224,85 @@ export class OrgAuthService {
         currentRole: user.currentRole,
         accountType: user.accountType,
         mobileNo: user.mobileNo,
-        reportingManagerEmail: user.reportingManagerEmail
-      }
+        reportingManagerEmail: user.reportingManagerEmail,
+      },
+    };
+  }
+
+  async resendEmailOtp(emailRaw: string) {
+    const email = normalizeEmail(emailRaw);
+    const user = await this.companyUserModel.findOne({ email });
+    if (!user) throw new NotFoundException("User not found");
+    if (user.emailVerified) return { ok: true, message: "Email already verified" };
+
+    const last = user.emailOtpLastSentAt ? new Date(user.emailOtpLastSentAt).getTime() : 0;
+    const now = Date.now();
+    if (last && now - last < OTP_RESEND_COOLDOWN_SECONDS * 1000) {
+      const wait = Math.ceil((OTP_RESEND_COOLDOWN_SECONDS * 1000 - (now - last)) / 1000);
+      throw new BadRequestException(`Please wait ${wait}s before requesting another OTP`);
+    }
+
+    await this.setAndSendEmailOtp(user);
+    return { ok: true };
+  }
+
+  async verifyEmailOtp(emailRaw: string, otpRaw: string) {
+    const email = normalizeEmail(emailRaw);
+    const otp = (otpRaw || "").trim();
+    const user = await this.companyUserModel.findOne({ email });
+    if (!user) throw new NotFoundException("User not found");
+    if (user.emailVerified) {
+      const token = this.signToken(user);
+      return {
+        token,
+        user: {
+          id: user._id.toString(),
+          email: user.email,
+          fullName: user.fullName,
+          designation: user.designation,
+          companyName: user.companyName,
+          companyDomain: user.companyDomain,
+          employeeId: user.employeeId,
+          currentRole: user.currentRole,
+          accountType: user.accountType,
+          mobileNo: user.mobileNo,
+          reportingManagerEmail: user.reportingManagerEmail,
+        },
+      };
+    }
+
+    const exp = user.emailOtpExpiresAt ? new Date(user.emailOtpExpiresAt).getTime() : 0;
+    if (!user.emailOtpHash || !exp || Date.now() > exp) {
+      throw new BadRequestException("OTP expired. Please resend OTP.");
+    }
+
+    const got = this.otpHash(email, otp);
+    const a = Buffer.from(got, "hex");
+    const b = Buffer.from(user.emailOtpHash, "hex");
+    const ok = a.length === b.length && crypto.timingSafeEqual(a, b);
+    if (!ok) throw new BadRequestException("Invalid OTP");
+
+    user.emailVerified = true;
+    user.emailOtpHash = undefined;
+    user.emailOtpExpiresAt = undefined;
+    await user.save();
+
+    const token = this.signToken(user);
+    return {
+      token,
+      user: {
+        id: user._id.toString(),
+        email: user.email,
+        fullName: user.fullName,
+        designation: user.designation,
+        companyName: user.companyName,
+        companyDomain: user.companyDomain,
+        employeeId: user.employeeId,
+        currentRole: user.currentRole,
+        accountType: user.accountType,
+        mobileNo: user.mobileNo,
+        reportingManagerEmail: user.reportingManagerEmail,
+      },
     };
   }
 

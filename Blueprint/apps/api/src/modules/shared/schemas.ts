@@ -102,6 +102,11 @@ export class CompanyUser {
 
   @Prop() mobileNo?: string;
   @Prop({ lowercase: true, trim: true }) reportingManagerEmail?: string;
+
+  @Prop({ default: false }) emailVerified!: boolean;
+  @Prop() emailOtpHash?: string;
+  @Prop() emailOtpExpiresAt?: Date;
+  @Prop() emailOtpLastSentAt?: Date;
 }
 
 export type BlueprintDocument = HydratedDocument<Blueprint>;

@@ -42,6 +42,14 @@ export default function AdminLoginPage() {
         </label>
 
         {error ? <div style={errorBox}>{error}</div> : null}
+        {error?.toLowerCase?.().includes("not verified") ? (
+          <div style={{ fontSize: 13, color: "#475569" }}>
+            Need to verify?{" "}
+            <Link href={`/auth/verify-otp?email=${encodeURIComponent(email)}&next=${encodeURIComponent("/dashboard/admin")}`} style={link}>
+              Enter OTP
+            </Link>
+          </div>
+        ) : null}
 
         <button type="submit" disabled={loading} style={primaryBtn}>
           {loading ? "Logging in..." : "Login"}

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
-import { orgRegisterAdmin, setOrgAuthInStorage } from "@/lib/orgAuth";
+import { orgRegisterAdmin } from "@/lib/orgAuth";
 
 function domainFromEmail(email: string) {
   const v = email.trim().toLowerCase();
@@ -29,8 +29,7 @@ export default function AdminRegisterPage() {
     try {
       if (!inferredDomain) throw new Error("Please enter a valid company email");
       const r = await orgRegisterAdmin({ email, password, fullName, companyName, companyDomain: inferredDomain });
-      setOrgAuthInStorage(r.token, r.user);
-      window.location.href = "/dashboard/admin";
+      window.location.href = `/auth/verify-otp?email=${encodeURIComponent(r.email)}&next=${encodeURIComponent("/dashboard/admin")}`;
     } catch (err: any) {
       setError(err?.message || "Registration failed");
     } finally {

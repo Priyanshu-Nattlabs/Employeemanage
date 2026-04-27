@@ -17,6 +17,8 @@ export type OrgUser = {
   reportingManagerEmail?: string;
 };
 
+export type OrgRegisterResponse = { verificationRequired: true; email: string };
+
 const TOKEN_KEY = "jbv2_org_token";
 const USER_KEY = "jbv2_org_user";
 
@@ -68,7 +70,7 @@ export async function orgRegisterEmployee(body: {
   mobileNo: string;
   reportingManagerEmail: string;
 }) {
-  return apiJson<{ token: string; user: OrgUser }>("/api/org-auth/register/employee", {
+  return apiJson<OrgRegisterResponse>("/api/org-auth/register/employee", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body)
@@ -76,10 +78,26 @@ export async function orgRegisterEmployee(body: {
 }
 
 export async function orgRegisterAdmin(body: { email: string; password: string; fullName: string; companyName: string; companyDomain?: string }) {
-  return apiJson<{ token: string; user: OrgUser }>("/api/org-auth/register/admin", {
+  return apiJson<OrgRegisterResponse>("/api/org-auth/register/admin", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body)
+  });
+}
+
+export async function orgVerifyEmailOtp(body: { email: string; otp: string }) {
+  return apiJson<{ token: string; user: OrgUser }>("/api/org-auth/verify-email-otp", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+}
+
+export async function orgResendEmailOtp(body: { email: string }) {
+  return apiJson<{ ok: true; message?: string }>("/api/org-auth/resend-email-otp", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
   });
 }
 
