@@ -15,7 +15,14 @@ export class RolePreparationService {
     return Array.from(new Set((items || []).map((x) => String(x || "").trim()).filter(Boolean)));
   }
 
-  async start(studentId: string, roleName: string, ganttChartData?: Record<string, unknown>) {
+  async start(
+    studentId: string,
+    roleName: string,
+    ganttChartData?: Record<string, unknown>,
+    targetStartDate?: string,
+    targetCompletionDate?: string,
+    activate = true
+  ) {
     let prep = await this.prepModel.findOne({ studentId, roleName });
 
     // Build skillProgress from tasks in the saved chart (not just the DB role doc),
@@ -44,13 +51,18 @@ export class RolePreparationService {
       prep = await this.prepModel.create({
         studentId,
         roleName,
-        preparationStartDate: new Date().toISOString().slice(0, 10),
-        isActive: true,
+        preparationStartDate: targetStartDate || new Date().toISOString().slice(0, 10),
+        targetCompletionDate: targetCompletionDate || undefined,
+        isActive: activate,
+        knownSkillsConfigured: false,
+        knownSkillsTestSubmitted: false,
         skillProgress,
         ganttChartData,
       });
     } else {
-      prep.isActive = true;
+      prep.isActive = activate;
+      if (targetStartDate) prep.preparationStartDate = targetStartDate;
+      if (targetCompletionDate) prep.targetCompletionDate = targetCompletionDate;
       if (ganttChartData) {
         prep.ganttChartData = ganttChartData;
         // Sync skillProgress to match the newly saved chart tasks
@@ -97,10 +109,12 @@ export class RolePreparationService {
       filteredChart = gc;
     }
 
-    await this.start(studentId, roleName, filteredChart);
+    await this.start(studentId, roleName, filteredChart, undefined, undefined, false);
     const prep = await this.prepModel.findOne({ studentId, roleName });
     if (!prep) throw new NotFoundException("Preparation not found");
 
+    prep.knownSkillsConfigured = true;
+    prep.knownSkillsTestSubmitted = false;
     prep.knownSkillsForTest = this.uniq([...(prep.knownSkillsForTest || []), ...known]);
     prep.passedKnownSkills = this.uniq(prep.passedKnownSkills || []);
     prep.failedKnownSkills = this.uniq((prep.failedKnownSkills || []).filter((x) => !knownSet.has(x)));
@@ -111,6 +125,14 @@ export class RolePreparationService {
       delete prep.skillProgress[k];
     }
     prep.markModified("skillProgress");
+    await prep.save();
+    return prep;
+  }
+
+  async markKnownSkillsTestSubmitted(studentId: string, roleName: string) {
+    const prep = await this.prepModel.findOne({ studentId, roleName });
+    if (!prep) return null;
+    prep.knownSkillsTestSubmitted = true;
     await prep.save();
     return prep;
   }

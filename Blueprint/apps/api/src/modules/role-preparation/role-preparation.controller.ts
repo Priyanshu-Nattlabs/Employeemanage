@@ -7,7 +7,14 @@ export class RolePreparationController {
 
   @Post("start/:roleName")
   start(@Param("roleName") roleName: string, @Query("studentId") studentId: string, @Body() body?: any) {
-    return this.service.start(studentId, decodeURIComponent(roleName), body?.ganttChartData);
+    return this.service.start(
+      studentId,
+      decodeURIComponent(roleName),
+      body?.ganttChartData,
+      body?.targetStartDate,
+      body?.targetCompletionDate,
+      body?.activate ?? true
+    );
   }
 
   @Put("known-skills/:roleName")

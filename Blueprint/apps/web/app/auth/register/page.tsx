@@ -62,7 +62,7 @@ export default function RegisterPage() {
           companyDomain: inferredDomain
         });
         setOrgAuthInStorage(r.token, r.user);
-        window.location.href = r.user.currentRole === "MANAGER" ? "/dashboard/manager" : "/";
+        window.location.href = "/target-role";
         return;
       }
 

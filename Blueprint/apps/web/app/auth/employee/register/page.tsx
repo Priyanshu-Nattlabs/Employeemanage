@@ -51,7 +51,7 @@ export default function EmployeeRegisterPage() {
       });
 
       setOrgAuthInStorage(r.token, r.user);
-      window.location.href = r.user.currentRole === "MANAGER" ? "/dashboard/manager" : "/";
+      window.location.href = "/target-role";
     } catch (err: any) {
       setError(err?.message || "Registration failed");
     } finally {

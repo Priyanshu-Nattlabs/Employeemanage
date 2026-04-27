@@ -141,6 +141,8 @@ export default function SkillTestPage() {
   const router   = useRouter();
   const roleName = decodeURIComponent(params.roleName);
   const skillName = decodeURIComponent(params.skillName);
+  const isCombinedKnownSkillsTest = skillName.toLowerCase() === "known-skills";
+  const displayTestTitle = isCombinedKnownSkillsTest ? "Combined Known Skills Test" : skillName;
 
   const [userId,     setUserId]     = useState("demo-student-1");
   const [test,       setTest]       = useState<TestType | null>(null);
@@ -149,6 +151,15 @@ export default function SkillTestPage() {
   const [error,      setError]      = useState("");
   const [currentQ,   setCurrentQ]   = useState(0);
   const [copied,     setCopied]     = useState(false);
+  const [cameraReady, setCameraReady] = useState(false);
+  const [cameraError, setCameraError] = useState("");
+  const [tabSwitchCount, setTabSwitchCount] = useState(0);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [proctoringStarted, setProctoringStarted] = useState(false);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const mediaStreamRef = useRef<MediaStream | null>(null);
+  const violationLockRef = useRef(false);
+  const tabExitTriggeredRef = useRef(false);
 
   // Ref-based answers map: immune to stale closures — always holds latest picks
   const answersRef = useRef<Record<string, string>>({});
@@ -180,10 +191,11 @@ export default function SkillTestPage() {
     try {
       setLoading(true);
       if (!isRetake) {
+        const inProgressUrl = isCombinedKnownSkillsTest
+          ? `${API}/api/skill-test/in-progress-known-skills?studentId=${encodeURIComponent(uid)}&roleName=${encodeURIComponent(roleName)}`
+          : `${API}/api/skill-test/in-progress?studentId=${encodeURIComponent(uid)}&roleName=${encodeURIComponent(roleName)}&skillName=${encodeURIComponent(skillName)}`;
         // On initial load, check for an existing in-progress test
-        const inProg = await fetch(
-          `${API}/api/skill-test/in-progress?studentId=${encodeURIComponent(uid)}&roleName=${encodeURIComponent(roleName)}&skillName=${encodeURIComponent(skillName)}`
-        );
+        const inProg = await fetch(inProgressUrl);
         if (inProg.ok) {
           const existing = await safeJson(inProg);
           if (existing && (existing._id || existing.id)) {
@@ -195,10 +207,25 @@ export default function SkillTestPage() {
           }
         }
       }
-      const started = await fetch(
-        `${API}/api/skill-test/start?studentId=${encodeURIComponent(uid)}&roleName=${encodeURIComponent(roleName)}&skillName=${encodeURIComponent(skillName)}`,
-        { method: "POST" }
-      );
+      let started: Response;
+      if (isCombinedKnownSkillsTest) {
+        const prepRes = await fetch(`${API}/api/role-preparation/${encodeURIComponent(roleName)}?studentId=${encodeURIComponent(uid)}`);
+        const prepBody = await safeJson(prepRes);
+        const selectedSkills = Array.isArray(prepBody?.knownSkillsForTest) ? prepBody.knownSkillsForTest : [];
+        started = await fetch(
+          `${API}/api/skill-test/start-known-skills?studentId=${encodeURIComponent(uid)}&roleName=${encodeURIComponent(roleName)}`,
+          {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ selectedSkills }),
+          }
+        );
+      } else {
+        started = await fetch(
+          `${API}/api/skill-test/start?studentId=${encodeURIComponent(uid)}&roleName=${encodeURIComponent(roleName)}&skillName=${encodeURIComponent(skillName)}`,
+          { method: "POST" }
+        );
+      }
       if (!started.ok) {
         const eb = await safeJson(started);
         throw new Error(eb?.message || `Server error ${started.status}`);
@@ -256,12 +283,129 @@ export default function SkillTestPage() {
     }
   };
 
+  const stopCamera = () => {
+    const stream = mediaStreamRef.current;
+    if (stream) {
+      stream.getTracks().forEach((t) => t.stop());
+      mediaStreamRef.current = null;
+    }
+    if (videoRef.current) {
+      videoRef.current.srcObject = null;
+    }
+  };
+
+  const startProctoring = async () => {
+    setCameraError("");
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+      mediaStreamRef.current = stream;
+      if (videoRef.current) videoRef.current.srcObject = stream;
+      setCameraReady(true);
+      setProctoringStarted(true);
+      try {
+        await document.documentElement.requestFullscreen?.();
+      } catch {
+        // Fullscreen may fail due to browser policy; test still continues with visibility checks.
+      }
+    } catch (e: any) {
+      setCameraReady(false);
+      setCameraError(e?.message || "Camera permission is required for proctored test");
+    }
+  };
+
+  const handleViolation = async (reason: string) => {
+    if (!test || test.status !== "IN_PROGRESS") return;
+    if (violationLockRef.current) return;
+    violationLockRef.current = true;
+    setTimeout(() => { violationLockRef.current = false; }, 500);
+    setError(`${reason}.`);
+  };
+
+  const handleTabSwitch = () => {
+    if (!test || test.status !== "IN_PROGRESS") return;
+    if (tabExitTriggeredRef.current) return;
+    setTabSwitchCount((prev) => {
+      const next = prev + 1;
+      if (next >= 3) {
+        tabExitTriggeredRef.current = true;
+        setError("Third tab switch detected. Exiting test.");
+        stopCamera();
+        if (document.fullscreenElement) void document.exitFullscreen().catch(() => {});
+        setTimeout(() => {
+          router.push(`/role/${encodeURIComponent(roleName)}`);
+        }, 300);
+      } else {
+        setError(`Warning ${next}/3: Tab switching detected. On 3rd switch, test will be exited.`);
+      }
+      return next;
+    });
+  };
+
+  useEffect(() => {
+    if (!proctoringStarted || !test || test.status !== "IN_PROGRESS") return;
+
+    const onVisibility = () => {
+      if (document.visibilityState === "hidden") handleTabSwitch();
+    };
+    const onFullscreen = () => {
+      const fs = !!document.fullscreenElement;
+      setIsFullscreen(fs);
+      if (!fs) void handleViolation("Exited fullscreen mode");
+    };
+    const onCopy = (e: ClipboardEvent) => {
+      e.preventDefault();
+      void handleViolation("Copy action blocked");
+    };
+    const onPaste = (e: ClipboardEvent) => {
+      e.preventDefault();
+      void handleViolation("Paste action blocked");
+    };
+    const onContext = (e: MouseEvent) => {
+      e.preventDefault();
+      void handleViolation("Right click blocked");
+    };
+
+    document.addEventListener("visibilitychange", onVisibility);
+    document.addEventListener("fullscreenchange", onFullscreen);
+    document.addEventListener("copy", onCopy);
+    document.addEventListener("paste", onPaste);
+    document.addEventListener("contextmenu", onContext);
+    setIsFullscreen(!!document.fullscreenElement);
+
+    return () => {
+      document.removeEventListener("visibilitychange", onVisibility);
+      document.removeEventListener("fullscreenchange", onFullscreen);
+      document.removeEventListener("copy", onCopy);
+      document.removeEventListener("paste", onPaste);
+      document.removeEventListener("contextmenu", onContext);
+    };
+  }, [proctoringStarted, test]);
+
+  useEffect(() => {
+    return () => {
+      stopCamera();
+      if (document.fullscreenElement) {
+        void document.exitFullscreen().catch(() => {});
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!test) return;
+    if (test.status !== "IN_PROGRESS") {
+      stopCamera();
+      if (document.fullscreenElement) {
+        void document.exitFullscreen().catch(() => {});
+      }
+    }
+  }, [test]);
+
   /* ── Loading ── */
   if (loading) return (
     <div style={{ display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", minHeight:"60vh", gap:18 }}>
       <style>{`@keyframes spin{from{transform:rotate(0)}to{transform:rotate(360deg)}}`}</style>
       <div style={{ width:52, height:52, border:"4px solid #e9d5ff", borderTop:"4px solid #8b5cf6", borderRadius:"50%", animation:"spin 1s linear infinite" }}/>
-      <p style={{ color:"#6366f1", fontWeight:700, fontSize:16 }}>Generating questions for<br/><strong>{skillName}</strong>…</p>
+      <p style={{ color:"#6366f1", fontWeight:700, fontSize:16 }}>Generating questions for<br/><strong>{displayTestTitle}</strong>…</p>
       <p style={{ color:"#94a3b8", fontSize:13 }}>This may take up to 20 seconds</p>
     </div>
   );
@@ -283,12 +427,37 @@ export default function SkillTestPage() {
 
   if (!test) return <p style={{ padding:24 }}>No test data.</p>;
 
+  if (!cameraReady) {
+    return (
+      <div style={{ maxWidth: 760, margin: "0 auto", padding: "10px 0 32px" }}>
+        <div style={{ ...card }}>
+          <h2 style={{ margin: "0 0 8px", fontSize: 22, color: "#0f172a" }}>🔒 Proctored Test Setup</h2>
+          <p style={{ margin: "0 0 12px", color: "#475569", fontSize: 14 }}>
+            Camera access is required. Tab switching, exiting fullscreen, copy/paste, and right click are monitored.
+          </p>
+          <div style={{ border: "1px solid #e2e8f0", borderRadius: 12, padding: 10, marginBottom: 12, background: "#f8fafc" }}>
+            <video ref={videoRef} autoPlay muted playsInline style={{ width: "100%", maxHeight: 260, borderRadius: 10, background: "#0f172a" }} />
+          </div>
+          {cameraError && <p style={{ margin: "0 0 10px", color: "#dc2626", fontSize: 13 }}>{cameraError}</p>}
+          <div style={{ display: "flex", gap: 8 }}>
+            <button style={btn("white", "#2563eb")} onClick={() => { void startProctoring(); }}>
+              Enable Camera & Start Proctoring
+            </button>
+            <Link href={`/role/${encodeURIComponent(roleName)}`}>
+              <button style={btn("#1e293b", "#f1f5f9", "#e2e8f0")}>Cancel</button>
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   /* ── Result screen ── */
   if (test.status !== "IN_PROGRESS") {
     const passed = (test.score ?? 0) >= 75;
     const score  = test.score ?? 0;
     const today  = new Date().toLocaleDateString("en-US", { year:"numeric", month:"long", day:"numeric" });
-    const liText = `🏆 I just passed the "${skillName}" skill assessment for ${roleName} on JobBlueprint with a score of ${score}%! Career roadmaps and skill tracking. #CareerDevelopment #JobBlueprint`;
+    const liText = `🏆 I just passed the "${displayTestTitle}" skill assessment for ${roleName} on JobBlueprint with a score of ${score}%! Career roadmaps and skill tracking. #CareerDevelopment #JobBlueprint`;
     const liUrl  = `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent("https://jobblueprint.app")}&summary=${encodeURIComponent(liText)}`;
 
     return (
@@ -305,7 +474,7 @@ export default function SkillTestPage() {
         {passed ? (
           /* ══ PASSED ══════════════════════════════════════════ */
           <div style={{ animation:"fadeUp .5s ease" }}>
-            <PassBadge skillName={skillName} roleName={roleName} score={score} date={today} />
+            <PassBadge skillName={displayTestTitle} roleName={roleName} score={score} date={today} />
 
             {/* action bar */}
             <div style={{ marginTop:20, display:"flex", flexDirection:"column", gap:12 }}>
@@ -350,7 +519,7 @@ export default function SkillTestPage() {
               <div style={{ padding: "36px 32px", textAlign: "center" }}>
                 <div style={{ fontSize: 56, marginBottom: 12, animation:"pop .5s ease" }}>😔</div>
                 <h2 style={{ margin:"0 0 6px", color:"white", fontSize:26, fontWeight:900 }}>Not Passed</h2>
-                <p style={{ margin:"0 0 20px", color:"rgba(255,255,255,.55)", fontSize:14 }}>{skillName}</p>
+                <p style={{ margin:"0 0 20px", color:"rgba(255,255,255,.55)", fontSize:14 }}>{displayTestTitle}</p>
 
                 <div style={{ position:"relative", display:"inline-flex", alignItems:"center", justifyContent:"center", marginBottom:20 }}>
                   <ScoreRing pct={score} size={120} stroke={13} />
@@ -414,8 +583,21 @@ export default function SkillTestPage() {
         <p style={{ margin:"0 0 6px", fontSize:13, opacity:.75 }}>
           <Link href={`/role/${encodeURIComponent(roleName)}`} style={{ color:"rgba(255,255,255,.8)", textDecoration:"none" }}>← {roleName}</Link>
         </p>
-        <h1 style={{ margin:"0 0 3px", fontSize:22, fontWeight:900 }}>🧠 {skillName}</h1>
-        <p style={{ margin:0, opacity:.8, fontSize:13 }}>Skill assessment · score ≥ 75% to pass</p>
+        <h1 style={{ margin:"0 0 3px", fontSize:22, fontWeight:900 }}>🧠 {displayTestTitle}</h1>
+        <p style={{ margin:0, opacity:.8, fontSize:13 }}>
+          {isCombinedKnownSkillsTest ? "One combined test for all selected known skills · score ≥ 75% to pass" : "Skill assessment · score ≥ 75% to pass"}
+        </p>
+        <div style={{ marginTop: 10, display: "flex", gap: 8, flexWrap: "wrap" }}>
+          <span style={{ background: "rgba(255,255,255,.16)", border: "1px solid rgba(255,255,255,.3)", borderRadius: 999, padding: "4px 10px", fontSize: 12 }}>
+            📷 Camera active
+          </span>
+          <span style={{ background: isFullscreen ? "rgba(34,197,94,.25)" : "rgba(239,68,68,.25)", border: "1px solid rgba(255,255,255,.3)", borderRadius: 999, padding: "4px 10px", fontSize: 12 }}>
+            {isFullscreen ? "🖥 Fullscreen ON" : "⚠ Fullscreen OFF"}
+          </span>
+          <span style={{ background: "rgba(255,255,255,.16)", border: "1px solid rgba(255,255,255,.3)", borderRadius: 999, padding: "4px 10px", fontSize: 12 }}>
+            Tab switches: {tabSwitchCount}/3
+          </span>
+        </div>
       </div>
 
       {/* progress + nav dots */}
