@@ -135,7 +135,17 @@ export default function HomePage() {
   };
 
   return (
-    <div style={{ margin: "-18px -20px 0", fontFamily: "Inter, 'Segoe UI', sans-serif", overflowX: "hidden", background: "#fff" }}>
+    <div
+      style={{
+        width: "100vw",
+        marginLeft: "calc(50% - 50vw)",
+        marginRight: "calc(50% - 50vw)",
+        marginTop: -18,
+        fontFamily: "Inter, 'Segoe UI', sans-serif",
+        overflowX: "hidden",
+        background: "#fff",
+      }}
+    >
       <style>{`
         @keyframes fadeUp { from { opacity:0; transform:translateY(20px); } to { opacity:1; transform:translateY(0); } }
         .jb-fade1 { animation: fadeUp 0.55s ease-out forwards; }

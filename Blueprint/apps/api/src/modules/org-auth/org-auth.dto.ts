@@ -80,3 +80,25 @@ export class ResendEmailOtpDto {
   email!: string;
 }
 
+export class CompleteInviteDto {
+  @IsString()
+  @MinLength(8)
+  newPassword!: string;
+
+  @IsOptional()
+  @IsString()
+  fullName?: string;
+
+  @IsString()
+  @MinLength(2)
+  designation!: string;
+
+  @IsString()
+  @MinLength(5)
+  mobileNo!: string;
+
+  @IsOptional()
+  @IsString()
+  employeeId?: string;
+}
+

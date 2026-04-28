@@ -26,6 +26,15 @@ export function getAssetPrefix(): string {
   return raw ? (raw.startsWith("/") ? raw : `/${raw}`) : "";
 }
 
+/** Client-side path including `basePath`, with trailing slash (matches next.config `trailingSlash`). */
+export function appPath(path: string): string {
+  const base = getAssetPrefix().replace(/\/$/, "");
+  const p = path.startsWith("/") ? path : `/${path}`;
+  const joined = `${base}${p}`;
+  const withSlash = joined.endsWith("/") ? joined : `${joined}/`;
+  return withSlash || (p.endsWith("/") ? p : `${p}/`);
+}
+
 export function publicAssetUrl(path: string): string {
   const p = path.startsWith("/") ? path : `/${path}`;
   return `${getAssetPrefix()}${p}`;

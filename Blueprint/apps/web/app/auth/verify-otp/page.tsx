@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { orgResendEmailOtp, orgVerifyEmailOtp, setOrgAuthInStorage } from "@/lib/orgAuth";
+import { appPath } from "@/lib/apiBase";
 
 function domainFromEmail(email: string) {
   const v = email.trim().toLowerCase();
@@ -35,6 +36,10 @@ export default function VerifyOtpPage() {
     try {
       const r = await orgVerifyEmailOtp({ email, otp });
       setOrgAuthInStorage(r.token, r.user);
+      if (r.user.accountType === "EMPLOYEE" && (r.user.needsProfileCompletion || r.user.mustChangePassword)) {
+        window.location.href = appPath("/auth/employee/complete-profile");
+        return;
+      }
       window.location.href = nextUrl || "/";
     } catch (err: any) {
       setError(err?.message || "OTP verification failed");
