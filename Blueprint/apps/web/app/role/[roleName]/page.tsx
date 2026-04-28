@@ -353,6 +353,7 @@ function RolePageContent() {
   const ctxSpecialization = searchParams.get("specialization") ?? "";
   const targetStartDate = searchParams.get("targetStartDate") ?? "";
   const targetCompletionDate = searchParams.get("targetCompletionDate") ?? "";
+  const targetDurationMonths = Number(searchParams.get("targetDurationMonths") || "");
 
   /* manager → "recommend role" flow context (passed via querystring from /dashboard/manager) */
   const recommendFor   = searchParams.get("recommendFor")   ?? "";
@@ -452,7 +453,10 @@ function RolePageContent() {
       // No saved chart → generate chart using the deterministic algorithm
       let chartData: any = null;
       try {
-        const rR = await fetch(`${API}/api/blueprint/role/${enc(roleName)}/gantt?userId=${enc(u)}`);
+        const durationQuery = Number.isFinite(targetDurationMonths) && targetDurationMonths > 0
+          ? `&duration=${encodeURIComponent(String(targetDurationMonths))}`
+          : "";
+        const rR = await fetch(`${API}/api/blueprint/role/${enc(roleName)}/gantt?userId=${enc(u)}${durationQuery}`);
         const body = await rR.json().catch(() => null);
         if (body?.plan && Array.isArray(body.plan.tasks)) {
           chartData = body;
@@ -1303,6 +1307,11 @@ function RolePageContent() {
                 </div>
               </div>
             )}
+            <Link href={`/role/${enc(roleName)}/report`} style={{ textDecoration: "none" }}>
+              <div style={{ marginTop: 10, border: "1px solid #bae6fd", borderRadius: 8, padding: "8px 10px", color: "#0c4a6e", fontWeight: 700, background: "#f0f9ff", textAlign: "center" }}>
+                📄 View Detailed Test Report
+              </div>
+            </Link>
             {!canActivatePreparation && (
               <p style={{ margin: "10px 0 0", fontSize: 12, color: "#b45309" }}>
                 Submit this combined test to unlock Start Preparation.

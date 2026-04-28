@@ -164,6 +164,27 @@ export class OrgAuthService {
     return jwt.sign(payload, secret, { expiresIn });
   }
 
+  private authPayload(user: CompanyUserDocument) {
+    const token = this.signToken(user);
+    return {
+      token,
+      user: {
+        id: user._id.toString(),
+        email: user.email,
+        fullName: user.fullName,
+        designation: user.designation,
+        department: (user as any).department,
+        companyName: user.companyName,
+        companyDomain: user.companyDomain,
+        employeeId: user.employeeId,
+        currentRole: user.currentRole,
+        accountType: user.accountType,
+        mobileNo: user.mobileNo,
+        reportingManagerEmail: user.reportingManagerEmail,
+      },
+    };
+  }
+
   verifyToken(token: string): any {
     try {
       return jwt.verify(token, JWT_SECRET);
@@ -522,11 +543,13 @@ export class OrgAuthService {
       accountType: "EMPLOYEE" as OrgAccountType,
       mobileNo: input.mobileNo?.trim(),
       reportingManagerEmail: mgrEmail,
-      emailVerified: false,
+      emailVerified: true,
     });
-
-    const debugMail = await this.setAndSendEmailOtp(created);
-    return OTP_DEBUG ? { verificationRequired: true, email: created.email, debugMail } : { verificationRequired: true, email: created.email };
+    created.emailOtpHash = undefined;
+    created.emailOtpExpiresAt = undefined;
+    created.emailOtpLastSentAt = undefined;
+    await created.save();
+    return this.authPayload(created);
   }
 
   async registerAdmin(input: { email: string; password: string; fullName: string; companyName: string; companyDomain?: string }) {
@@ -551,18 +574,19 @@ export class OrgAuthService {
       companyDomain,
       currentRole: "EMPLOYEE",
       accountType: "ADMIN" as OrgAccountType,
-      emailVerified: false,
+      emailVerified: true,
     });
-
-    const debugMail = await this.setAndSendEmailOtp(created);
-    return OTP_DEBUG ? { verificationRequired: true, email: created.email, debugMail } : { verificationRequired: true, email: created.email };
+    created.emailOtpHash = undefined;
+    created.emailOtpExpiresAt = undefined;
+    created.emailOtpLastSentAt = undefined;
+    await created.save();
+    return this.authPayload(created);
   }
 
   async login(emailRaw: string, password: string) {
     const email = normalizeEmail(emailRaw);
     const user = await this.companyUserModel.findOne({ email });
     if (!user) throw new UnauthorizedException("Invalid email or password");
-    if (!user.emailVerified) throw new UnauthorizedException("Email not verified. Please verify your email with OTP.");
     const ok = await bcrypt.compare(password, user.passwordHash);
     if (!ok) throw new UnauthorizedException("Invalid email or password");
     const token = this.signToken(user);
@@ -573,22 +597,18 @@ export class OrgAuthService {
     const email = normalizeEmail(emailRaw);
     const user = await this.companyUserModel.findOne({ email });
     if (!user) throw new NotFoundException("User not found");
-    if (user.emailVerified) return { ok: true, message: "Email already verified" };
-
-    const last = user.emailOtpLastSentAt ? new Date(user.emailOtpLastSentAt).getTime() : 0;
-    const now = Date.now();
-    if (last && now - last < OTP_RESEND_COOLDOWN_SECONDS * 1000) {
-      const wait = Math.ceil((OTP_RESEND_COOLDOWN_SECONDS * 1000 - (now - last)) / 1000);
-      throw new BadRequestException(`Please wait ${wait}s before requesting another OTP`);
+    if (!user.emailVerified) {
+      user.emailVerified = true;
+      user.emailOtpHash = undefined;
+      user.emailOtpExpiresAt = undefined;
+      user.emailOtpLastSentAt = undefined;
+      await user.save();
     }
-
-    const debugMail = await this.setAndSendEmailOtp(user);
-    return OTP_DEBUG ? { ok: true, debugMail } : { ok: true };
+    return { ok: true, message: "OTP verification is currently disabled." };
   }
 
   async verifyEmailOtp(emailRaw: string, otpRaw: string) {
     const email = normalizeEmail(emailRaw);
-    const otp = (otpRaw || "").trim();
     const user = await this.companyUserModel.findOne({ email });
     if (!user) throw new NotFoundException("User not found");
     if (user.emailVerified) {

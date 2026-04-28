@@ -2,6 +2,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { getApiPrefix, publicAssetUrl } from "@/lib/apiBase";
+import { getOrgAuthFromStorage } from "@/lib/orgAuth";
 import { SiteFooter } from "@/app/components/SiteFooter";
 
 function normalizeSearch(s: string) {
@@ -90,6 +91,7 @@ function rankRolesForSearch(roles: string[], rawQ: string, limit: number): strin
 export default function HomePage() {
   const [roles, setRoles] = useState<string[]>([]);
   const [search, setSearch] = useState("");
+  const [resuming, setResuming] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -109,6 +111,28 @@ export default function HomePage() {
     [roles, search],
   );
   const searchTrimmed = search.trim();
+
+  const goToPreparation = async () => {
+    if (resuming) return;
+    setResuming(true);
+    try {
+      const auth = getOrgAuthFromStorage();
+      const userId = auth?.user?.id;
+      if (!auth?.token || !userId) {
+        window.location.href = "/auth/employee/login";
+        return;
+      }
+      const r = await fetch(`${getApiPrefix()}/api/role-preparation/ongoing?studentId=${encodeURIComponent(userId)}`);
+      const ongoing = await r.json().catch(() => []);
+      if (Array.isArray(ongoing) && ongoing.length > 0 && ongoing[0]?.roleName) {
+        window.location.href = `/role/${encodeURIComponent(ongoing[0].roleName)}`;
+        return;
+      }
+      window.location.href = "/target-role";
+    } finally {
+      setResuming(false);
+    }
+  };
 
   return (
     <div
@@ -244,52 +268,42 @@ export default function HomePage() {
                   </div>
                 )}
               </div>
+              <div className="jb-fade3" style={{ marginTop: 12, display: "flex", gap: 10, flexWrap: "wrap" }}>
+                <button
+                  onClick={() => { void goToPreparation(); }}
+                  style={{
+                    display: "inline-block",
+                    padding: "10px 20px",
+                    borderRadius: 9,
+                    border: "2px solid #3f1d8f",
+                    background: "#3f1d8f",
+                    color: "#fff",
+                    fontSize: 14,
+                    fontWeight: 700,
+                    cursor: "pointer",
+                  }}
+                >
+                  {resuming ? "Opening..." : "Go to your preparation"}
+                </button>
+                <Link
+                  href="/role/"
+                  style={{
+                    display: "inline-block",
+                    padding: "10px 20px",
+                    borderRadius: 9,
+                    border: "2px solid #3f1d8f",
+                    background: "#fff",
+                    color: "#3f1d8f",
+                    fontSize: 14,
+                    fontWeight: 700,
+                    textDecoration: "none",
+                  }}
+                >
+                  Browse Roles
+                </Link>
+              </div>
             </div>
 
-            {/* Reference: image2 @ ~347×505, image3 @ ~504×504, overlapping — extracted from Job Blue Print.svg */}
-            <div
-              className="jb-hero-ref-images"
-              style={{
-                display: "flex",
-                alignItems: "flex-end",
-                justifyContent: "flex-end",
-                flex: "0 0 auto",
-                marginRight: "clamp(-12px, -1vw, 0px)",
-                pointerEvents: "none",
-                userSelect: "none",
-              }}
-            >
-              <img
-                src={publicAssetUrl("/ui-images/hero-ref-student-left.png")}
-                alt=""
-                width={414}
-                height={603}
-                style={{
-                  width: "clamp(160px, 24vw, 347px)",
-                  height: "auto",
-                  maxHeight: 505,
-                  objectFit: "contain",
-                  objectPosition: "bottom",
-                  zIndex: 1,
-                }}
-              />
-              <img
-                className="jb-hero-ref-img-right"
-                src={publicAssetUrl("/ui-images/hero-ref-student-right.png")}
-                alt=""
-                width={500}
-                height={500}
-                style={{
-                  width: "clamp(180px, 35vw, 504px)",
-                  height: "auto",
-                  maxHeight: 504,
-                  objectFit: "contain",
-                  objectPosition: "bottom",
-                  zIndex: 2,
-                  marginLeft: "clamp(-72px, -9vw, -32px)",
-                }}
-              />
-            </div>
           </div>
         </div>
       </div>
@@ -298,7 +312,7 @@ export default function HomePage() {
       <div style={{ background: "#f5f3ff", padding: "72px 32px" }}>
         <div style={{ maxWidth: 1100, margin: "0 auto" }}>
           <h2 style={{ textAlign: "center", margin: "0 0 40px", fontSize: 30, fontWeight: 800, color: "#4c1d95", letterSpacing: "-0.5px" }}>
-            Why Teams Choose Job Blueprint
+            Why Teams Choose This Platform
           </h2>
 
           {/* Feature visual / placeholder */}
@@ -478,6 +492,24 @@ export default function HomePage() {
             >
               Start Employee Development
             </Link>
+            <button
+              onClick={() => { void goToPreparation(); }}
+              className="jb-cta-btn"
+              style={{
+                display: "inline-block",
+                marginLeft: 12,
+                padding: "12px 28px",
+                borderRadius: 9,
+                border: "2px solid rgba(255,255,255,.9)",
+                background: "transparent",
+                color: "#fff",
+                fontSize: 15,
+                fontWeight: 700,
+                cursor: "pointer",
+              }}
+            >
+              {resuming ? "Opening..." : "Go to your preparation"}
+            </button>
           </div>
         </div>
       </div>
