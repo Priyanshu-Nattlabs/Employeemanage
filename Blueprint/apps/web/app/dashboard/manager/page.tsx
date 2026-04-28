@@ -1,17 +1,18 @@
 "use client";
 
 export const dynamic = "force-dynamic";
-
 import { Suspense, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
-  clearOrgAuthInStorage,
   getOrgAuthFromStorage,
   orgGetEmployeesActivity,
   orgListEmployeesManagerSummary,
+  orgManagerBulkInviteEmployees,
+  type OrgBulkInviteResult,
   type OrgManagerActivity,
 } from "@/lib/orgAuth";
 import { SiteFooter } from "@/app/components/SiteFooter";
+import { appPath } from "@/lib/apiBase";
 
 type EmployeeRow = {
   employee: any;
@@ -21,6 +22,11 @@ type EmployeeRow = {
 };
 
 const REFRESH_MS = 30_000;
+const ACTIVITY_FEED_PREVIEW = 5;
+const LEADERBOARD_PREVIEW = 3;
+const DEPARTMENT_COMPARE_PREVIEW = 6;
+/** Collapsed employee table shows this many rows; "View more" reveals the rest. */
+const EMPLOYEE_TABLE_PREVIEW_ROWS = 8;
 
 function ManagerDashboardContent() {
   const [{ token, user }, setAuth] = useState<{ token: string; user: any | null }>({ token: "", user: null });
@@ -36,6 +42,12 @@ function ManagerDashboardContent() {
   const [statusFilter, setStatusFilter] = useState<"ALL" | "ACTIVE" | "NOT_STARTED">("ALL");
   const [sortKey, setSortKey] = useState<"NAME" | "PROGRESS_DESC" | "PROGRESS_ASC" | "RECENT_TEST">("PROGRESS_DESC");
 
+  const [inviteFile, setInviteFile] = useState<File | null>(null);
+  const [inviteLoading, setInviteLoading] = useState(false);
+  const [inviteError, setInviteError] = useState("");
+  const [inviteResult, setInviteResult] = useState<OrgBulkInviteResult | null>(null);
+  const [employeeTableExpanded, setEmployeeTableExpanded] = useState(false);
+
   // Success banner shown after a recommendation has been sent (we redirect back here).
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -46,7 +58,7 @@ function ManagerDashboardContent() {
     if (recommendedRole) {
       setRecoBanner({ role: recommendedRole, employee: recommendedFor });
       // Clear query string so the banner doesn't re-appear on refresh.
-      router.replace("/dashboard/manager");
+      router.replace(appPath("/dashboard/manager"));
       const t = window.setTimeout(() => setRecoBanner(null), 8000);
       return () => window.clearTimeout(t);
     }
@@ -58,7 +70,7 @@ function ManagerDashboardContent() {
     if (e?.fullName) params.set("recommendName", String(e.fullName));
     if (e?.email) params.set("recommendEmail", String(e.email));
     if (e?.department) params.set("recommendDept", String(e.department));
-    router.push(`/role?${params.toString()}`);
+    router.push(`${appPath("/role")}?${params.toString()}`);
   };
 
   useEffect(() => {
@@ -143,6 +155,17 @@ function ManagerDashboardContent() {
     return out;
   }, [rows, query, statusFilter, sortKey]);
 
+  const visibleEmployeeRows = useMemo(() => {
+    if (employeeTableExpanded) return filteredRows;
+    return filteredRows.slice(0, EMPLOYEE_TABLE_PREVIEW_ROWS);
+  }, [filteredRows, employeeTableExpanded]);
+
+  const employeeTableHiddenCount = Math.max(0, filteredRows.length - EMPLOYEE_TABLE_PREVIEW_ROWS);
+
+  useEffect(() => {
+    setEmployeeTableExpanded(false);
+  }, [query, statusFilter, sortKey]);
+
   if (!mounted) return null;
   if (!user) return null;
 
@@ -197,10 +220,10 @@ function ManagerDashboardContent() {
         <div style={blobA} />
         <div style={blobB} />
 
-        <div style={{ position: "relative", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 14 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 14, minWidth: 0 }}>
+        <div style={{ position: "relative", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 14, width: "100%", boxSizing: "border-box" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 14, minWidth: 0, flex: "1 1 240px", maxWidth: "100%" }}>
             <div style={iconTile} title={user.fullName || user.email}>{initials}</div>
-            <div style={{ minWidth: 0 }}>
+            <div style={{ minWidth: 0, overflow: "hidden" }}>
               <div style={breadcrumb}>
                 <span style={crumbCur}>Dashboard</span>
                 <span style={crumbSep}>›</span>
@@ -219,7 +242,7 @@ function ManagerDashboardContent() {
             </div>
           </div>
 
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", flex: "0 1 auto", minWidth: 0, justifyContent: "flex-end" }}>
             <span style={chipManager}>{isHR ? "HR view" : "Manager view"}</span>
             {lastRefreshed ? (
               <span style={chipLive}>
@@ -240,7 +263,7 @@ function ManagerDashboardContent() {
       {error ? <div style={errorStyle}>{error}</div> : null}
 
       {/* KPI cards */}
-      <div style={kpiGrid}>
+      <div className="manager-kpi-grid">
         <KpiCard label="Employees"           value={String(stats.total)}                                hint={isHR ? "All departments" : myDepartment || "Your department"} icon="👥" accent="#3b82f6" />
         <KpiCard label="Actively preparing"  value={`${stats.active}`}                                  hint={`${stats.activePct}% of team`}                                  icon="🔥" accent="#16a34a" />
         <KpiCard label="Average progress"    value={`${stats.avgProgress}%`}                            hint="Across active prep plans"                                       icon="📈" accent="#8b5cf6" />
@@ -248,8 +271,8 @@ function ManagerDashboardContent() {
       </div>
 
       {/* Comparison + Distribution */}
-      <div style={twoCol}>
-        <div style={card}>
+      <div className="manager-two-col">
+        <div style={{ ...card, minWidth: 0, maxWidth: "100%" }}>
           <div style={cardTitle}><span style={titleIcon("#6366f1")}>📊</span>Progress distribution</div>
           <div style={cardSub}>How active learners are spread across progress bands.</div>
           <div style={{ marginTop: 14, display: "grid", gap: 10 }}>
@@ -262,7 +285,7 @@ function ManagerDashboardContent() {
           </div>
         </div>
 
-        <div style={card}>
+        <div style={{ ...card, minWidth: 0, maxWidth: "100%" }}>
           <div style={cardTitle}>
             <span style={titleIcon("#3b82f6")}>{isHR ? "🏢" : "🏆"}</span>
             {isHR ? "Department comparison" : "Top vs. lagging in your team"}
@@ -284,15 +307,95 @@ function ManagerDashboardContent() {
       {/* Engagement strip */}
       <EngagementStrip activity={activity} />
 
+      {/* Bulk invite (manager: dept inherited; HR: Department column per row) */}
+      <div style={{ ...card, minWidth: 0, maxWidth: "100%" }}>
+        <div style={cardTitle}><span style={titleIcon("#10b981")}>📤</span>Invite employees from Excel</div>
+        <div style={cardSub}>
+          Upload a spreadsheet with <b>Email</b> and <b>Name</b> columns (first sheet).
+          {isHR ? (
+            <> Each row must also include a <b>Department</b> column.</>
+          ) : (
+            <> New accounts are created in <b>{myDepartment || "your"}</b> department and report to you.</>
+          )}{" "}
+          Each person receives an email with a temporary password and must complete their profile after first login.
+        </div>
+        <div style={{ marginTop: 14, display: "flex", flexWrap: "wrap", gap: 10, alignItems: "center" }}>
+          <input
+            type="file"
+            accept=".xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel"
+            onChange={(e) => {
+              setInviteResult(null);
+              setInviteError("");
+              const f = e.target.files?.[0] || null;
+              setInviteFile(f);
+            }}
+            style={{ fontSize: 13 }}
+          />
+          <button
+            type="button"
+            disabled={!inviteFile || inviteLoading || !token}
+            onClick={async () => {
+              if (!inviteFile || !token) return;
+              setInviteLoading(true);
+              setInviteError("");
+              setInviteResult(null);
+              try {
+                const r = await orgManagerBulkInviteEmployees(token, inviteFile);
+                setInviteResult(r);
+                void (async () => {
+                  try {
+                    const summary = await orgListEmployeesManagerSummary(token);
+                    setRows(Array.isArray(summary) ? summary : []);
+                  } catch {
+                    /* ignore */
+                  }
+                })();
+              } catch (e: any) {
+                setInviteError(e?.message || "Upload failed");
+              } finally {
+                setInviteLoading(false);
+              }
+            }}
+            style={{ ...btnSolid, opacity: !inviteFile || inviteLoading ? 0.6 : 1 }}
+          >
+            {inviteLoading ? "Uploading…" : "Upload & invite"}
+          </button>
+        </div>
+        {inviteError ? <div style={{ ...errorStyle, marginTop: 12 }}>{inviteError}</div> : null}
+        {inviteResult ? (
+          <div style={{ marginTop: 14, fontSize: 13, lineHeight: 1.6, color: "#0f172a" }}>
+            <div style={{ fontWeight: 900, color: "#065f46" }}>
+              Created {inviteResult.created} account{inviteResult.created === 1 ? "" : "s"}
+            </div>
+            {inviteResult.errors?.length ? (
+              <div style={{ marginTop: 10 }}>
+                <div style={{ fontWeight: 800, color: "#991b1b" }}>Row errors ({inviteResult.errors.length})</div>
+                <ul style={{ margin: "8px 0 0", paddingLeft: 18, color: "#475569" }}>
+                  {inviteResult.errors.slice(0, 12).map((err, i) => (
+                    <li key={i}>
+                      Row {err.row}
+                      {err.email ? ` · ${err.email}` : ""}: {err.message}
+                    </li>
+                  ))}
+                </ul>
+                {inviteResult.errors.length > 12 ? (
+                  <div style={{ color: "#64748b", marginTop: 6 }}>…and {inviteResult.errors.length - 12} more</div>
+                ) : null}
+              </div>
+            ) : null}
+          </div>
+        ) : null}
+      </div>
+
       {/* Trend chart + Activity feed */}
-      <div style={twoCol}>
-        <div style={card}>
+      <div className="manager-two-col">
+        <div style={{ ...card, minWidth: 0, maxWidth: "100%" }}>
           <div style={cardTitle}><span style={titleIcon("#16a34a")}>📈</span>Test activity (last 14 days)</div>
           <div style={cardSub}>Daily test attempts split by pass / fail, with average score line.</div>
           <TrendChart series={activity?.dailySeries || []} />
         </div>
 
-        <div style={card}>
+        <div style={{ ...card, minWidth: 0, maxWidth: "100%" }}>
           <div style={cardTitle}><span style={titleIcon("#db2777")}>⚡</span>Live activity feed</div>
           <div style={cardSub}>Latest preparation actions and test results across {isHR ? "the company" : "your department"}.</div>
           <ActivityFeed feed={activity?.activityFeed || []} />
@@ -300,14 +403,14 @@ function ManagerDashboardContent() {
       </div>
 
       {/* Top skills + Role distribution */}
-      <div style={twoCol}>
-        <div style={card}>
+      <div className="manager-two-col">
+        <div style={{ ...card, minWidth: 0, maxWidth: "100%" }}>
           <div style={cardTitle}><span style={titleIcon("#f59e0b")}>🧠</span>Skill mastery — most attempted</div>
           <div style={cardSub}>Where the team is strong and where they struggle. Pass rate is across all attempts.</div>
           <TopSkills items={activity?.topSkills || []} />
         </div>
 
-        <div style={card}>
+        <div style={{ ...card, minWidth: 0, maxWidth: "100%" }}>
           <div style={cardTitle}><span style={titleIcon("#7c3aed")}>🎯</span>Roles being prepared for</div>
           <div style={cardSub}>How many active learners per role, and how far along they are.</div>
           <RoleAggregateChart items={activity?.roleAggregates || []} />
@@ -315,22 +418,29 @@ function ManagerDashboardContent() {
       </div>
 
       {/* Toolbar */}
-      <div style={card}>
-        <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap", alignItems: "center" }}>
+      <div style={{ ...card, minWidth: 0, maxWidth: "100%" }}>
+        <div style={{ display: "grid", gap: 14 }}>
           <div style={cardTitle}><span style={titleIcon("#0ea5e9")}>👥</span>Employee preparation database</div>
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 200px), 1fr))",
+              gap: 10,
+              alignItems: "center",
+            }}
+          >
             <input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Search name, email, designation…"
-              style={{ ...inputStyle, minWidth: 240 }}
+              style={{ ...inputStyle, width: "100%", minWidth: 0 }}
             />
-            <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as any)} style={inputStyle}>
+            <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as any)} style={{ ...inputStyle, width: "100%", minWidth: 0 }}>
               <option value="ALL">All employees</option>
               <option value="ACTIVE">Actively preparing</option>
               <option value="NOT_STARTED">Not started</option>
             </select>
-            <select value={sortKey} onChange={(e) => setSortKey(e.target.value as any)} style={inputStyle}>
+            <select value={sortKey} onChange={(e) => setSortKey(e.target.value as any)} style={{ ...inputStyle, width: "100%", minWidth: 0 }}>
               <option value="PROGRESS_DESC">Sort: progress (high → low)</option>
               <option value="PROGRESS_ASC">Sort: progress (low → high)</option>
               <option value="NAME">Sort: name (A → Z)</option>
@@ -339,8 +449,27 @@ function ManagerDashboardContent() {
           </div>
         </div>
 
-        <div style={{ marginTop: 12, overflowX: "auto", border: "1px solid #e5e7eb", borderRadius: 14 }}>
-          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+        <div
+          style={{
+            marginTop: 12,
+            overflowX: "auto",
+            WebkitOverflowScrolling: "touch",
+            border: "1px solid #e5e7eb",
+            borderRadius: 14,
+            maxWidth: "100%",
+          }}
+        >
+          <table style={employeeTableStyle}>
+            <colgroup>
+              <col style={{ width: "19%" }} />
+              <col style={{ width: "11%" }} />
+              <col style={{ width: "12%" }} />
+              <col style={{ width: "9%" }} />
+              <col style={{ width: "12%" }} />
+              <col style={{ width: "15%" }} />
+              <col style={{ width: "12%" }} />
+              <col style={{ width: "10%" }} />
+            </colgroup>
             <thead>
               <tr style={{ background: "#f8fafc" }}>
                 {["Employee", "Department", "Designation", "Active prep", "Avg progress", "Latest test", "Track", "Recommend"].map((h) => (
@@ -358,7 +487,7 @@ function ManagerDashboardContent() {
                     : "No employees match the current filters."}
                 </td></tr>
               ) : (
-                filteredRows.map((r) => {
+                visibleEmployeeRows.map((r) => {
                   const e = r.employee || {};
                   const ongoing = Array.isArray(r.ongoing) ? r.ongoing : [];
                   const latest = r.latestTest;
@@ -373,22 +502,26 @@ function ManagerDashboardContent() {
                     window.open(`/dashboard/manager/track/${encodeURIComponent(roleName)}?${qs.toString()}`, "_blank", "noopener,noreferrer");
                   };
                   return (
-                    <tr key={e._id || e.email} style={{ borderTop: "1px solid #e5e7eb" }}>
+                    <tr key={e._id || e.email}>
                       <td style={td}>
-                        <div style={{ fontWeight: 800, color: "#0f172a" }}>{e.fullName || "—"}</div>
-                        <div style={{ color: "#64748b", fontSize: 12 }}>{e.email || "—"}</div>
+                        <div style={{ fontWeight: 800, color: "#0f172a", wordBreak: "break-word" }}>{e.fullName || "—"}</div>
+                        <div style={{ color: "#64748b", fontSize: 12, wordBreak: "break-all" }}>{e.email || "—"}</div>
                       </td>
-                      <td style={td}>{e.department || <span style={{ color: "#94a3b8" }}>—</span>}</td>
-                      <td style={td}>{e.designation || "—"}</td>
+                      <td style={td}>
+                        {e.department ? <span style={tdMultiline}>{String(e.department)}</span> : <span style={{ color: "#94a3b8" }}>—</span>}
+                      </td>
+                      <td style={td}>
+                        {e.designation ? <span style={tdMultiline}>{String(e.designation)}</span> : <span style={{ color: "#94a3b8" }}>—</span>}
+                      </td>
                       <td style={td}>{ongoing.length ? `${ongoing.length} role(s)` : <span style={{ color: "#94a3b8" }}>None</span>}</td>
-                      <td style={{ ...td, minWidth: 200 }}>
+                      <td style={td}>
                         {ongoing.length ? <ProgressBar pct={r.avgPct || 0} /> : <span style={{ color: "#94a3b8" }}>—</span>}
                       </td>
                       <td style={td}>
                         {latest ? (
-                          <div>
-                            <div style={{ fontWeight: 800 }}>{latest.skillName || "—"}</div>
-                            <div style={{ fontSize: 12, color: latest.passed ? "#15803d" : "#b91c1c" }}>
+                          <div style={{ minWidth: 0 }}>
+                            <div style={{ fontWeight: 800, wordBreak: "break-word", lineHeight: 1.35 }}>{latest.skillName || "—"}</div>
+                            <div style={{ fontSize: 12, color: latest.passed ? "#15803d" : "#b91c1c", marginTop: 4 }}>
                               {latest.score == null ? "—" : `${latest.score}%`} · {latest.passed ? "Passed" : "Failed"}
                             </div>
                           </div>
@@ -396,16 +529,22 @@ function ManagerDashboardContent() {
                       </td>
                       <td style={td}>
                         {ongoing.length === 0 ? (
-                          <button disabled style={{ ...btnMini, opacity: 0.5, cursor: "not-allowed" }} title="Employee hasn’t started preparation yet">
+                          <button
+                            type="button"
+                            disabled
+                            style={{ ...btnMini, maxWidth: "100%", opacity: 0.5, cursor: "not-allowed", whiteSpace: "normal" }}
+                            title="Employee hasn’t started preparation yet"
+                          >
                             View analytics
                           </button>
                         ) : (
-                          <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                          <div style={{ display: "flex", gap: 6, flexWrap: "wrap", minWidth: 0 }}>
                             {pick.map((o: any) => (
                               <button
+                                type="button"
                                 key={o.roleName}
                                 onClick={() => openAnalytics(o.roleName)}
-                                style={btnMini}
+                                style={{ ...btnMini, maxWidth: "100%", whiteSpace: "normal" }}
                                 title={`Open analytics for ${o.roleName}`}
                               >
                                 {o.roleName.length > 18 ? `${o.roleName.slice(0, 18)}…` : o.roleName}
@@ -417,8 +556,9 @@ function ManagerDashboardContent() {
                       </td>
                       <td style={td}>
                         <button
+                          type="button"
                           onClick={() => openRecommendFlow(e)}
-                          style={btnRecommend}
+                          style={{ ...btnRecommend, width: "100%", maxWidth: "100%", boxSizing: "border-box", whiteSpace: "normal", textAlign: "center" }}
                           title="Pick a role to recommend to this employee"
                         >
                           💡 Recommend role
@@ -431,17 +571,21 @@ function ManagerDashboardContent() {
             </tbody>
           </table>
         </div>
+        {!loading && filteredRows.length > EMPLOYEE_TABLE_PREVIEW_ROWS ? (
+          <button
+            type="button"
+            onClick={() => setEmployeeTableExpanded((v) => !v)}
+            style={btnEmployeeTableExpand}
+          >
+            {employeeTableExpanded
+              ? "Show less"
+              : `View more · ${employeeTableHiddenCount} more employee${employeeTableHiddenCount === 1 ? "" : "s"}`}
+          </button>
+        ) : null}
       </div>
 
-      {/* Footer — same SiteFooter as homepage, full-bleed */}
-      <div
-        style={{
-          width: "100vw",
-          marginLeft: "calc(50% - 50vw)",
-          marginRight: "calc(50% - 50vw)",
-          marginTop: 28,
-        }}
-      >
+      {/* Footer — parent is already full-bleed; avoid a second 100vw (prevents horizontal overflow). */}
+      <div style={{ width: "100%", marginTop: 28 }}>
         <SiteFooter />
       </div>
     </div>
@@ -471,6 +615,8 @@ function KpiCard({ label, value, hint, icon, accent }: { label: string; value: s
       boxShadow: "0 6px 20px -10px rgba(15,23,42,0.10)",
       position: "relative",
       overflow: "hidden",
+      minWidth: 0,
+      maxWidth: "100%",
     }}>
       {/* top gradient stripe */}
       <div aria-hidden style={{
@@ -553,20 +699,50 @@ function BucketBar({ label, count, total, color }: { label: string; count: numbe
 }
 
 function TopVsLagging({ rows }: { rows: EmployeeRow[] }) {
+  const [expanded, setExpanded] = useState(false);
   const active = rows.filter((r) => Array.isArray(r.ongoing) && r.ongoing.length > 0);
   const sorted = active.slice().sort((a, b) => (b.avgPct || 0) - (a.avgPct || 0));
-  const top = sorted.slice(0, 3);
-  const lag = sorted.slice(-3).reverse();
+  const top = sorted.slice(0, LEADERBOARD_PREVIEW);
+  const lag = sorted.slice(-LEADERBOARD_PREVIEW).reverse();
+  const canExpand = sorted.length > LEADERBOARD_PREVIEW;
 
   if (active.length === 0) {
     return <div style={emptyHint}>No active preparation in your team yet.</div>;
   }
 
+  if (expanded) {
+    return (
+      <div style={{ marginTop: 12, display: "grid", gap: 10 }}>
+        <div style={{ maxHeight: "min(70vh, 520px)", overflowY: "auto", paddingRight: 4 }}>
+          <RankedList
+            title="All active learners (by progress)"
+            rows={sorted}
+            accent="#16a34a"
+            icon="🏆"
+            tone="positive"
+          />
+        </div>
+        <button type="button" onClick={() => setExpanded(false)} style={btnViewMore}>
+          Show less
+        </button>
+      </div>
+    );
+  }
+
   return (
     <div style={{ marginTop: 12, display: "grid", gap: 14 }}>
       <RankedList title="Top performers" rows={top} accent="#16a34a" icon="🏆" tone="positive" />
-      {sorted.length > 3 ? (
+      {sorted.length > LEADERBOARD_PREVIEW ? (
         <RankedList title="Needs attention" rows={lag} accent="#ea580c" icon="⚠️" tone="warn" />
+      ) : null}
+      {canExpand ? (
+        <button
+          type="button"
+          onClick={() => setExpanded(true)}
+          style={btnViewMore}
+        >
+          View more · all {sorted.length} active learners
+        </button>
       ) : null}
     </div>
   );
@@ -620,7 +796,7 @@ function RankedList({
                 <div style={{ fontWeight: 800, color: "#0f172a", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{e.fullName || e.email || "—"}</div>
                 <div style={{ fontSize: 12, color: "#64748b", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{e.designation || "—"}</div>
               </div>
-              <div style={{ width: 140 }}><ProgressBar pct={r.avgPct || 0} /></div>
+              <div style={{ flex: "0 1 120px", minWidth: 0, maxWidth: "42%" }}><ProgressBar pct={r.avgPct || 0} /></div>
             </div>
           );
         })}
@@ -630,6 +806,7 @@ function RankedList({
 }
 
 function DepartmentCompare({ rows }: { rows: EmployeeRow[] }) {
+  const [expanded, setExpanded] = useState(false);
   const groups = new Map<string, { sum: number; count: number; active: number; total: number }>();
   for (const r of rows) {
     const dept = String((r.employee?.department || "Unassigned")).trim() || "Unassigned";
@@ -657,26 +834,50 @@ function DepartmentCompare({ rows }: { rows: EmployeeRow[] }) {
   }
 
   const max = Math.max(1, ...list.map((x) => x.avgPct));
+  const hasMore = list.length > DEPARTMENT_COMPARE_PREVIEW;
+  const visible = expanded || !hasMore ? list : list.slice(0, DEPARTMENT_COMPARE_PREVIEW);
+  const hiddenCount = list.length - DEPARTMENT_COMPARE_PREVIEW;
 
   return (
     <div style={{ marginTop: 12, display: "grid", gap: 10 }}>
-      {list.map((d) => {
-        const widthPct = Math.round((d.avgPct / max) * 100);
-        const color = d.avgPct >= 75 ? "#16a34a" : d.avgPct >= 40 ? "#0b5fe8" : "#ea580c";
-        return (
-          <div key={d.dept}>
-            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, fontWeight: 800, color: "#0f172a", marginBottom: 4 }}>
-              <span>{d.dept}</span>
-              <span style={{ color: "#475569", fontWeight: 700 }}>
-                {d.avgPct}% avg · {d.active}/{d.total} active
-              </span>
+      <div
+        style={{
+          display: "grid",
+          gap: 10,
+          maxHeight: expanded ? "min(70vh, 520px)" : undefined,
+          overflowY: expanded ? "auto" : "visible",
+          paddingRight: expanded ? 4 : 0,
+        }}
+      >
+        {visible.map((d) => {
+          const widthPct = Math.round((d.avgPct / max) * 100);
+          const color = d.avgPct >= 75 ? "#16a34a" : d.avgPct >= 40 ? "#0b5fe8" : "#ea580c";
+          return (
+            <div key={d.dept}>
+              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, fontWeight: 800, color: "#0f172a", marginBottom: 4, gap: 8, flexWrap: "wrap" }}>
+                <span>{d.dept}</span>
+                <span style={{ color: "#475569", fontWeight: 700 }}>
+                  {d.avgPct}% avg · {d.active}/{d.total} active
+                </span>
+              </div>
+              <div style={{ height: 10, background: "#f1f5f9", borderRadius: 999, overflow: "hidden" }}>
+                <div style={{ width: `${widthPct}%`, background: color, height: "100%", transition: "width .3s ease" }} />
+              </div>
             </div>
-            <div style={{ height: 10, background: "#f1f5f9", borderRadius: 999, overflow: "hidden" }}>
-              <div style={{ width: `${widthPct}%`, background: color, height: "100%", transition: "width .3s ease" }} />
-            </div>
-          </div>
-        );
-      })}
+          );
+        })}
+      </div>
+      {hasMore ? (
+        <button
+          type="button"
+          onClick={() => setExpanded((v) => !v)}
+          style={btnViewMore}
+        >
+          {expanded
+            ? "Show less"
+            : `View more · ${hiddenCount} more department${hiddenCount === 1 ? "" : "s"}`}
+        </button>
+      ) : null}
     </div>
   );
 }
@@ -689,7 +890,7 @@ function EngagementStrip({ activity }: { activity: OrgManagerActivity | null }) 
   const dormant = e?.dormant ?? 0;
   const pct = (n: number) => (total > 0 ? Math.round((n / total) * 100) : 0);
   return (
-    <div style={engagementGrid}>
+    <div className="manager-engagement-grid">
       <EngagementCard label="Active in last 7 days"  value={`${a7}`}      sub={`${pct(a7)}% of team`}                        accent="#16a34a" icon="⚡" />
       <EngagementCard label="Active in last 30 days" value={`${a30}`}     sub={`${pct(a30)}% of team`}                       accent="#0b5fe8" icon="📅" />
       <EngagementCard label="Dormant"                value={`${dormant}`} sub={`${pct(dormant)}% no activity in 30d`}        accent="#ea580c" icon="💤" />
@@ -705,6 +906,8 @@ function EngagementCard({ label, value, sub, accent, icon }: { label: string; va
       position: "relative",
       overflow: "hidden",
       boxShadow: "0 6px 18px -10px rgba(15,23,42,0.10)",
+      minWidth: 0,
+      maxWidth: "100%",
     }}>
       {/* gradient stripe at the top */}
       <div aria-hidden style={{
@@ -829,35 +1032,60 @@ function LegendDot({ color, label }: { color: string; label: string }) {
 }
 
 function ActivityFeed({ feed }: { feed: OrgManagerActivity["activityFeed"] }) {
+  const [expanded, setExpanded] = useState(false);
   if (!feed || feed.length === 0) {
     return <div style={emptyHint}>No activity yet. As employees take tests or complete skills, events will appear here.</div>;
   }
+
+  const hasMore = feed.length > ACTIVITY_FEED_PREVIEW;
+  const visible = expanded || !hasMore ? feed : feed.slice(0, ACTIVITY_FEED_PREVIEW);
+  const hiddenCount = feed.length - ACTIVITY_FEED_PREVIEW;
+
   return (
-    <div style={{ marginTop: 12, display: "grid", gap: 8, maxHeight: 360, overflowY: "auto", paddingRight: 4 }}>
-      {feed.map((evt, i) => {
-        const meta = eventMeta(evt.type);
-        return (
-          <div key={i} style={feedRow}>
-            <div style={{ ...feedDot, background: meta.color }} />
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: 13, color: "#0f172a" }}>
-                <b>{evt.employeeName}</b>{" "}
-                <span style={{ color: "#475569" }}>{meta.verb}</span>{" "}
-                {evt.skillName ? <b>{evt.skillName}</b> : null}
-                {evt.skillName && evt.roleName ? <span style={{ color: "#64748b" }}> · {evt.roleName}</span> : null}
-                {!evt.skillName && evt.roleName ? <b>{evt.roleName}</b> : null}
-                {typeof evt.score === "number" ? (
-                  <span style={{ marginLeft: 6, fontSize: 12, fontWeight: 800, color: meta.color }}>{evt.score}%</span>
-                ) : null}
-              </div>
-              <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 2 }}>
-                {evt.employeeDepartment ? <>{evt.employeeDepartment} · </> : null}
-                {timeAgo(evt.at)}
+    <div style={{ marginTop: 12, display: "grid", gap: 10 }}>
+      <div
+        style={{
+          display: "grid",
+          gap: 8,
+          maxHeight: expanded ? "min(70vh, 560px)" : 360,
+          overflowY: "auto",
+          paddingRight: 4,
+        }}
+      >
+        {visible.map((evt, i) => {
+          const meta = eventMeta(evt.type);
+          return (
+            <div key={i} style={feedRow}>
+              <div style={{ ...feedDot, background: meta.color }} />
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 13, color: "#0f172a" }}>
+                  <b>{evt.employeeName}</b>{" "}
+                  <span style={{ color: "#475569" }}>{meta.verb}</span>{" "}
+                  {evt.skillName ? <b>{evt.skillName}</b> : null}
+                  {evt.skillName && evt.roleName ? <span style={{ color: "#64748b" }}> · {evt.roleName}</span> : null}
+                  {!evt.skillName && evt.roleName ? <b>{evt.roleName}</b> : null}
+                  {typeof evt.score === "number" ? (
+                    <span style={{ marginLeft: 6, fontSize: 12, fontWeight: 800, color: meta.color }}>{evt.score}%</span>
+                  ) : null}
+                </div>
+                <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 2 }}>
+                  {evt.employeeDepartment ? <>{evt.employeeDepartment} · </> : null}
+                  {timeAgo(evt.at)}
+                </div>
               </div>
             </div>
-          </div>
-        );
-      })}
+          );
+        })}
+      </div>
+      {hasMore ? (
+        <button
+          type="button"
+          onClick={() => setExpanded((v) => !v)}
+          style={btnViewMore}
+        >
+          {expanded ? "Show less" : `View more · ${hiddenCount} more event${hiddenCount === 1 ? "" : "s"}`}
+        </button>
+      ) : null}
     </div>
   );
 }
@@ -999,23 +1227,29 @@ function computeStats(rows: EmployeeRow[]) {
 // ===================== Styles =====================
 
 const wrap: React.CSSProperties = {
-  maxWidth: 1200,
-  margin: "20px auto 0",
-  padding: "0 14px 0",
+  /* Stay inside <main>; avoid calc(50% - 50vw) breakout — it misaligns with max-width main + overflow-x:hidden and clips the left edge. */
+  marginTop: 2,
+  padding: 0,
   display: "grid",
   gap: 14,
   position: "relative",
+  boxSizing: "border-box",
+  width: "100%",
+  maxWidth: "100%",
+  minWidth: 0,
 };
 
 // ─── Hero banner (matches /dashboard/manager/track/[role] banner) ───
 const banner: React.CSSProperties = {
   borderRadius: 22,
-  padding: "22px 24px",
+  padding: "22px clamp(16px, 3vw, 24px)",
   background: "linear-gradient(135deg,#0f172a 0%,#1e293b 30%,#312e81 65%,#7c3aed 100%)",
   color: "#fff",
   position: "relative",
   overflow: "hidden",
   boxShadow: "0 16px 36px -22px rgba(99,102,241,0.55)",
+  maxWidth: "100%",
+  boxSizing: "border-box",
 };
 const blobA: React.CSSProperties = {
   position: "absolute", top: -50, right: -30, width: 200, height: 200,
@@ -1036,7 +1270,7 @@ const iconTile: React.CSSProperties = {
   flex: "0 0 auto",
 };
 const breadcrumb: React.CSSProperties = {
-  display: "flex", alignItems: "center", gap: 6,
+  display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap",
   fontSize: 12, color: "rgba(255,255,255,0.75)", fontWeight: 700,
   marginBottom: 6,
 };
@@ -1095,17 +1329,71 @@ function titleIcon(accent: string): React.CSSProperties {
 }
 const cardSub: React.CSSProperties = { fontSize: 12, color: "#64748b", marginTop: 4 };
 const btnOutline: React.CSSProperties = { border: "1px solid #cbd5e1", background: "#fff", padding: "9px 12px", borderRadius: 10, fontWeight: 800, cursor: "pointer", fontSize: 13 };
+const btnViewMore: React.CSSProperties = {
+  ...btnOutline,
+  width: "100%",
+  marginTop: 2,
+  color: "#312e81",
+  borderColor: "#c7d2fe",
+  background: "linear-gradient(180deg, #f5f3ff 0%, #fff 100%)",
+};
 const btnMini: React.CSSProperties = { border: "1px solid rgba(15,23,42,0.16)", background: "white", padding: "6px 10px", borderRadius: 10, fontWeight: 800, cursor: "pointer", color: "#0f172a", fontSize: 12, maxWidth: 220, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" };
-const th: React.CSSProperties = { textAlign: "left", padding: "12px 12px", fontWeight: 900, color: "#0f172a", whiteSpace: "nowrap", fontSize: 12, letterSpacing: 0.3, textTransform: "uppercase" };
-const td: React.CSSProperties = { padding: "12px 12px", color: "#0f172a", verticalAlign: "top" };
+const employeeTableStyle: React.CSSProperties = {
+  width: "100%",
+  minWidth: 1080,
+  tableLayout: "fixed",
+  borderCollapse: "collapse",
+  fontSize: 13,
+};
+const th: React.CSSProperties = {
+  textAlign: "left",
+  padding: "12px 12px",
+  fontWeight: 900,
+  color: "#0f172a",
+  whiteSpace: "normal",
+  fontSize: 12,
+  letterSpacing: 0.3,
+  textTransform: "uppercase",
+  verticalAlign: "bottom",
+  borderBottom: "1px solid #e5e7eb",
+  lineHeight: 1.25,
+  wordBreak: "break-word",
+};
+const td: React.CSSProperties = {
+  padding: "12px 12px",
+  color: "#0f172a",
+  verticalAlign: "top",
+  textAlign: "left",
+  borderBottom: "1px solid #f1f5f9",
+  wordWrap: "break-word",
+  overflowWrap: "break-word",
+};
+const tdMultiline: React.CSSProperties = { display: "block", wordBreak: "break-word", lineHeight: 1.35 };
+const btnEmployeeTableExpand: React.CSSProperties = {
+  ...btnOutline,
+  width: "100%",
+  marginTop: 12,
+  padding: "10px 14px",
+  color: "#312e81",
+  borderColor: "#c7d2fe",
+  background: "linear-gradient(180deg, #f5f3ff 0%, #fff 100%)",
+  fontWeight: 900,
+};
 const errorStyle: React.CSSProperties = { padding: "10px 12px", borderRadius: 10, background: "#fef2f2", border: "1px solid #fecaca", color: "#991b1b", fontSize: 13 };
 const inputStyle: React.CSSProperties = { minHeight: 40, borderRadius: 10, border: "1px solid #cbd5e1", padding: "8px 12px", outline: "none", fontSize: 13, background: "#fff" };
-const kpiGrid: React.CSSProperties = { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 12 };
-const twoCol: React.CSSProperties = { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(360px, 1fr))", gap: 16 };
-const rankRow: React.CSSProperties = { display: "flex", alignItems: "center", gap: 10, border: "1px solid #e5e7eb", borderRadius: 12, padding: "8px 10px", background: "#fff" };
+const rankRow: React.CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  gap: 10,
+  border: "1px solid #e5e7eb",
+  borderRadius: 12,
+  padding: "8px 10px",
+  background: "#fff",
+  minWidth: 0,
+  maxWidth: "100%",
+};
 const rankBadge: React.CSSProperties = { width: 24, height: 24, borderRadius: 999, color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 900, flex: "0 0 auto" };
 const emptyHint: React.CSSProperties = { fontSize: 13, color: "#64748b", padding: "10px 12px", border: "1px dashed #e2e8f0", borderRadius: 10, background: "#f8fafc" };
-const engagementGrid: React.CSSProperties = { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12 };
 const engagementCard: React.CSSProperties = { background: "#fff", border: "1px solid #e5e7eb", borderRadius: 14, padding: 14 };
 const feedRow: React.CSSProperties = { display: "flex", alignItems: "flex-start", gap: 10, padding: "8px 10px", border: "1px solid #f1f5f9", borderRadius: 10, background: "#fff" };
 const feedDot: React.CSSProperties = { width: 8, height: 8, borderRadius: 999, marginTop: 6, flex: "0 0 auto" };

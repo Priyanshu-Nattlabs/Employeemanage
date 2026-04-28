@@ -1,4 +1,4 @@
-import { getApiPrefix } from "@/lib/apiBase";
+import { apiUrl } from "@/lib/apiBase";
 
 export type OrgAccountType = "EMPLOYEE" | "ADMIN";
 export type OrgCurrentRole = "EMPLOYEE" | "MANAGER" | "HR";
@@ -16,6 +16,9 @@ export type OrgUser = {
   employeeId?: string;
   mobileNo?: string;
   reportingManagerEmail?: string;
+  /** Manager bulk invite: user must finish profile + new password */
+  needsProfileCompletion?: boolean;
+  mustChangePassword?: boolean;
 };
 
 export type OrgRegisterResponse =
@@ -50,10 +53,16 @@ export function clearOrgAuthInStorage() {
 }
 
 async function apiJson<T>(path: string, init?: RequestInit): Promise<T> {
-  const prefix = getApiPrefix();
-  const res = await fetch(`${prefix}${path}`, init);
+  const res = await fetch(apiUrl(path), init);
   const text = await res.text();
-  const data = text ? (JSON.parse(text) as any) : null;
+  let data: any = null;
+  if (text) {
+    try {
+      data = JSON.parse(text) as any;
+    } catch {
+      throw new Error(text.trim().slice(0, 200) || `Bad response (${res.status})`);
+    }
+  }
   if (!res.ok) {
     const msg = data?.message || data?.error || `Request failed (${res.status})`;
     throw new Error(Array.isArray(msg) ? msg.join(", ") : String(msg));
@@ -110,6 +119,66 @@ export async function orgLogin(body: { email: string; password: string }) {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body)
+  });
+}
+
+/** Manager/HR login: send password-reset OTP to the given email (no-op message if not a Manager/HR account). */
+export async function orgRequestManagerHrPasswordResetOtp(body: { email: string }) {
+  return apiJson<{ ok: true; message?: string }>("/api/org-auth/forgot-password/request-otp", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+}
+
+/** Manager/HR login: verify OTP and set new password; returns a normal login session. */
+export async function orgConfirmManagerHrPasswordReset(body: { email: string; otp: string; newPassword: string }) {
+  return apiJson<{ token: string; user: OrgUser }>("/api/org-auth/forgot-password/confirm", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+}
+
+export type OrgBulkInviteResult = {
+  ok: true;
+  created: number;
+  invited: Array<{ email: string; employeeId: string }>;
+  errors: Array<{ row: number; email: string; message: string }>;
+};
+
+export async function orgManagerBulkInviteEmployees(token: string, file: File) {
+  const fd = new FormData();
+  fd.append("file", file);
+  const res = await fetch(apiUrl("/api/org-auth/manager/invite-employees"), {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+    body: fd,
+  });
+  const text = await res.text();
+  let data: any = null;
+  if (text) {
+    try {
+      data = JSON.parse(text) as any;
+    } catch {
+      throw new Error(text.trim().slice(0, 200) || `Bad response (${res.status})`);
+    }
+  }
+  if (!res.ok) {
+    const msg = data?.message || data?.error || `Request failed (${res.status})`;
+    throw new Error(Array.isArray(msg) ? msg.join(", ") : String(msg));
+  }
+  return data as OrgBulkInviteResult;
+}
+
+export async function orgCompleteInvite(
+  token: string,
+  body: { newPassword: string; fullName?: string; designation: string; mobileNo: string; employeeId?: string },
+) {
+  return apiJson<{ token: string; user: OrgUser }>("/api/org-auth/me/complete-invite", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+    body: JSON.stringify(body),
   });
 }
 

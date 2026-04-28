@@ -80,3 +80,43 @@ export class ResendEmailOtpDto {
   email!: string;
 }
 
+export class ForgotPasswordRequestOtpDto {
+  @IsEmail()
+  email!: string;
+}
+
+export class ForgotPasswordConfirmDto {
+  @IsEmail()
+  email!: string;
+
+  @IsString()
+  @Matches(/^\d{6}$/, { message: "otp must be a 6-digit code" })
+  otp!: string;
+
+  @IsString()
+  @MinLength(8)
+  newPassword!: string;
+}
+
+export class CompleteInviteDto {
+  @IsString()
+  @MinLength(8)
+  newPassword!: string;
+
+  @IsOptional()
+  @IsString()
+  fullName?: string;
+
+  @IsString()
+  @MinLength(2)
+  designation!: string;
+
+  @IsString()
+  @MinLength(5)
+  mobileNo!: string;
+
+  @IsOptional()
+  @IsString()
+  employeeId?: string;
+}
+

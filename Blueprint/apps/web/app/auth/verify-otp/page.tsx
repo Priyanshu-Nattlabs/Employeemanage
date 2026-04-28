@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { orgResendEmailOtp, orgVerifyEmailOtp, setOrgAuthInStorage } from "@/lib/orgAuth";
+import { appPath } from "@/lib/apiBase";
 
 function domainFromEmail(email: string) {
   const v = email.trim().toLowerCase();
@@ -13,6 +14,7 @@ function domainFromEmail(email: string) {
 
 export default function VerifyOtpPage() {
   const [error, setError] = useState("");
+  const [info, setInfo] = useState("");
   const [loading, setLoading] = useState(false);
   const [resending, setResending] = useState(false);
   const [otp, setOtp] = useState("");
@@ -31,10 +33,15 @@ export default function VerifyOtpPage() {
   const onVerify = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
+    setInfo("");
     setLoading(true);
     try {
       const r = await orgVerifyEmailOtp({ email, otp });
       setOrgAuthInStorage(r.token, r.user);
+      if (r.user.accountType === "EMPLOYEE" && (r.user.needsProfileCompletion || r.user.mustChangePassword)) {
+        window.location.href = appPath("/auth/employee/complete-profile");
+        return;
+      }
       window.location.href = nextUrl || "/";
     } catch (err: any) {
       setError(err?.message || "OTP verification failed");
@@ -45,9 +52,11 @@ export default function VerifyOtpPage() {
 
   const onResend = async () => {
     setError("");
+    setInfo("");
     setResending(true);
     try {
-      await orgResendEmailOtp({ email });
+      const r = await orgResendEmailOtp({ email });
+      setInfo(r.message || "Check your inbox for a new code.");
     } catch (err: any) {
       setError(err?.message || "Failed to resend OTP");
     } finally {
@@ -82,6 +91,12 @@ export default function VerifyOtpPage() {
             placeholder="••••••"
           />
         </label>
+
+        {info ? (
+          <div style={{ padding: "10px 12px", borderRadius: 10, background: "#eff6ff", border: "1px solid #bfdbfe", color: "#1e3a8a", fontSize: 13 }}>
+            {info}
+          </div>
+        ) : null}
 
         {error ? (
           <div style={{ padding: "10px 12px", borderRadius: 10, background: "#fef2f2", border: "1px solid #fecaca", color: "#991b1b", fontSize: 13 }}>

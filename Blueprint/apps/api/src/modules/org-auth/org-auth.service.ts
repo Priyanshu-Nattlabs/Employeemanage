@@ -5,6 +5,7 @@ import bcrypt from "bcryptjs";
 import * as jwt from "jsonwebtoken";
 import crypto from "crypto";
 import nodemailer from "nodemailer";
+import * as XLSX from "xlsx";
 import {
   CompanyOrgStructure,
   type CompanyOrgStructureDocument,
@@ -41,6 +42,33 @@ function normalizeDomain(domain: string): string {
   return (domain || "").trim().toLowerCase().replace(/^@/, "");
 }
 
+function escapeHtml(s: string) {
+  return String(s || "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+/** Which portal branding to show in the email From display name (address still comes from SMTP_*, see extractMailboxAddress). */
+type MailPortalBranding = "employee_login" | "manager_login_or_signup";
+
+function extractMailboxAddress(): string {
+  const raw = (process.env.SMTP_FROM || process.env.SMTP_USER || "no-reply@example.com").trim();
+  const m = /<([^<>]+@[^<>]+)>/.exec(raw);
+  if (m) return m[1].trim();
+  return raw;
+}
+
+function fromHeaderForPortal(kind: MailPortalBranding): string {
+  const addr = extractMailboxAddress();
+  const displayName =
+    kind === "employee_login"
+      ? "Employee Development — Employee login"
+      : "Employee Development — Manager login or signup";
+  return `${displayName} <${addr}>`;
+}
+
 @Injectable()
 export class OrgAuthService {
   constructor(
@@ -57,18 +85,35 @@ export class OrgAuthService {
     return h.digest("hex");
   }
 
+  /** Separate namespace from email verification OTP hashes. */
+  private passwordResetOtpHash(email: string, otp: string): string {
+    const h = crypto.createHash("sha256");
+    h.update(`PWRESET:${normalizeEmail(email)}:${otp}:${OTP_SECRET}`);
+    return h.digest("hex");
+  }
+
   private generateOtp(): string {
     // 6-digit numeric code (000000-999999)
     const n = crypto.randomInt(0, 1_000_000);
     return String(n).padStart(6, "0");
   }
 
-  private async sendOtpEmail(email: string, otp: string): Promise<null | { messageId?: string; accepted?: any; rejected?: any; response?: string }> {
+  private mailPortalBrandingForUser(user: CompanyUserDocument): MailPortalBranding {
+    if (user.accountType === "ADMIN") return "manager_login_or_signup";
+    if (user.currentRole === "MANAGER" || user.currentRole === "HR") return "manager_login_or_signup";
+    return "employee_login";
+  }
+
+  private async sendOtpEmail(
+    email: string,
+    otp: string,
+    portal: MailPortalBranding,
+  ): Promise<null | { messageId?: string; accepted?: any; rejected?: any; response?: string }> {
     const host = (process.env.SMTP_HOST || "").trim();
     const port = Number(process.env.SMTP_PORT || "0");
     const user = (process.env.SMTP_USER || "").trim();
     const pass = (process.env.SMTP_PASS || "").trim();
-    const from = (process.env.SMTP_FROM || user || "no-reply@example.com").trim();
+    const from = fromHeaderForPortal(portal);
 
     // eslint-disable-next-line no-console
     console.log("[ORG AUTH] SMTP config", {
@@ -138,7 +183,66 @@ export class OrgAuthService {
     user.emailOtpExpiresAt = new Date(Date.now() + OTP_TTL_MINUTES * 60_000);
     user.emailOtpLastSentAt = new Date();
     await user.save();
-    return await this.sendOtpEmail(user.email, otp);
+    return await this.sendOtpEmail(user.email, otp, this.mailPortalBrandingForUser(user));
+  }
+
+  private async sendPasswordResetOtpEmail(
+    email: string,
+    otp: string,
+  ): Promise<null | { messageId?: string; accepted?: any; rejected?: any; response?: string }> {
+    const host = (process.env.SMTP_HOST || "").trim();
+    const port = Number(process.env.SMTP_PORT || "0");
+    const user = (process.env.SMTP_USER || "").trim();
+    const pass = (process.env.SMTP_PASS || "").trim();
+    const from = fromHeaderForPortal("manager_login_or_signup");
+
+    if (!host || !port || !user || !pass) {
+      // eslint-disable-next-line no-console
+      console.log(`[ORG AUTH] Password reset OTP for ${email}: ${otp} (SMTP not configured)`);
+      return null;
+    }
+
+    const secure = port === 465;
+    const transport = nodemailer.createTransport({
+      host,
+      port,
+      secure,
+      auth: { user, pass },
+      requireTLS: !secure,
+    });
+
+    const info = await transport.sendMail({
+      from,
+      to: normalizeEmail(email),
+      subject: "Your password reset code",
+      text: `Your password reset code is ${otp}. It expires in ${OTP_TTL_MINUTES} minutes. If you did not request this, you can ignore this email.`,
+      html: `
+        <div style="font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial; line-height:1.5">
+          <h2 style="margin:0 0 10px">Reset your password</h2>
+          <p style="margin:0 0 14px">Use this code to set a new password for your Manager/HR account:</p>
+          <div style="font-size:28px; font-weight:800; letter-spacing:6px; margin:0 0 14px">${otp}</div>
+          <p style="margin:0; color:#475569">This code expires in ${OTP_TTL_MINUTES} minutes.</p>
+        </div>
+      `,
+    });
+
+    // eslint-disable-next-line no-console
+    console.log("[ORG AUTH] Password reset OTP email sent", {
+      to: normalizeEmail(email),
+      messageId: (info as any)?.messageId,
+    });
+
+    if (!OTP_DEBUG) return null;
+    return {
+      messageId: (info as any)?.messageId,
+      accepted: (info as any)?.accepted,
+      rejected: (info as any)?.rejected,
+      response: (info as any)?.response,
+    };
+  }
+
+  private isManagerOrHrPortalUser(u: CompanyUserDocument | any): boolean {
+    return u?.accountType === "EMPLOYEE" && (u?.currentRole === "MANAGER" || u?.currentRole === "HR");
   }
 
   private signToken(user: CompanyUserDocument) {
@@ -182,6 +286,305 @@ export class OrgAuthService {
     } catch {
       throw new UnauthorizedException("Invalid or expired token");
     }
+  }
+
+  private serializeOrgUser(u: any) {
+    const id = String(u?._id ?? u?.id ?? "");
+    return {
+      id,
+      email: u?.email,
+      fullName: u?.fullName,
+      designation: u?.designation,
+      department: u?.department,
+      companyName: u?.companyName,
+      companyDomain: u?.companyDomain,
+      employeeId: u?.employeeId,
+      currentRole: u?.currentRole,
+      accountType: u?.accountType,
+      mobileNo: u?.mobileNo,
+      reportingManagerEmail: u?.reportingManagerEmail,
+      needsProfileCompletion: Boolean(u?.needsProfileCompletion),
+      mustChangePassword: Boolean(u?.mustChangePassword),
+    };
+  }
+
+  private randomInvitePassword(): string {
+    const chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789";
+    let s = "";
+    for (let i = 0; i < 12; i++) s += chars[crypto.randomInt(0, chars.length)];
+    return s;
+  }
+
+  private async generateUniqueEmployeeId(companyDomain: string): Promise<string> {
+    const dom = normalizeDomain(companyDomain);
+    const prefix =
+      dom
+        .split(".")[0]
+        .replace(/[^a-z0-9]/gi, "")
+        .toUpperCase()
+        .slice(0, 6) || "ORG";
+    for (let attempt = 0; attempt < 8; attempt++) {
+      const candidate = `${prefix}-${crypto.randomBytes(3).toString("hex").toUpperCase()}`;
+      const exists = await this.companyUserModel.exists({ companyDomain: dom, employeeId: candidate });
+      if (!exists) return candidate;
+    }
+    return `${prefix}-${Date.now().toString(36).toUpperCase()}`;
+  }
+
+  private parseInviteSpreadsheet(buffer: Buffer): Array<{ email: string; name: string; department?: string }> {
+    const wb = XLSX.read(buffer, { type: "buffer" });
+    const sheetName = wb.SheetNames?.[0];
+    if (!sheetName) return [];
+    const sheet = wb.Sheets[sheetName];
+    const raw = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, { defval: "" });
+    const normKey = (k: string) =>
+      String(k || "")
+        .trim()
+        .toLowerCase()
+        .replace(/\s+/g, " ");
+
+    const out: Array<{ email: string; name: string; department?: string }> = [];
+    for (const row of raw) {
+      const map: Record<string, string> = {};
+      for (const k of Object.keys(row)) {
+        map[normKey(k)] = String(row[k] ?? "").trim();
+      }
+      const email =
+        map["email"] ||
+        map["company email"] ||
+        map["work email"] ||
+        map["e-mail"] ||
+        map["company mail"] ||
+        map["work_mail"] ||
+        "";
+      const name =
+        map["name"] || map["full name"] || map["employee name"] || map["full_name"] || map["employee_name"] || "";
+      const department = map["department"] || map["dept"] || map["team"] || "";
+      if (!email && !name) continue;
+      out.push({ email, name, department: department || undefined });
+    }
+    return out;
+  }
+
+  private async sendInviteCredentialsEmail(input: {
+    to: string;
+    fullName: string;
+    tempPassword: string;
+    employeeId?: string;
+    invitedByName?: string;
+    loginUrl?: string;
+  }) {
+    const host = (process.env.SMTP_HOST || "").trim();
+    const port = Number(process.env.SMTP_PORT || "0");
+    const user = (process.env.SMTP_USER || "").trim();
+    const pass = (process.env.SMTP_PASS || "").trim();
+    const from = fromHeaderForPortal("employee_login");
+
+    const portal = (process.env.ORG_PORTAL_BASE_URL || "").trim().replace(/\/$/, "");
+    const loginHref = (input.loginUrl && input.loginUrl.trim()) || (portal ? `${portal}/auth/employee/login` : "");
+
+    const textLines = [
+      `Hello ${input.fullName || input.to},`,
+      ``,
+      `Your manager has created an account for you on the employee portal.`,
+      input.employeeId ? `Employee ID: ${input.employeeId}` : ``,
+      ``,
+      `Sign in with your company email and this temporary password:`,
+      `${input.tempPassword}`,
+      ``,
+      loginHref ? `Login: ${loginHref}` : `Login: use your company portal employee login page`,
+      ``,
+      `After you sign in, you will be asked to complete your profile and choose a new password.`,
+    ];
+
+    if (!host || !port || !user || !pass) {
+      // eslint-disable-next-line no-console
+      console.log(`[ORG AUTH] Invite credentials for ${input.to} (SMTP not configured). Temp password: ${input.tempPassword}`);
+      return null;
+    }
+
+    const secure = port === 465;
+    const transport = nodemailer.createTransport({
+      host,
+      port,
+      secure,
+      auth: { user, pass },
+      requireTLS: !secure,
+    });
+
+    const info = await transport.sendMail({
+      from,
+      to: normalizeEmail(input.to),
+      subject: "Your employee portal login",
+      text: textLines.join("\n"),
+      html: `
+        <div style="font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial; line-height:1.55; color:#0f172a">
+          <h2 style="margin:0 0 10px">Welcome${input.invitedByName ? ` — invited by ${escapeHtml(input.invitedByName)}` : ""}</h2>
+          <p style="margin:0 0 12px">Hello <b>${escapeHtml(input.fullName || input.to)}</b>,</p>
+          <p style="margin:0 0 12px">Your account is ready. Use your company email and this <b>temporary password</b> to sign in:</p>
+          <div style="font-size:22px; font-weight:900; letter-spacing:1px; margin:0 0 14px; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace">${escapeHtml(input.tempPassword)}</div>
+          ${input.employeeId ? `<p style="margin:0 0 12px"><b>Employee ID:</b> ${escapeHtml(input.employeeId)}</p>` : ""}
+          <p style="margin:0 0 12px">${
+            loginHref
+              ? `<a href="${escapeHtml(loginHref)}" style="color:#2563eb; font-weight:800">Open login page</a>`
+              : `<span style="color:#475569">Open your company’s employee login page (your manager can share the link).</span>`
+          }</p>
+          <p style="margin:0; color:#475569; font-size:13px">After login you must complete your profile and set a new password.</p>
+        </div>
+      `,
+    });
+
+    // eslint-disable-next-line no-console
+    console.log("[ORG AUTH] Invite email sent", { to: normalizeEmail(input.to), messageId: (info as any)?.messageId });
+    return info;
+  }
+
+  async bulkInviteEmployeesFromExcel(input: { actorJwt: any; file?: Express.Multer.File }) {
+    const me = input.actorJwt;
+    const file = input.file;
+    if (!file?.buffer?.length) throw new BadRequestException("Upload an Excel file (.xlsx or .xls)");
+
+    const isManager = me?.accountType === "EMPLOYEE" && me?.currentRole === "MANAGER";
+    const isHR = me?.accountType === "EMPLOYEE" && me?.currentRole === "HR";
+    if (!isManager && !isHR) throw new UnauthorizedException("Only managers or HR can invite employees");
+
+    const managerProfile = await this.getProfileById(me.sub);
+    const managerDept = String((managerProfile as any)?.department || "").trim();
+    if (isManager && !managerDept) {
+      throw new BadRequestException("Your profile has no department. Update your profile before inviting teammates.");
+    }
+
+    const companyDomain = normalizeDomain(me.companyDomain);
+    const companyName = String(me.companyName || "").trim();
+    const mgrEmail = normalizeEmail(me.email);
+    const mgrName = String(me.fullName || "").trim();
+
+    const parsed = this.parseInviteSpreadsheet(file.buffer);
+    if (!parsed.length) {
+      throw new BadRequestException(
+        "No valid rows found. Add a header row with columns such as Email and Name (and Department when uploading as HR).",
+      );
+    }
+    if (parsed.length > 200) throw new BadRequestException("Too many rows (max 200 per upload)");
+
+    const staticPw = (process.env.ORG_MANAGER_INVITE_STATIC_PASSWORD || "").trim();
+    if (staticPw && staticPw.length < 8) {
+      throw new BadRequestException("ORG_MANAGER_INVITE_STATIC_PASSWORD must be at least 8 characters");
+    }
+
+    const portalBase = (process.env.ORG_PORTAL_BASE_URL || "").trim().replace(/\/$/, "");
+    const loginUrl = portalBase ? `${portalBase}/auth/employee/login` : "";
+
+    const invited: Array<{ email: string; employeeId: string }> = [];
+    const errors: Array<{ row: number; email: string; message: string }> = [];
+
+    for (let i = 0; i < parsed.length; i++) {
+      const row = parsed[i];
+      const rowNum = i + 2;
+      const emailRaw = row.email;
+      try {
+        const email = normalizeEmail(emailRaw);
+        if (!email) throw new Error("Missing email");
+        if (emailDomain(email) !== companyDomain) {
+          throw new Error(`Email must use @${companyDomain}`);
+        }
+
+        let dept = managerDept;
+        if (isHR) {
+          dept = String(row.department || "").trim();
+          if (!dept) throw new Error("Department column is required for each row when HR uploads the sheet");
+        }
+
+        const fullName = String(row.name || "").trim() || email.split("@")[0] || "Employee";
+
+        const exists = await this.companyUserModel.findOne({ email }).lean();
+        if (exists) throw new Error("An account with this email already exists");
+
+        const tempPassword = staticPw || this.randomInvitePassword();
+        const employeeId = await this.generateUniqueEmployeeId(companyDomain);
+        const passwordHash = await bcrypt.hash(tempPassword, 12);
+
+        await this.companyUserModel.create({
+          email,
+          passwordHash,
+          fullName,
+          designation: undefined,
+          department: dept,
+          companyName,
+          companyDomain,
+          employeeId,
+          currentRole: "EMPLOYEE",
+          accountType: "EMPLOYEE",
+          reportingManagerEmail: mgrEmail,
+          mobileNo: undefined,
+          emailVerified: true,
+          needsProfileCompletion: true,
+          mustChangePassword: true,
+        });
+
+        await this.sendInviteCredentialsEmail({
+          to: email,
+          fullName,
+          tempPassword,
+          employeeId,
+          invitedByName: mgrName,
+          loginUrl: loginUrl || undefined,
+        });
+
+        invited.push({ email, employeeId });
+      } catch (e: any) {
+        errors.push({ row: rowNum, email: String(emailRaw || ""), message: e?.message || "Failed" });
+      }
+    }
+
+    return { ok: true, created: invited.length, invited, errors };
+  }
+
+  async completeInviteProfile(
+    userId: string,
+    body: { newPassword: string; fullName?: string; designation: string; mobileNo: string; employeeId?: string },
+  ) {
+    if (!userId) throw new UnauthorizedException("Invalid token");
+    const user = await this.companyUserModel.findById(userId);
+    if (!user) throw new NotFoundException("User not found");
+    if (!user.needsProfileCompletion && !user.mustChangePassword) {
+      throw new BadRequestException("Your profile is already complete");
+    }
+    if (user.accountType !== "EMPLOYEE") throw new BadRequestException("This flow is only for employee accounts");
+
+    const designation = String(body.designation || "").trim();
+    const mobileNo = String(body.mobileNo || "").trim();
+    const newPassword = String(body.newPassword || "");
+    if (newPassword.length < 8) throw new BadRequestException("Password must be at least 8 characters");
+    if (designation.length < 2) throw new BadRequestException("Designation is required");
+    if (mobileNo.length < 5) throw new BadRequestException("Mobile number is required");
+
+    const okOld = await bcrypt.compare(newPassword, user.passwordHash);
+    if (okOld) throw new BadRequestException("New password must be different from the temporary password");
+
+    user.passwordHash = await bcrypt.hash(newPassword, 12);
+    user.mustChangePassword = false;
+    user.needsProfileCompletion = false;
+    user.designation = designation;
+    user.mobileNo = mobileNo;
+    user.emailVerified = true;
+
+    const fn = String(body.fullName || "").trim();
+    if (fn) user.fullName = fn;
+
+    const eid = String(body.employeeId || "").trim();
+    if (eid) {
+      const dom = normalizeDomain(user.companyDomain);
+      const clash = await this.companyUserModel
+        .findOne({ companyDomain: dom, employeeId: eid, _id: { $ne: user._id } })
+        .lean();
+      if (clash) throw new BadRequestException("That employee ID is already used by someone else");
+      user.employeeId = eid;
+    }
+
+    await user.save();
+    const plain = user.toObject();
+    return { token: this.signToken(user), user: this.serializeOrgUser(plain) };
   }
 
   async registerEmployee(input: {
@@ -235,13 +638,10 @@ export class OrgAuthService {
       accountType: "EMPLOYEE" as OrgAccountType,
       mobileNo: input.mobileNo?.trim(),
       reportingManagerEmail: mgrEmail,
-      emailVerified: true,
+      emailVerified: false,
     });
-    created.emailOtpHash = undefined;
-    created.emailOtpExpiresAt = undefined;
-    created.emailOtpLastSentAt = undefined;
-    await created.save();
-    return this.authPayload(created);
+    await this.setAndSendEmailOtp(created);
+    return { verificationRequired: true as const, email: created.email };
   }
 
   async registerAdmin(input: { email: string; password: string; fullName: string; companyName: string; companyDomain?: string }) {
@@ -266,13 +666,10 @@ export class OrgAuthService {
       companyDomain,
       currentRole: "EMPLOYEE",
       accountType: "ADMIN" as OrgAccountType,
-      emailVerified: true,
+      emailVerified: false,
     });
-    created.emailOtpHash = undefined;
-    created.emailOtpExpiresAt = undefined;
-    created.emailOtpLastSentAt = undefined;
-    await created.save();
-    return this.authPayload(created);
+    await this.setAndSendEmailOtp(created);
+    return { verificationRequired: true as const, email: created.email };
   }
 
   async login(emailRaw: string, password: string) {
@@ -282,51 +679,139 @@ export class OrgAuthService {
     const ok = await bcrypt.compare(password, user.passwordHash);
     if (!ok) throw new UnauthorizedException("Invalid email or password");
     if (!user.emailVerified) {
-      user.emailVerified = true;
-      user.emailOtpHash = undefined;
-      user.emailOtpExpiresAt = undefined;
-      user.emailOtpLastSentAt = undefined;
-      await user.save();
+      throw new UnauthorizedException("Email not verified. Please verify your email with OTP.");
     }
-    return this.authPayload(user);
+    const token = this.signToken(user);
+    return { token, user: this.serializeOrgUser(user.toObject ? user.toObject() : user) };
   }
 
   async resendEmailOtp(emailRaw: string) {
     const email = normalizeEmail(emailRaw);
     const user = await this.companyUserModel.findOne({ email });
     if (!user) throw new NotFoundException("User not found");
-    if (!user.emailVerified) {
-      user.emailVerified = true;
-      user.emailOtpHash = undefined;
-      user.emailOtpExpiresAt = undefined;
-      user.emailOtpLastSentAt = undefined;
-      await user.save();
+    if (user.emailVerified) {
+      return { ok: true, message: "This email is already verified." };
     }
-    return { ok: true, message: "OTP verification is currently disabled." };
+    const last = user.emailOtpLastSentAt ? new Date(user.emailOtpLastSentAt).getTime() : 0;
+    if (last && Date.now() - last < OTP_RESEND_COOLDOWN_SECONDS * 1000) {
+      throw new BadRequestException(`Please wait ${OTP_RESEND_COOLDOWN_SECONDS} seconds before requesting another code.`);
+    }
+    await this.setAndSendEmailOtp(user);
+    return { ok: true, message: "We sent a new verification code to your email." };
   }
 
   async verifyEmailOtp(emailRaw: string, otpRaw: string) {
     const email = normalizeEmail(emailRaw);
+    const otp = (otpRaw || "").trim();
     const user = await this.companyUserModel.findOne({ email });
     if (!user) throw new NotFoundException("User not found");
-    if (!user.emailVerified) {
-      user.emailVerified = true;
-      user.emailOtpHash = undefined;
-      user.emailOtpExpiresAt = undefined;
-      user.emailOtpLastSentAt = undefined;
-      await user.save();
+    if (user.emailVerified) {
+      const token = this.signToken(user);
+      return { token, user: this.serializeOrgUser(user.toObject ? user.toObject() : user) };
     }
-    return this.authPayload(user);
+
+    const exp = user.emailOtpExpiresAt ? new Date(user.emailOtpExpiresAt).getTime() : 0;
+    if (!user.emailOtpHash || !exp || Date.now() > exp) {
+      throw new BadRequestException("OTP expired. Please resend OTP.");
+    }
+
+    const got = this.otpHash(email, otp);
+    const a = Buffer.from(got, "hex");
+    const b = Buffer.from(user.emailOtpHash, "hex");
+    const ok = a.length === b.length && crypto.timingSafeEqual(a, b);
+    if (!ok) throw new BadRequestException("Invalid OTP");
+
+    user.emailVerified = true;
+    user.emailOtpHash = undefined;
+    user.emailOtpExpiresAt = undefined;
+    user.emailOtpLastSentAt = undefined;
+    await user.save();
+
+    const token = this.signToken(user);
+    return { token, user: this.serializeOrgUser(user.toObject ? user.toObject() : user) };
   }
 
+  /**
+   * Sends a 6-digit OTP to the email for Manager/HR employee accounts only.
+   * Response is generic whether or not the user exists (avoids email enumeration).
+   */
+  async requestManagerHrPasswordResetOtp(emailRaw: string) {
+    const email = normalizeEmail(emailRaw);
+    const user = await this.companyUserModel.findOne({ email });
+    const ok = user && this.isManagerOrHrPortalUser(user);
+    if (ok) {
+      const last = user!.passwordResetOtpLastSentAt ? new Date(user!.passwordResetOtpLastSentAt).getTime() : 0;
+      if (last && Date.now() - last < OTP_RESEND_COOLDOWN_SECONDS * 1000) {
+        throw new BadRequestException(`Please wait ${OTP_RESEND_COOLDOWN_SECONDS} seconds before requesting another code.`);
+      }
+      const otp = this.generateOtp();
+      user!.passwordResetOtpHash = this.passwordResetOtpHash(user!.email, otp);
+      user!.passwordResetOtpExpiresAt = new Date(Date.now() + OTP_TTL_MINUTES * 60_000);
+      user!.passwordResetOtpLastSentAt = new Date();
+      await user!.save();
+      await this.sendPasswordResetOtpEmail(user!.email, otp);
+    }
+    return {
+      ok: true,
+      message: "If this email is registered as a Manager or HR account, we sent a verification code.",
+    };
+  }
+
+  /** Verifies OTP and sets the new password for Manager/HR portal accounts. */
+  async confirmManagerHrPasswordReset(emailRaw: string, otpRaw: string, newPassword: string) {
+    const email = normalizeEmail(emailRaw);
+    const otp = (otpRaw || "").trim();
+    const user = await this.companyUserModel.findOne({ email });
+    if (!user || !this.isManagerOrHrPortalUser(user)) {
+      throw new BadRequestException("Invalid or expired code");
+    }
+
+    const exp = user.passwordResetOtpExpiresAt ? new Date(user.passwordResetOtpExpiresAt).getTime() : 0;
+    if (!user.passwordResetOtpHash || !exp || Date.now() > exp) {
+      throw new BadRequestException("Invalid or expired code");
+    }
+
+    const got = this.passwordResetOtpHash(user.email, otp);
+    const a = Buffer.from(got, "hex");
+    const b = Buffer.from(user.passwordResetOtpHash, "hex");
+    const otpOk = a.length === b.length && crypto.timingSafeEqual(a, b);
+    if (!otpOk) throw new BadRequestException("Invalid or expired code");
+
+    user.passwordResetOtpHash = undefined;
+    user.passwordResetOtpExpiresAt = undefined;
+    user.passwordResetOtpLastSentAt = undefined;
+    user.passwordHash = await bcrypt.hash(newPassword, 12);
+    user.emailVerified = true;
+    await user.save();
+
+    const token = this.signToken(user);
+    return { token, user: this.serializeOrgUser(user.toObject ? user.toObject() : user) };
+  }
+
+  /**
+   * Employees visible to Manager/HR dashboards: org accounts with `currentRole: EMPLOYEE`
+   * (employee portal signups and invited line employees)—not peers with Manager/HR roles.
+   *
+   * @param department - If **omitted** (HR callers), lists all line employees for the domain.
+   *                     If **passed** (always for managers—even `""`), require a non-empty department
+   *                     to scope results; managers with no department get an empty roster (never whole-domain leakage).
+   */
   async getEmployeesForManager(companyDomain: string, department?: string) {
     const domain = normalizeDomain(companyDomain);
-    const filter: any = { companyDomain: domain, accountType: "EMPLOYEE" };
-    const dept = (department || "").trim();
-    if (dept) {
-      // Match the manager's department case-insensitively, ignoring trailing spaces.
+    const filter: any = {
+      companyDomain: domain,
+      accountType: "EMPLOYEE",
+      currentRole: "EMPLOYEE",
+    };
+
+    if (department !== undefined) {
+      const dept = String(department || "").trim();
+      if (!dept) {
+        return [];
+      }
       filter.department = new RegExp(`^${dept.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`, "i");
     }
+
     return this.companyUserModel
       .find(filter)
       .select("-passwordHash")
@@ -353,6 +838,11 @@ export class OrgAuthService {
 
   async updateProfileById(id: string, patch: any) {
     if (!id) throw new UnauthorizedException("Invalid token");
+
+    const pending = await this.companyUserModel.findById(id).select("needsProfileCompletion mustChangePassword").lean();
+    if (pending && ((pending as any).needsProfileCompletion || (pending as any).mustChangePassword)) {
+      throw new BadRequestException("Complete the profile setup form first (you will be redirected after login).");
+    }
 
     // Only allow editable fields. Email/company identity stays locked.
     const allowed: any = {};
@@ -731,6 +1221,9 @@ export class OrgAuthService {
       .select("-passwordHash")
       .lean();
     if (!employee) throw new NotFoundException("Employee not found");
+    if (String((employee as any).currentRole || "EMPLOYEE") !== "EMPLOYEE") {
+      throw new BadRequestException("Recommendations apply to line employees only.");
+    }
 
     const empDept = String((employee as any).department || "").trim();
 
@@ -784,6 +1277,9 @@ export class OrgAuthService {
       .select("-passwordHash")
       .lean();
     if (!employee) throw new NotFoundException("Employee not found");
+    if (String((employee as any).currentRole || "EMPLOYEE") !== "EMPLOYEE") {
+      throw new BadRequestException("Recommendations apply to line employees only.");
+    }
 
     const empDept = String((employee as any).department || "").trim();
 

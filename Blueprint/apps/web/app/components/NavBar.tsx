@@ -118,13 +118,16 @@ export function NavBar() {
     >
       <div
         style={{
-          maxWidth: 1200,
+          width: "100%",
+          maxWidth: 1280,
           margin: "0 auto",
           display: "flex",
           alignItems: "center",
           height: 64,
-          padding: "0 24px",
-          gap: 24,
+          padding: "0 clamp(12px, 3vw, 24px)",
+          gap: 16,
+          boxSizing: "border-box",
+          minWidth: 0,
         }}
       >
         <Link
@@ -134,10 +137,10 @@ export function NavBar() {
           <div style={{ fontWeight: 900, fontSize: 16, letterSpacing: "-0.02em" }}>Employee Portal</div>
         </Link>
 
-        <div style={{ flex: 1 }} />
+        <div style={{ flex: 1, minWidth: 0 }} />
 
         {isLoggedIn ? (
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", justifyContent: "flex-end", minWidth: 0, maxWidth: "100%" }}>
             {isEmployee ? (
               <div style={{ position: "relative" }}>
                 <button

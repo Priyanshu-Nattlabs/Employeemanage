@@ -845,7 +845,7 @@ function RolePageContent() {
     const fromReq =
       (activeData?.skillRequirements || data?.skillRequirements || baseRole?.skillRequirements || [])
         .map((s: any) => String(s?.skillName || "").trim())
-        .filter(Boolean);
+        .filter((x: string): x is string => Boolean(x));
     return Array.from(new Set(fromReq));
   }, [activeData?.skillRequirements, data?.skillRequirements, baseRole?.skillRequirements]);
 
