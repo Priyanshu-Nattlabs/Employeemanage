@@ -61,12 +61,20 @@ export default function RegisterPage() {
           reportingManagerEmail,
           companyDomain: inferredDomain
         });
+        if (!("token" in r) || !("user" in r)) {
+          setError("Email verification is required. Please verify with OTP before login.");
+          return;
+        }
         setOrgAuthInStorage(r.token, r.user);
         window.location.href = "/target-role";
         return;
       }
 
       const r = await orgRegisterAdmin({ email, password, fullName, companyName, companyDomain: inferredDomain });
+      if (!("token" in r) || !("user" in r)) {
+        setError("Email verification is required. Please verify with OTP before login.");
+        return;
+      }
       setOrgAuthInStorage(r.token, r.user);
       window.location.href = "/dashboard/admin";
     } catch (err: any) {

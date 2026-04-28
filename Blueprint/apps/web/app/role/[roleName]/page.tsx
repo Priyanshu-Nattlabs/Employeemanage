@@ -353,6 +353,8 @@ function RolePageContent() {
   const ctxSpecialization = searchParams.get("specialization") ?? "";
   const targetStartDate = searchParams.get("targetStartDate") ?? "";
   const targetCompletionDate = searchParams.get("targetCompletionDate") ?? "";
+  const employeeLevel = searchParams.get("employeeLevel") ?? "";
+  const levelQuery = employeeLevel ? `?level=${enc(employeeLevel)}` : "";
   const targetDurationMonths = Number(searchParams.get("targetDurationMonths") || "");
 
   /* manager → "recommend role" flow context (passed via querystring from /dashboard/manager) */
@@ -378,7 +380,7 @@ function RolePageContent() {
     try {
       await orgCreateRecommendation(auth.token, {
         employeeId: recommendFor,
-        role: roleName,
+        roleName,
         note: recommendNote.trim() || undefined,
       });
       const params = new URLSearchParams();
@@ -411,6 +413,8 @@ function RolePageContent() {
   const [trendingErr,     setTrendingErr]     = useState<string>("");
   const [knownSkillsSelection, setKnownSkillsSelection] = useState<string[]>([]);
   const [savingKnownSkills, setSavingKnownSkills] = useState(false);
+  const [previousLevelSkills, setPreviousLevelSkills] = useState<string[]>([]);
+  const [skillCompareLoading, setSkillCompareLoading] = useState(false);
   /** Base role doc (JD + skills) when chart snapshot omits them */
   const [baseRole,        setBaseRole]        = useState<any>(null);
 
@@ -433,7 +437,7 @@ function RolePageContent() {
       const [pR, mR, roleR] = await Promise.all([
         fetch(`${API}/api/role-preparation/${enc(roleName)}?studentId=${enc(u)}`),
         fetch(`${API}/api/blueprint/role/${enc(roleName)}/mappings`),
-        fetch(`${API}/api/blueprint/role/${enc(roleName)}`),
+        fetch(`${API}/api/blueprint/role/${enc(roleName)}${levelQuery}`),
       ]);
       const prepData     = await pR.json().catch(() => null);
       const mappingsData = await mR.json().catch(() => null);
@@ -456,7 +460,8 @@ function RolePageContent() {
         const durationQuery = Number.isFinite(targetDurationMonths) && targetDurationMonths > 0
           ? `&duration=${encodeURIComponent(String(targetDurationMonths))}`
           : "";
-        const rR = await fetch(`${API}/api/blueprint/role/${enc(roleName)}/gantt?userId=${enc(u)}${durationQuery}`);
+        const levelParam = employeeLevel ? `&level=${enc(employeeLevel)}` : "";
+        const rR = await fetch(`${API}/api/blueprint/role/${enc(roleName)}/gantt?userId=${enc(u)}${durationQuery}${levelParam}`);
         const body = await rR.json().catch(() => null);
         if (body?.plan && Array.isArray(body.plan.tasks)) {
           chartData = body;
@@ -575,10 +580,33 @@ function RolePageContent() {
     if (ctxIndustry)  q.set("industry",  ctxIndustry);
     if (ctxEducation) q.set("education", ctxEducation);
     if (ctxSpecialization) q.set("specialization", ctxSpecialization);
+    if (employeeLevel) q.set("level", employeeLevel);
     fetch(`${API}/api/blueprint/role/${enc(roleName)}/contextual?${q.toString()}`, { method: "POST" })
       .then(r => r.json()).catch(() => null)
       .then(d => { setContextualData(d); setCtxLoading(false); });
-  }, [roleName, ctxIndustry, ctxEducation, ctxSpecialization]);
+  }, [roleName, ctxIndustry, ctxEducation, ctxSpecialization, employeeLevel]);
+
+  useEffect(() => {
+    const currentLevel = Number(employeeLevel);
+    if (!Number.isFinite(currentLevel) || currentLevel <= 1) {
+      setPreviousLevelSkills([]);
+      return;
+    }
+    const previousLevel = String(currentLevel - 1);
+    setSkillCompareLoading(true);
+    fetch(`${API}/api/blueprint/role/${enc(roleName)}?level=${enc(previousLevel)}`)
+      .then((r) => r.json())
+      .catch(() => null)
+      .then((d) => {
+        const reqSkills = Array.isArray(d?.skillRequirements)
+          ? d.skillRequirements.map((s: any) => String(s?.skillName || "").trim()).filter(Boolean)
+          : [];
+        const legacyTech = Array.isArray(d?.skills?.technical) ? d.skills.technical.map((s: any) => String(s || "").trim()).filter(Boolean) : [];
+        const legacySoft = Array.isArray(d?.skills?.soft) ? d.skills.soft.map((s: any) => String(s || "").trim()).filter(Boolean) : [];
+        setPreviousLevelSkills(Array.from(new Set([...reqSkills, ...legacyTech, ...legacySoft])));
+      })
+      .finally(() => setSkillCompareLoading(false));
+  }, [roleName, employeeLevel]);
 
   /* ── trending jobs insights (Jsearch) ── */
   useEffect(() => {
@@ -678,6 +706,7 @@ function RolePageContent() {
         ganttChartData: snapshot,
         targetStartDate: targetStartDate || undefined,
         targetCompletionDate: targetCompletionDate || undefined,
+        employeeLevel: employeeLevel || undefined,
       }),
     });
     setSavedMsg("Preparation locked & saved!"); setTimeout(() => setSavedMsg(""), 3000);
@@ -812,7 +841,7 @@ function RolePageContent() {
     );
   }, [contextualData, data, baseRole]);
 
-  const allRoleSkillNames = useMemo(() => {
+  const allRoleSkillNames = useMemo<string[]>(() => {
     const fromReq =
       (activeData?.skillRequirements || data?.skillRequirements || baseRole?.skillRequirements || [])
         .map((s: any) => String(s?.skillName || "").trim())
@@ -820,7 +849,13 @@ function RolePageContent() {
     return Array.from(new Set(fromReq));
   }, [activeData?.skillRequirements, data?.skillRequirements, baseRole?.skillRequirements]);
 
-  const knownSkillsSet = new Set(knownSkillsSelection || []);
+  const previousSkillKeySet = useMemo(() => {
+    const out = new Set<string>();
+    for (const s of previousLevelSkills) out.add(String(s || "").trim().toLowerCase());
+    return out;
+  }, [previousLevelSkills]);
+
+  const knownSkillsSet = new Set<string>((knownSkillsSelection || []).map((s) => String(s)));
   const testQueueSkills: string[] = Array.isArray(prep?.knownSkillsForTest) ? prep.knownSkillsForTest : [];
   const passedKnownSkills: string[] = Array.isArray(prep?.passedKnownSkills) ? prep.passedKnownSkills : [];
   const knownSkillsTestSubmitted = !!prep?.knownSkillsTestSubmitted;
@@ -924,11 +959,25 @@ function RolePageContent() {
             <p style={{ margin: "0 0 10px", fontSize: 13, color: "#64748b" }}>
               Select skills you already know. These move to the test section and are removed from the learning blueprint for now.
             </p>
+            {Number(employeeLevel) > 1 && (
+              <div style={{ margin: "0 0 10px", fontSize: 12, color: "#475569", display: "flex", gap: 10, flexWrap: "wrap" }}>
+                <span style={{ background: "#ECFDF5", border: "1px solid #86EFAC", borderRadius: 999, padding: "4px 10px", fontWeight: 700, color: "#166534" }}>
+                  Common with Level {Number(employeeLevel) - 1}
+                </span>
+                <span style={{ background: "#FFF7ED", border: "1px solid #FDBA74", borderRadius: 999, padding: "4px 10px", fontWeight: 700, color: "#9A3412" }}>
+                  New at Level {employeeLevel}
+                </span>
+                {skillCompareLoading && <span style={{ color: "#64748b" }}>Comparing with previous level…</span>}
+              </div>
+            )}
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 8, marginBottom: 12 }}>
               {allRoleSkillNames.map((skill) => {
                 const checked = knownSkillsSet.has(skill);
+                const isCommon = previousSkillKeySet.has(String(skill || "").trim().toLowerCase());
+                const baseBg = isCommon ? "#ECFDF5" : "#FFF7ED";
+                const baseBorder = isCommon ? "#86EFAC" : "#FDBA74";
                 return (
-                  <label key={skill} style={{ display: "flex", gap: 8, alignItems: "center", border: "1px solid #e2e8f0", borderRadius: 8, padding: "8px 10px", background: checked ? "#EFF6FF" : "white" }}>
+                  <label key={skill} style={{ display: "flex", gap: 8, alignItems: "center", border: `1px solid ${checked ? "#93C5FD" : baseBorder}`, borderRadius: 8, padding: "8px 10px", background: checked ? "#EFF6FF" : baseBg }}>
                     <input
                       type="checkbox"
                       checked={checked}
@@ -1229,11 +1278,25 @@ function RolePageContent() {
           <p style={{ margin: "0 0 10px", fontSize: 13, color: "#64748b" }}>
             Select skills you already know. These move to the test section and are removed from the learning blueprint for now.
           </p>
+          {Number(employeeLevel) > 1 && (
+            <div style={{ margin: "0 0 10px", fontSize: 12, color: "#475569", display: "flex", gap: 10, flexWrap: "wrap" }}>
+              <span style={{ background: "#ECFDF5", border: "1px solid #86EFAC", borderRadius: 999, padding: "4px 10px", fontWeight: 700, color: "#166534" }}>
+                Common with Level {Number(employeeLevel) - 1}
+              </span>
+              <span style={{ background: "#FFF7ED", border: "1px solid #FDBA74", borderRadius: 999, padding: "4px 10px", fontWeight: 700, color: "#9A3412" }}>
+                New at Level {employeeLevel}
+              </span>
+              {skillCompareLoading && <span style={{ color: "#64748b" }}>Comparing with previous level…</span>}
+            </div>
+          )}
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 8, marginBottom: 12 }}>
             {allRoleSkillNames.map((skill) => {
               const checked = knownSkillsSet.has(skill);
+              const isCommon = previousSkillKeySet.has(String(skill || "").trim().toLowerCase());
+              const baseBg = isCommon ? "#ECFDF5" : "#FFF7ED";
+              const baseBorder = isCommon ? "#86EFAC" : "#FDBA74";
               return (
-                <label key={skill} style={{ display: "flex", gap: 8, alignItems: "center", border: "1px solid #e2e8f0", borderRadius: 8, padding: "8px 10px", background: checked ? "#EFF6FF" : "white" }}>
+                <label key={skill} style={{ display: "flex", gap: 8, alignItems: "center", border: `1px solid ${checked ? "#93C5FD" : baseBorder}`, borderRadius: 8, padding: "8px 10px", background: checked ? "#EFF6FF" : baseBg }}>
                   <input
                     type="checkbox"
                     checked={checked}

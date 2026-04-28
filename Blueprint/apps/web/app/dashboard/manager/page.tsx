@@ -1,6 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+export const dynamic = "force-dynamic";
+
+import { Suspense, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   clearOrgAuthInStorage,
@@ -20,7 +22,7 @@ type EmployeeRow = {
 
 const REFRESH_MS = 30_000;
 
-export default function ManagerDashboardPage() {
+function ManagerDashboardContent() {
   const [{ token, user }, setAuth] = useState<{ token: string; user: any | null }>({ token: "", user: null });
   const [rows, setRows] = useState<EmployeeRow[]>([]);
   const [activity, setActivity] = useState<OrgManagerActivity | null>(null);
@@ -443,6 +445,14 @@ export default function ManagerDashboardPage() {
         <SiteFooter />
       </div>
     </div>
+  );
+}
+
+export default function ManagerDashboardPage() {
+  return (
+    <Suspense fallback={null}>
+      <ManagerDashboardContent />
+    </Suspense>
   );
 }
 
