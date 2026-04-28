@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
-import { orgRegisterEmployee, type OrgCurrentRole } from "@/lib/orgAuth";
+import { orgRegisterEmployee, setOrgAuthInStorage, type OrgCurrentRole } from "@/lib/orgAuth";
 
 function domainFromEmail(email: string) {
   const v = email.trim().toLowerCase();
@@ -51,10 +51,9 @@ export default function EmployeeRegisterPage() {
         reportingManagerEmail,
         companyDomain: inferredDomain
       });
-
-      // If a manager signs up via the Employee signup, they should land on the same preparation flow as employees.
-      const next = "/";
-      window.location.href = `/auth/verify-otp?email=${encodeURIComponent(r.email)}&next=${encodeURIComponent(next)}`;
+      if (!("token" in r) || !r.token || !r.user) throw new Error("Registration succeeded but login payload missing.");
+      setOrgAuthInStorage(r.token, r.user);
+      window.location.href = "/target-role";
     } catch (err: any) {
       setError(err?.message || "Registration failed");
     } finally {

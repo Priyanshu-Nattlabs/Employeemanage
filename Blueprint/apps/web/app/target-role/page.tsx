@@ -43,8 +43,7 @@ export default function TargetRolePage() {
   const [search, setSearch] = useState("");
   const [savingRole, setSavingRole] = useState("");
   const [error, setError] = useState("");
-  const [targetStartDate, setTargetStartDate] = useState("");
-  const [targetEndDate, setTargetEndDate] = useState("");
+  const [targetDurationMonths, setTargetDurationMonths] = useState("");
 
   useEffect(() => {
     const auth = getOrgAuthFromStorage();
@@ -105,20 +104,26 @@ export default function TargetRolePage() {
       window.location.href = "/auth/employee/login";
       return;
     }
-    if (!targetStartDate || !targetEndDate) {
-      setError("Please select both start date and completion date.");
+    const durationMonths = Number(targetDurationMonths);
+    if (!Number.isFinite(durationMonths) || durationMonths < 1) {
+      setError("Please enter a valid completion span in months.");
       return;
     }
-    if (targetEndDate < targetStartDate) {
-      setError("Completion date must be after start date.");
+    if (durationMonths > 60) {
+      setError("Please keep completion span between 1 and 60 months.");
       return;
     }
     setSavingRole(roleName);
     setError("");
     try {
+      const start = new Date();
+      const end = new Date(start);
+      end.setMonth(end.getMonth() + durationMonths);
+      const toIsoDate = (d: Date) => d.toISOString().slice(0, 10);
       const q = new URLSearchParams({
-        targetStartDate,
-        targetCompletionDate: targetEndDate,
+        targetDurationMonths: String(durationMonths),
+        targetStartDate: toIsoDate(start),
+        targetCompletionDate: toIsoDate(end),
       });
       window.location.href = `/role/${encodeURIComponent(roleName)}?${q.toString()}`;
     } catch (e: any) {
@@ -142,16 +147,18 @@ export default function TargetRolePage() {
           blueprint from this role.
         </p>
 
-        <div style={dateRow}>
-          <label style={dateField}>
-            <span style={dateLabel}>From (start date)</span>
-            <input type="date" value={targetStartDate} onChange={(e) => setTargetStartDate(e.target.value)} style={dateInput} />
-          </label>
-          <label style={dateField}>
-            <span style={dateLabel}>To (target completion)</span>
-            <input type="date" value={targetEndDate} onChange={(e) => setTargetEndDate(e.target.value)} style={dateInput} />
-          </label>
-        </div>
+        <label style={dateField}>
+          <span style={dateLabel}>In how much span are you going to complete this role? (months)</span>
+          <input
+            type="number"
+            min={1}
+            max={60}
+            value={targetDurationMonths}
+            onChange={(e) => setTargetDurationMonths(e.target.value)}
+            style={dateInput}
+            placeholder="e.g. 6"
+          />
+        </label>
 
         <input
           value={search}
@@ -242,7 +249,6 @@ const err: React.CSSProperties = {
 const crumb: React.CSSProperties = { margin: "0 0 8px", color: "#64748b", fontSize: 13 };
 const link: React.CSSProperties = { color: "#2563eb", textDecoration: "none", fontWeight: 700 };
 const muted: React.CSSProperties = { color: "#64748b", textAlign: "center", padding: "18px 8px", fontSize: 14 };
-const dateRow: React.CSSProperties = { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 12 };
 const dateField: React.CSSProperties = { display: "grid", gap: 6 };
 const dateLabel: React.CSSProperties = { fontSize: 12, color: "#475569", fontWeight: 700 };
 const dateInput: React.CSSProperties = { borderRadius: 8, border: "1px solid #cbd5e1", minHeight: 40, padding: "8px 10px", fontSize: 14 };

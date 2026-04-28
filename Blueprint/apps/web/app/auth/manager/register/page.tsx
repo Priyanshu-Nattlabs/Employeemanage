@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
-import { orgRegisterEmployee, type OrgCurrentRole } from "@/lib/orgAuth";
+import { orgRegisterEmployee, setOrgAuthInStorage, type OrgCurrentRole } from "@/lib/orgAuth";
 
 function domainFromEmail(email: string) {
   const v = email.trim().toLowerCase();
@@ -56,8 +56,9 @@ export default function ManagerRegisterPage() {
         reportingManagerEmail,
         companyDomain: inferredDomain
       });
-
-      window.location.href = `/auth/verify-otp?email=${encodeURIComponent(r.email)}&next=${encodeURIComponent("/dashboard/manager")}`;
+      if (!("token" in r) || !r.token || !r.user) throw new Error("Registration succeeded but login payload missing.");
+      setOrgAuthInStorage(r.token, r.user);
+      window.location.href = "/dashboard/manager";
     } catch (err: any) {
       setError(err?.message || "Registration failed");
     } finally {

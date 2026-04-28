@@ -156,6 +156,7 @@ export default function SkillTestPage() {
   const [tabSwitchCount, setTabSwitchCount] = useState(0);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [proctoringStarted, setProctoringStarted] = useState(false);
+  const [timeLeftSec, setTimeLeftSec] = useState(60 * 60);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const mediaStreamRef = useRef<MediaStream | null>(null);
   const violationLockRef = useRef(false);
@@ -299,7 +300,10 @@ export default function SkillTestPage() {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
       mediaStreamRef.current = stream;
-      if (videoRef.current) videoRef.current.srcObject = stream;
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        void videoRef.current.play().catch(() => {});
+      }
       setCameraReady(true);
       setProctoringStarted(true);
       try {
@@ -340,6 +344,16 @@ export default function SkillTestPage() {
       return next;
     });
   };
+
+  useEffect(() => {
+    const stream = mediaStreamRef.current;
+    const video = videoRef.current;
+    if (!cameraReady || !stream || !video) return;
+    if (video.srcObject !== stream) {
+      video.srcObject = stream;
+    }
+    void video.play().catch(() => {});
+  }, [cameraReady, currentQ]);
 
   useEffect(() => {
     if (!proctoringStarted || !test || test.status !== "IN_PROGRESS") return;
@@ -399,6 +413,33 @@ export default function SkillTestPage() {
       }
     }
   }, [test]);
+
+  useEffect(() => {
+    const prevHtmlOverflow = document.documentElement.style.overflow;
+    const prevBodyOverflow = document.body.style.overflow;
+    document.documentElement.style.overflow = "hidden";
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.documentElement.style.overflow = prevHtmlOverflow;
+      document.body.style.overflow = prevBodyOverflow;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!test || test.status !== "IN_PROGRESS" || !cameraReady) return;
+    const id = window.setInterval(() => {
+      setTimeLeftSec((prev) => {
+        if (prev <= 1) {
+          window.clearInterval(id);
+          setError("Time is over. Submitting test...");
+          void submit();
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => window.clearInterval(id);
+  }, [test, cameraReady]);
 
   /* ── Loading ── */
   if (loading) return (
@@ -499,6 +540,12 @@ export default function SkillTestPage() {
                   onClick={() => router.push(`/role/${encodeURIComponent(roleName)}`)}>
                   ← Back to Role
                 </button>
+                <button
+                  style={{ ...btn("white","#0ea5e9"), flex:1, justifyContent:"center", borderRadius:12 }}
+                  onClick={() => router.push(`/role/${encodeURIComponent(roleName)}/report`)}
+                >
+                  📄 View Report
+                </button>
                 <Link href="/" style={{ textDecoration:"none", flex:1 }}>
                   <button style={{ ...btn("#0f172a","#f8fafc","#e2e8f0"), width:"100%", justifyContent:"center", borderRadius:12 }}>
                     🏠 Home
@@ -545,6 +592,12 @@ export default function SkillTestPage() {
                   >
                     🔄 Retake Test
                   </button>
+                  <button
+                    style={{ ...btn("white","#0ea5e9"), justifyContent:"center", fontSize:14, padding:"12px 0", borderRadius:12 }}
+                    onClick={() => router.push(`/role/${encodeURIComponent(roleName)}/report`)}
+                  >
+                    📄 View Report
+                  </button>
                   <button style={{ ...btn("white","rgba(255,255,255,.08)","rgba(255,255,255,.15)"), justifyContent:"center", fontSize:14, padding:"12px 0", borderRadius:12 }}
                     onClick={() => router.push(`/role/${encodeURIComponent(roleName)}`)}
                   >
@@ -573,113 +626,189 @@ export default function SkillTestPage() {
   const q = qList[currentQ];
   // Read from ref so the highlighted option is never stale
   const selectedAnswer = answersRef.current[String(q?.questionNumber)] || "";
+  const timeMin = String(Math.floor(timeLeftSec / 60)).padStart(2, "0");
+  const timeSec = String(timeLeftSec % 60).padStart(2, "0");
 
   return (
-    <div style={{ width:"100%", maxWidth:760, margin:"0 auto", padding:"4px 0 32px" }}>
+    <div style={{ width:"100%", maxWidth:1220, margin:"0 auto", padding:"2px 0 70px", height:"calc(100vh - 8px)", overflow:"hidden", display:"flex", flexDirection:"column" }}>
       <style>{`@keyframes spin{from{transform:rotate(0)}to{transform:rotate(360deg)}}`}</style>
 
-      {/* header */}
-      <div style={{ background:"linear-gradient(135deg,#6366f1,#8b5cf6)", borderRadius:22, padding:"26px 30px", marginBottom:14, color:"white", boxShadow:"0 14px 40px rgba(99,102,241,.28)" }}>
-        <p style={{ margin:"0 0 6px", fontSize:13, opacity:.75 }}>
-          <Link href={`/role/${encodeURIComponent(roleName)}`} style={{ color:"rgba(255,255,255,.8)", textDecoration:"none" }}>← {roleName}</Link>
-        </p>
-        <h1 style={{ margin:"0 0 3px", fontSize:22, fontWeight:900 }}>🧠 {displayTestTitle}</h1>
-        <p style={{ margin:0, opacity:.8, fontSize:13 }}>
-          {isCombinedKnownSkillsTest ? "One combined test for all selected known skills · score ≥ 75% to pass" : "Skill assessment · score ≥ 75% to pass"}
-        </p>
-        <div style={{ marginTop: 10, display: "flex", gap: 8, flexWrap: "wrap" }}>
-          <span style={{ background: "rgba(255,255,255,.16)", border: "1px solid rgba(255,255,255,.3)", borderRadius: 999, padding: "4px 10px", fontSize: 12 }}>
-            📷 Camera active
-          </span>
-          <span style={{ background: isFullscreen ? "rgba(34,197,94,.25)" : "rgba(239,68,68,.25)", border: "1px solid rgba(255,255,255,.3)", borderRadius: 999, padding: "4px 10px", fontSize: 12 }}>
-            {isFullscreen ? "🖥 Fullscreen ON" : "⚠ Fullscreen OFF"}
-          </span>
-          <span style={{ background: "rgba(255,255,255,.16)", border: "1px solid rgba(255,255,255,.3)", borderRadius: 999, padding: "4px 10px", fontSize: 12 }}>
-            Tab switches: {tabSwitchCount}/3
-          </span>
+      {/* top strip */}
+      <div style={{ background:"#fff", border:"1px solid #e2e8f0", borderRadius:12, padding:"8px 10px", marginBottom:8, display:"grid", gridTemplateColumns:"1.05fr .85fr .75fr", gap:6, alignItems:"center", flexShrink:0 }}>
+        <div>
+          <p style={{ margin:"0 0 4px", fontSize:11, color:"#64748b", fontWeight:800, letterSpacing:".08em", textTransform:"uppercase" }}>Skill Assessment</p>
+          <h1 style={{ margin:"0 0 2px", fontSize:19, fontWeight:900, color:"#0f172a" }}>Assessment in Progress</h1>
+          <p style={{ margin:0, color:"#334155", fontSize:12 }}>
+            {displayTestTitle} · {roleName}
+          </p>
+          <p style={{ margin:"4px 0 0", color:"#64748b", fontSize:11 }}>Answered {answered}/{questionCount}</p>
         </div>
-      </div>
-
-      {/* progress + nav dots */}
-      <div style={{ ...card, marginBottom:14 }}>
-        <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:8 }}>
-          <span style={{ fontWeight:700, color:"#0f172a", fontSize:14 }}>Progress</span>
-          <span style={{ fontWeight:800, color:"#6366f1", fontSize:14 }}>{answered} / {questionCount} answered</span>
-        </div>
-        <div style={{ height:9, borderRadius:999, background:"#f1f5f9", overflow:"hidden" }}>
-          <div style={{ height:"100%", width:`${progress}%`, borderRadius:999, background:"linear-gradient(90deg,#6366f1,#a855f7)", transition:"width .4s" }}/>
-        </div>
-        <div style={{ display:"flex", flexWrap:"wrap", gap:6, marginTop:14 }}>
-          {qList.map((q2, i) => {
-            const ans = answersRef.current[String(q2.questionNumber)];
-            return (
-              <button key={i} onClick={() => setCurrentQ(i)} style={{
-                width:34, height:34, borderRadius:9, border:"none", cursor:"pointer", fontWeight:700, fontSize:12,
-                background: i === currentQ ? "#6366f1" : ans ? "#22c55e" : "#f1f5f9",
-                color: i === currentQ || ans ? "white" : "#64748b",
-                boxShadow: i === currentQ ? "0 4px 12px rgba(99,102,241,.4)" : "none",
-                transition:"all .15s",
-              }}>{i + 1}</button>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* question */}
-      {q && (
-        <div style={{ ...card, marginBottom:14 }}>
-          <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:18 }}>
-            <span style={{ fontSize:12, fontWeight:800, color:"#6366f1", background:"#ede9fe", padding:"5px 12px", borderRadius:999 }}>
-              Q{q.questionNumber} / {questionCount}
-            </span>
-            {answeredCount === questionCount && questionCount > 0 && (
-              <span style={{ fontSize:11, fontWeight:700, color:"#16a34a", background:"#dcfce7", padding:"4px 10px", borderRadius:999 }}>
-                ✓ All answered
-              </span>
-            )}
+        <div style={{ display:"flex", alignItems:"center", gap:6, border:"1px solid #e2e8f0", borderRadius:10, padding:6, background:"#f8fafc" }}>
+          <video ref={videoRef} autoPlay muted playsInline style={{ width:106, height:64, borderRadius:8, objectFit:"cover", background:"#0f172a" }} />
+          <div style={{ display:"grid", gap:4 }}>
+            <span style={{ fontSize:11, fontWeight:800, color:"#047857", background:"#d1fae5", borderRadius:999, padding:"2px 7px", width:"fit-content" }}>Face Detected</span>
+            <span style={{ fontSize:11, color:"#334155" }}>{isFullscreen ? "Fullscreen On" : "Fullscreen Off"}</span>
+            <span style={{ fontSize:11, color:"#334155" }}>Tab Switches: {tabSwitchCount}/3</span>
           </div>
-          <p style={{ fontSize:17, fontWeight:700, color:"#0f172a", lineHeight:1.6, margin:"0 0 22px" }}>{q.questionText}</p>
-          <div style={{ display:"grid", gap:10 }}>
-            {q.options.map((opt, oi) => {
-              const sel = selectedAnswer === opt;
-              const letter = ["A","B","C","D"][oi] || String(oi + 1);
+        </div>
+        <div style={{ display:"grid", gap:6 }}>
+          <div style={{ border:"1px solid #fde68a", background:"#fffbeb", borderRadius:9, padding:"6px 8px" }}>
+            <p style={{ margin:0, fontSize:11, color:"#92400e", fontWeight:700 }}>Violations</p>
+            <p style={{ margin:"1px 0 0", fontSize:18, fontWeight:900, color:"#b45309" }}>{tabSwitchCount}</p>
+          </div>
+          <div style={{ border:"1px solid #ddd6fe", background:"#f5f3ff", borderRadius:9, padding:"6px 8px" }}>
+            <p style={{ margin:0, fontSize:11, color:"#5b21b6", fontWeight:700 }}>Time Remaining</p>
+            <p style={{ margin:"1px 0 0", fontSize:18, fontWeight:900, color:"#6d28d9" }}>{timeMin}:{timeSec}</p>
+          </div>
+        </div>
+      </div>
+
+      <div style={{ display:"grid", gridTemplateColumns:"1fr 250px", gap:8, minHeight:0, flex:1, overflow:"hidden" }}>
+        <div style={{ minHeight:0, overflow:"hidden", display:"flex", flexDirection:"column", gap:8 }}>
+          <div style={{ ...card, marginBottom:0, padding: "10px 12px", flexShrink:0 }}>
+            <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:8 }}>
+              <span style={{ fontWeight:700, color:"#0f172a", fontSize:14 }}>Progress</span>
+              <span style={{ fontWeight:800, color:"#6366f1", fontSize:14 }}>{answered} / {questionCount} answered</span>
+            </div>
+            <div style={{ height:9, borderRadius:999, background:"#f1f5f9", overflow:"hidden" }}>
+              <div style={{ height:"100%", width:`${progress}%`, borderRadius:999, background:"linear-gradient(90deg,#6366f1,#a855f7)", transition:"width .4s" }}/>
+            </div>
+          </div>
+
+          {/* question */}
+          {q && (
+            <div style={{ ...card, marginBottom:0, padding: "10px 12px", flex:1, overflow:"hidden" }}>
+              <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:18 }}>
+                <span style={{ fontSize:12, fontWeight:800, color:"#6366f1", background:"#ede9fe", padding:"5px 12px", borderRadius:999 }}>
+                  Question {q.questionNumber} / {questionCount}
+                </span>
+                {answeredCount === questionCount && questionCount > 0 && (
+                  <span style={{ fontSize:11, fontWeight:700, color:"#16a34a", background:"#dcfce7", padding:"4px 10px", borderRadius:999 }}>
+                    ✓ All answered
+                  </span>
+                )}
+              </div>
+              <p style={{ fontSize:20, color:"#cbd5e1", margin:"0 0 1px", fontWeight:800 }}>{q.questionNumber}</p>
+              <p style={{ fontSize:18, fontWeight:800, color:"#0f172a", lineHeight:1.24, margin:"0 0 8px" }}>{q.questionText}</p>
+              <div style={{ display:"grid", gap:6 }}>
+                {q.options.map((opt, oi) => {
+                  const sel = selectedAnswer === opt;
+                  const letter = ["A","B","C","D"][oi] || String(oi + 1);
+                  return (
+                    <button key={opt} onClick={() => saveAnswer(q.questionNumber, opt)} style={{
+                      textAlign:"left", padding:"8px 10px", borderRadius:10, cursor:"pointer",
+                      border: sel ? "2px solid #3b82f6" : "1.5px solid #e2e8f0",
+                      background: sel ? "#eff6ff" : "white",
+                      display:"flex", alignItems:"center", gap:14,
+                      transition:"all .14s",
+                      boxShadow: sel ? "0 4px 18px rgba(59,130,246,.15)" : "none",
+                    }}>
+                      <span style={{
+                        minWidth:28, height:28, borderRadius:8, display:"flex", alignItems:"center", justifyContent:"center",
+                        fontWeight:800, fontSize:12, flexShrink:0,
+                        background: sel ? "#3b82f6" : "#f1f5f9",
+                        color: sel ? "white" : "#64748b",
+                      }}>{letter}</span>
+                      <span style={{ fontSize:14, color: sel ? "#1e3a8a" : "#0f172a", fontWeight: sel ? 700 : 500 }}>{opt}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+        </div>
+
+        {/* right side panel */}
+        <div style={{ ...card, alignSelf:"start", padding: "10px 10px", minHeight:0, overflow:"hidden" }}>
+          <p style={{ margin:"0 0 10px", fontSize:13, color:"#334155", fontWeight:800 }}>Question Palette</p>
+          <div style={{ display:"grid", gap:8, marginBottom:12 }}>
+            <div style={{ display:"flex", alignItems:"center", gap:8, fontSize:12, color:"#475569" }}>
+              <span style={{ width:14, height:14, borderRadius:4, background:"#22c55e", display:"inline-block" }} /> Answered
+            </div>
+            <div style={{ display:"flex", alignItems:"center", gap:8, fontSize:12, color:"#475569" }}>
+              <span style={{ width:14, height:14, borderRadius:4, background:"#f1f5f9", border:"1px solid #cbd5e1", display:"inline-block" }} /> Not Answered
+            </div>
+            <div style={{ display:"flex", alignItems:"center", gap:8, fontSize:12, color:"#475569" }}>
+              <span style={{ width:14, height:14, borderRadius:4, background:"#f59e0b", display:"inline-block" }} /> Current
+            </div>
+          </div>
+          <div style={{ display:"grid", gridTemplateColumns:"repeat(6, 1fr)", gap:5 }}>
+            {qList.map((q2, i) => {
+              const ans = answersRef.current[String(q2.questionNumber)];
+              const isCurrent = i === currentQ;
               return (
-                <button key={opt} onClick={() => saveAnswer(q.questionNumber, opt)} style={{
-                  textAlign:"left", padding:"13px 16px", borderRadius:14, cursor:"pointer",
-                  border: sel ? "2px solid #6366f1" : "1.5px solid #e2e8f0",
-                  background: sel ? "#eef2ff" : "white",
-                  display:"flex", alignItems:"center", gap:14,
-                  transition:"all .14s",
-                  boxShadow: sel ? "0 4px 18px rgba(99,102,241,.15)" : "none",
-                }}>
-                  <span style={{
-                    minWidth:32, height:32, borderRadius:9, display:"flex", alignItems:"center", justifyContent:"center",
-                    fontWeight:800, fontSize:13, flexShrink:0,
-                    background: sel ? "#6366f1" : "#f1f5f9",
-                    color: sel ? "white" : "#64748b",
-                  }}>{letter}</span>
-                  <span style={{ fontSize:14, color: sel ? "#3730a3" : "#0f172a", fontWeight: sel ? 600 : 400 }}>{opt}</span>
-                </button>
+                <button key={i} onClick={() => setCurrentQ(i)} style={{
+                  height:31, borderRadius:8, border:"1px solid #e2e8f0", cursor:"pointer", fontWeight:700, fontSize:11,
+                  background: isCurrent ? "#f59e0b" : ans ? "#22c55e" : "#f8fafc",
+                  color: isCurrent || ans ? "white" : "#64748b",
+                  transition:"all .15s",
+                }}>{i + 1}</button>
               );
             })}
           </div>
-        </div>
-      )}
-
-      {/* nav + submit */}
-      <div style={{ ...card, display:"flex", gap:10, justifyContent:"space-between", alignItems:"center" }}>
-        <div style={{ display:"flex", gap:8 }}>
-          <button style={btn("#1e293b","#f1f5f9","#e2e8f0")} onClick={() => setCurrentQ(Math.max(0, currentQ - 1))} disabled={currentQ === 0}>
-            ← Prev
+          <p style={{ margin:"10px 0 0", fontSize:12, color:"#64748b" }}>
+            Answered: {answered}/{questionCount}
+          </p>
+          {error && <p style={{ margin:"8px 0 0", fontSize:12, color:"#dc2626" }}>{error}</p>}
+          <button
+            style={{ ...btn("white", answered < questionCount ? "#94a3b8" : "#16a34a"), marginTop:12, width:"100%", justifyContent:"center", opacity: submitting ? .7 : 1 }}
+            onClick={submit}
+            disabled={submitting || answered === 0}
+          >
+            {submitting
+              ? <><span style={{ width:13, height:13, border:"2px solid rgba(255,255,255,.4)", borderTop:"2px solid white", borderRadius:"50%", animation:"spin 1s linear infinite", display:"inline-block" }}/>Submitting…</>
+              : `✅ Submit`
+            }
           </button>
-          <button style={btn("white","#6366f1")} onClick={() => setCurrentQ(Math.min(questionCount - 1, currentQ + 1))} disabled={currentQ === questionCount - 1}>
+        </div>
+      </div>
+
+      {/* fixed bottom controls */}
+      <div
+        style={{
+          position: "fixed",
+          left: "50%",
+          transform: "translateX(-50%)",
+          bottom: 8,
+          width: "min(1220px, calc(100vw - 20px))",
+          zIndex: 1000,
+          background: "white",
+          border: "1px solid #e2e8f0",
+          borderRadius: 12,
+          padding: "8px 10px",
+          boxShadow: "0 8px 26px rgba(15,23,42,.12)",
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          gap: 8,
+        }}
+      >
+        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+          <button
+            style={btn("#7f1d1d", "#fee2e2", "#fecaca")}
+            onClick={() => router.push(`/role/${encodeURIComponent(roleName)}`)}
+          >
+            Exit
+          </button>
+          <button
+            style={btn("#1e293b","#f1f5f9","#e2e8f0")}
+            onClick={() => setCurrentQ(Math.max(0, currentQ - 1))}
+            disabled={currentQ === 0}
+          >
+            ← Previous
+          </button>
+        </div>
+        <div style={{ display:"flex", gap:8, alignItems:"center" }}>
+          <button
+            style={btn("white","#6366f1")}
+            onClick={() => setCurrentQ(Math.min(questionCount - 1, currentQ + 1))}
+            disabled={currentQ === questionCount - 1}
+          >
             Next →
           </button>
-        </div>
-        <div style={{ display:"flex", flexDirection:"column", alignItems:"flex-end", gap:4 }}>
-          {error && <p style={{ margin:0, fontSize:12, color:"#dc2626" }}>{error}</p>}
           <button
-            style={{ ...btn("white", answered < questionCount ? "#94a3b8" : "#22c55e"), opacity: submitting ? .7 : 1 }}
+            style={{ ...btn("white", answered < questionCount ? "#94a3b8" : "#16a34a"), opacity: submitting ? .7 : 1 }}
             onClick={submit}
             disabled={submitting || answered === 0}
           >
