@@ -61,23 +61,20 @@ export default function RegisterPage() {
           reportingManagerEmail,
           companyDomain: inferredDomain
         });
-        if ("verificationRequired" in r && r.verificationRequired) {
-          const nextPath = currentRole === "MANAGER" ? "/dashboard/manager" : "/target-role";
-          window.location.href = `/auth/verify-otp?email=${encodeURIComponent(r.email)}&next=${encodeURIComponent(nextPath)}`;
+        if (!("token" in r) || !("user" in r)) {
+          setError("Email verification is required. Please verify with OTP before login.");
           return;
         }
-        if (!("token" in r)) throw new Error("Unexpected registration response");
         setOrgAuthInStorage(r.token, r.user);
         window.location.href = "/target-role";
         return;
       }
 
       const r = await orgRegisterAdmin({ email, password, fullName, companyName, companyDomain: inferredDomain });
-      if ("verificationRequired" in r && r.verificationRequired) {
-        window.location.href = `/auth/verify-otp?email=${encodeURIComponent(r.email)}&next=${encodeURIComponent("/dashboard/admin")}`;
+      if (!("token" in r) || !("user" in r)) {
+        setError("Email verification is required. Please verify with OTP before login.");
         return;
       }
-      if (!("token" in r)) throw new Error("Unexpected registration response");
       setOrgAuthInStorage(r.token, r.user);
       window.location.href = "/dashboard/admin";
     } catch (err: any) {

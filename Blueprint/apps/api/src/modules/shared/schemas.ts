@@ -17,6 +17,7 @@ export class SkillRequirement {
 export class Blueprint {
   @Prop() type!: string;
   @Prop() name!: string;
+  @Prop({ type: String }) level?: string;
   @Prop({ type: [String], default: [] }) roles!: string[];
   @Prop({ type: [String], default: [] }) specializations!: string[];
   @Prop({ type: [String], default: [] }) educations!: string[];
@@ -41,6 +42,7 @@ export class SkillProgress {
 export class RolePreparation {
   @Prop() studentId!: string;
   @Prop() roleName!: string;
+  @Prop() employeeLevel?: string;
   @Prop() preparationStartDate?: string;
   @Prop() targetCompletionDate?: string;
   @Prop({ default: true }) isActive!: boolean;
