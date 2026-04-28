@@ -18,7 +18,9 @@ export type OrgUser = {
   reportingManagerEmail?: string;
 };
 
-export type OrgRegisterResponse = { verificationRequired: true; email: string };
+export type OrgRegisterResponse =
+  | { verificationRequired: true; email: string }
+  | { token: string; user: OrgUser };
 
 const TOKEN_KEY = "jbv2_org_token";
 const USER_KEY = "jbv2_org_user";
