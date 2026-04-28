@@ -311,6 +311,14 @@ Return only JSON array.`;
     if (test.testType === "KNOWN_SKILLS") {
       try {
         await this.prepService.markKnownSkillsTestSubmitted(test.studentId, test.roleName);
+        const skills = this.uniq((test.selectedSkills || []).map((s) => String(s || "").trim()).filter(Boolean));
+        for (const skill of skills) {
+          if (test.passed) {
+            await this.prepService.markKnownSkillPassed(test.studentId, test.roleName, skill, score);
+          } else {
+            await this.prepService.markKnownSkillFailed(test.studentId, test.roleName, skill);
+          }
+        }
       } catch (e: any) {
         this.logger.warn(`Combined known skills test could not unlock preparation gate: ${e?.message || e}`);
       }
@@ -371,6 +379,8 @@ Return only JSON array.`;
           : null;
         results.push({
           skillName,
+          testType: t.testType || "SINGLE_SKILL",
+          selectedSkills: Array.isArray(t.selectedSkills) ? t.selectedSkills : [],
           score:        typeof t.score === "number" ? t.score : null,
           passed:       t.passed === true,
           status:       t.status,

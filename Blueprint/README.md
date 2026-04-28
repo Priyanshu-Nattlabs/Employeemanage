@@ -27,6 +27,32 @@ npm run dev:api
 npm run dev:web
 ```
 
+## Docker (Full Stack)
+
+Run the full Blueprint stack (MongoDB + API + Web) with one command:
+
+```bash
+docker compose up --build -d
+```
+
+Services:
+
+- Web: `http://localhost:3002`
+- API: `http://localhost:8081`
+- MongoDB: `mongodb://localhost:27017`
+
+Stop stack:
+
+```bash
+docker compose down
+```
+
+Stop + remove DB volume:
+
+```bash
+docker compose down -v
+```
+
 ## Environment
 
 Create `apps/api/.env`:

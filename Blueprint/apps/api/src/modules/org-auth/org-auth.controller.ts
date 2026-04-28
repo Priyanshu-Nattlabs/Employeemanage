@@ -16,6 +16,8 @@ import { FileInterceptor } from "@nestjs/platform-express";
 import { OrgAuthService } from "./org-auth.service";
 import {
   CompleteInviteDto,
+  ForgotPasswordConfirmDto,
+  ForgotPasswordRequestOtpDto,
   LoginDto,
   RegisterAdminDto,
   RegisterEmployeeDto,
@@ -57,6 +59,18 @@ export class OrgAuthController {
   @Post("login")
   login(@Body() body: LoginDto) {
     return this.service.login(body.email, body.password);
+  }
+
+  /** Manager/HR portal: request OTP to inbox for password reset (uses email typed on login screen). */
+  @Post("forgot-password/request-otp")
+  requestPasswordResetOtp(@Body() body: ForgotPasswordRequestOtpDto) {
+    return this.service.requestManagerHrPasswordResetOtp(body.email);
+  }
+
+  /** Manager/HR portal: verify OTP and set new password; returns auth session. */
+  @Post("forgot-password/confirm")
+  confirmPasswordReset(@Body() body: ForgotPasswordConfirmDto) {
+    return this.service.confirmManagerHrPasswordReset(body.email, body.otp, body.newPassword);
   }
 
   @Get("me")

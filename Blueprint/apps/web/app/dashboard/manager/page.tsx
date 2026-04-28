@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   getOrgAuthFromStorage,
@@ -11,6 +11,7 @@ import {
   type OrgManagerActivity,
 } from "@/lib/orgAuth";
 import { SiteFooter } from "@/app/components/SiteFooter";
+import { appPath } from "@/lib/apiBase";
 
 type EmployeeRow = {
   employee: any;
@@ -23,8 +24,10 @@ const REFRESH_MS = 30_000;
 const ACTIVITY_FEED_PREVIEW = 5;
 const LEADERBOARD_PREVIEW = 3;
 const DEPARTMENT_COMPARE_PREVIEW = 6;
+/** Collapsed employee table shows this many rows; "View more" reveals the rest. */
+const EMPLOYEE_TABLE_PREVIEW_ROWS = 8;
 
-export default function ManagerDashboardPage() {
+function ManagerDashboardPageInner() {
   const [{ token, user }, setAuth] = useState<{ token: string; user: any | null }>({ token: "", user: null });
   const [rows, setRows] = useState<EmployeeRow[]>([]);
   const [activity, setActivity] = useState<OrgManagerActivity | null>(null);
@@ -42,6 +45,7 @@ export default function ManagerDashboardPage() {
   const [inviteLoading, setInviteLoading] = useState(false);
   const [inviteError, setInviteError] = useState("");
   const [inviteResult, setInviteResult] = useState<OrgBulkInviteResult | null>(null);
+  const [employeeTableExpanded, setEmployeeTableExpanded] = useState(false);
 
   // Success banner shown after a recommendation has been sent (we redirect back here).
   const router = useRouter();
@@ -53,7 +57,7 @@ export default function ManagerDashboardPage() {
     if (recommendedRole) {
       setRecoBanner({ role: recommendedRole, employee: recommendedFor });
       // Clear query string so the banner doesn't re-appear on refresh.
-      router.replace("/dashboard/manager");
+      router.replace(appPath("/dashboard/manager"));
       const t = window.setTimeout(() => setRecoBanner(null), 8000);
       return () => window.clearTimeout(t);
     }
@@ -65,7 +69,7 @@ export default function ManagerDashboardPage() {
     if (e?.fullName) params.set("recommendName", String(e.fullName));
     if (e?.email) params.set("recommendEmail", String(e.email));
     if (e?.department) params.set("recommendDept", String(e.department));
-    router.push(`/role?${params.toString()}`);
+    router.push(`${appPath("/role")}?${params.toString()}`);
   };
 
   useEffect(() => {
@@ -149,6 +153,17 @@ export default function ManagerDashboardPage() {
 
     return out;
   }, [rows, query, statusFilter, sortKey]);
+
+  const visibleEmployeeRows = useMemo(() => {
+    if (employeeTableExpanded) return filteredRows;
+    return filteredRows.slice(0, EMPLOYEE_TABLE_PREVIEW_ROWS);
+  }, [filteredRows, employeeTableExpanded]);
+
+  const employeeTableHiddenCount = Math.max(0, filteredRows.length - EMPLOYEE_TABLE_PREVIEW_ROWS);
+
+  useEffect(() => {
+    setEmployeeTableExpanded(false);
+  }, [query, statusFilter, sortKey]);
 
   if (!mounted) return null;
   if (!user) return null;
@@ -403,21 +418,28 @@ export default function ManagerDashboardPage() {
 
       {/* Toolbar */}
       <div style={{ ...card, minWidth: 0, maxWidth: "100%" }}>
-        <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap", alignItems: "center" }}>
+        <div style={{ display: "grid", gap: 14 }}>
           <div style={cardTitle}><span style={titleIcon("#0ea5e9")}>👥</span>Employee preparation database</div>
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 200px), 1fr))",
+              gap: 10,
+              alignItems: "center",
+            }}
+          >
             <input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Search name, email, designation…"
-              style={{ ...inputStyle, minWidth: "min(100%, 240px)" }}
+              style={{ ...inputStyle, width: "100%", minWidth: 0 }}
             />
-            <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as any)} style={inputStyle}>
+            <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as any)} style={{ ...inputStyle, width: "100%", minWidth: 0 }}>
               <option value="ALL">All employees</option>
               <option value="ACTIVE">Actively preparing</option>
               <option value="NOT_STARTED">Not started</option>
             </select>
-            <select value={sortKey} onChange={(e) => setSortKey(e.target.value as any)} style={inputStyle}>
+            <select value={sortKey} onChange={(e) => setSortKey(e.target.value as any)} style={{ ...inputStyle, width: "100%", minWidth: 0 }}>
               <option value="PROGRESS_DESC">Sort: progress (high → low)</option>
               <option value="PROGRESS_ASC">Sort: progress (low → high)</option>
               <option value="NAME">Sort: name (A → Z)</option>
@@ -426,8 +448,27 @@ export default function ManagerDashboardPage() {
           </div>
         </div>
 
-        <div style={{ marginTop: 12, overflowX: "auto", border: "1px solid #e5e7eb", borderRadius: 14 }}>
-          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+        <div
+          style={{
+            marginTop: 12,
+            overflowX: "auto",
+            WebkitOverflowScrolling: "touch",
+            border: "1px solid #e5e7eb",
+            borderRadius: 14,
+            maxWidth: "100%",
+          }}
+        >
+          <table style={employeeTableStyle}>
+            <colgroup>
+              <col style={{ width: "19%" }} />
+              <col style={{ width: "11%" }} />
+              <col style={{ width: "12%" }} />
+              <col style={{ width: "9%" }} />
+              <col style={{ width: "12%" }} />
+              <col style={{ width: "15%" }} />
+              <col style={{ width: "12%" }} />
+              <col style={{ width: "10%" }} />
+            </colgroup>
             <thead>
               <tr style={{ background: "#f8fafc" }}>
                 {["Employee", "Department", "Designation", "Active prep", "Avg progress", "Latest test", "Track", "Recommend"].map((h) => (
@@ -445,7 +486,7 @@ export default function ManagerDashboardPage() {
                     : "No employees match the current filters."}
                 </td></tr>
               ) : (
-                filteredRows.map((r) => {
+                visibleEmployeeRows.map((r) => {
                   const e = r.employee || {};
                   const ongoing = Array.isArray(r.ongoing) ? r.ongoing : [];
                   const latest = r.latestTest;
@@ -460,22 +501,26 @@ export default function ManagerDashboardPage() {
                     window.open(`/dashboard/manager/track/${encodeURIComponent(roleName)}?${qs.toString()}`, "_blank", "noopener,noreferrer");
                   };
                   return (
-                    <tr key={e._id || e.email} style={{ borderTop: "1px solid #e5e7eb" }}>
+                    <tr key={e._id || e.email}>
                       <td style={td}>
-                        <div style={{ fontWeight: 800, color: "#0f172a" }}>{e.fullName || "—"}</div>
-                        <div style={{ color: "#64748b", fontSize: 12 }}>{e.email || "—"}</div>
+                        <div style={{ fontWeight: 800, color: "#0f172a", wordBreak: "break-word" }}>{e.fullName || "—"}</div>
+                        <div style={{ color: "#64748b", fontSize: 12, wordBreak: "break-all" }}>{e.email || "—"}</div>
                       </td>
-                      <td style={td}>{e.department || <span style={{ color: "#94a3b8" }}>—</span>}</td>
-                      <td style={td}>{e.designation || "—"}</td>
+                      <td style={td}>
+                        {e.department ? <span style={tdMultiline}>{String(e.department)}</span> : <span style={{ color: "#94a3b8" }}>—</span>}
+                      </td>
+                      <td style={td}>
+                        {e.designation ? <span style={tdMultiline}>{String(e.designation)}</span> : <span style={{ color: "#94a3b8" }}>—</span>}
+                      </td>
                       <td style={td}>{ongoing.length ? `${ongoing.length} role(s)` : <span style={{ color: "#94a3b8" }}>None</span>}</td>
-                      <td style={{ ...td, minWidth: 200 }}>
+                      <td style={td}>
                         {ongoing.length ? <ProgressBar pct={r.avgPct || 0} /> : <span style={{ color: "#94a3b8" }}>—</span>}
                       </td>
                       <td style={td}>
                         {latest ? (
-                          <div>
-                            <div style={{ fontWeight: 800 }}>{latest.skillName || "—"}</div>
-                            <div style={{ fontSize: 12, color: latest.passed ? "#15803d" : "#b91c1c" }}>
+                          <div style={{ minWidth: 0 }}>
+                            <div style={{ fontWeight: 800, wordBreak: "break-word", lineHeight: 1.35 }}>{latest.skillName || "—"}</div>
+                            <div style={{ fontSize: 12, color: latest.passed ? "#15803d" : "#b91c1c", marginTop: 4 }}>
                               {latest.score == null ? "—" : `${latest.score}%`} · {latest.passed ? "Passed" : "Failed"}
                             </div>
                           </div>
@@ -483,16 +528,22 @@ export default function ManagerDashboardPage() {
                       </td>
                       <td style={td}>
                         {ongoing.length === 0 ? (
-                          <button disabled style={{ ...btnMini, opacity: 0.5, cursor: "not-allowed" }} title="Employee hasn’t started preparation yet">
+                          <button
+                            type="button"
+                            disabled
+                            style={{ ...btnMini, maxWidth: "100%", opacity: 0.5, cursor: "not-allowed", whiteSpace: "normal" }}
+                            title="Employee hasn’t started preparation yet"
+                          >
                             View analytics
                           </button>
                         ) : (
-                          <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                          <div style={{ display: "flex", gap: 6, flexWrap: "wrap", minWidth: 0 }}>
                             {pick.map((o: any) => (
                               <button
+                                type="button"
                                 key={o.roleName}
                                 onClick={() => openAnalytics(o.roleName)}
-                                style={btnMini}
+                                style={{ ...btnMini, maxWidth: "100%", whiteSpace: "normal" }}
                                 title={`Open analytics for ${o.roleName}`}
                               >
                                 {o.roleName.length > 18 ? `${o.roleName.slice(0, 18)}…` : o.roleName}
@@ -504,8 +555,9 @@ export default function ManagerDashboardPage() {
                       </td>
                       <td style={td}>
                         <button
+                          type="button"
                           onClick={() => openRecommendFlow(e)}
-                          style={btnRecommend}
+                          style={{ ...btnRecommend, width: "100%", maxWidth: "100%", boxSizing: "border-box", whiteSpace: "normal", textAlign: "center" }}
                           title="Pick a role to recommend to this employee"
                         >
                           💡 Recommend role
@@ -518,6 +570,17 @@ export default function ManagerDashboardPage() {
             </tbody>
           </table>
         </div>
+        {!loading && filteredRows.length > EMPLOYEE_TABLE_PREVIEW_ROWS ? (
+          <button
+            type="button"
+            onClick={() => setEmployeeTableExpanded((v) => !v)}
+            style={btnEmployeeTableExpand}
+          >
+            {employeeTableExpanded
+              ? "Show less"
+              : `View more · ${employeeTableHiddenCount} more employee${employeeTableHiddenCount === 1 ? "" : "s"}`}
+          </button>
+        ) : null}
       </div>
 
       {/* Footer — parent is already full-bleed; avoid a second 100vw (prevents horizontal overflow). */}
@@ -525,6 +588,14 @@ export default function ManagerDashboardPage() {
         <SiteFooter />
       </div>
     </div>
+  );
+}
+
+export default function ManagerDashboardPage() {
+  return (
+    <Suspense fallback={<div style={{ padding: 24, color: "#64748b", fontSize: 14 }}>Loading dashboard…</div>}>
+      <ManagerDashboardPageInner />
+    </Suspense>
   );
 }
 
@@ -1266,8 +1337,47 @@ const btnViewMore: React.CSSProperties = {
   background: "linear-gradient(180deg, #f5f3ff 0%, #fff 100%)",
 };
 const btnMini: React.CSSProperties = { border: "1px solid rgba(15,23,42,0.16)", background: "white", padding: "6px 10px", borderRadius: 10, fontWeight: 800, cursor: "pointer", color: "#0f172a", fontSize: 12, maxWidth: 220, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" };
-const th: React.CSSProperties = { textAlign: "left", padding: "12px 12px", fontWeight: 900, color: "#0f172a", whiteSpace: "nowrap", fontSize: 12, letterSpacing: 0.3, textTransform: "uppercase" };
-const td: React.CSSProperties = { padding: "12px 12px", color: "#0f172a", verticalAlign: "top" };
+const employeeTableStyle: React.CSSProperties = {
+  width: "100%",
+  minWidth: 1080,
+  tableLayout: "fixed",
+  borderCollapse: "collapse",
+  fontSize: 13,
+};
+const th: React.CSSProperties = {
+  textAlign: "left",
+  padding: "12px 12px",
+  fontWeight: 900,
+  color: "#0f172a",
+  whiteSpace: "normal",
+  fontSize: 12,
+  letterSpacing: 0.3,
+  textTransform: "uppercase",
+  verticalAlign: "bottom",
+  borderBottom: "1px solid #e5e7eb",
+  lineHeight: 1.25,
+  wordBreak: "break-word",
+};
+const td: React.CSSProperties = {
+  padding: "12px 12px",
+  color: "#0f172a",
+  verticalAlign: "top",
+  textAlign: "left",
+  borderBottom: "1px solid #f1f5f9",
+  wordWrap: "break-word",
+  overflowWrap: "break-word",
+};
+const tdMultiline: React.CSSProperties = { display: "block", wordBreak: "break-word", lineHeight: 1.35 };
+const btnEmployeeTableExpand: React.CSSProperties = {
+  ...btnOutline,
+  width: "100%",
+  marginTop: 12,
+  padding: "10px 14px",
+  color: "#312e81",
+  borderColor: "#c7d2fe",
+  background: "linear-gradient(180deg, #f5f3ff 0%, #fff 100%)",
+  fontWeight: 900,
+};
 const errorStyle: React.CSSProperties = { padding: "10px 12px", borderRadius: 10, background: "#fef2f2", border: "1px solid #fecaca", color: "#991b1b", fontSize: 13 };
 const inputStyle: React.CSSProperties = { minHeight: 40, borderRadius: 10, border: "1px solid #cbd5e1", padding: "8px 12px", outline: "none", fontSize: 13, background: "#fff" };
 const rankRow: React.CSSProperties = {

@@ -2,59 +2,66 @@ name: job-blueprint-v2
 
 services:
   mongodb:
-    image: mongo:4.4.29
+    # If mongod exits with "Wrong mongod version" / featureCompatibilityVersion 4.4 (etc.),
+    # this volume was created by an older MongoDB. Remove it and recreate: docker compose down -v
+    image: mongo:7
     container_name: job-blueprint-v2-mongodb
     ports:
-      - "27018:27017"
+      - "27017:27017"
     volumes:
       - job-blueprint-v2-mongo-data:/data/db
-    networks:
-      - saarthix-network
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
 
   backend:
     build:
       context: ./apps/api
       dockerfile: Dockerfile
     container_name: job-blueprint-v2-backend
+    # Host port defaults to 9081 so a local Nest/API on 8081 does not clash. Set BACKEND_PUBLISH_PORT=8081 to use 8081.
     ports:
-      - "8082:8081"
+      - "${BACKEND_PUBLISH_PORT:-9081}:8081"
     depends_on:
-      - mongodb
-    environment:
-      - PORT=8081
+      mongodb:
+        condition: service_healthy
     env_file:
       - .env
-    networks:
-      - saarthix-network
+    environment:
+      PORT: 8081
+      MONGODB_URI: ${BACKEND_MONGODB_URI:-mongodb://mongodb:27017/job_blueprint_v2}
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8081/api/blueprint/all >/dev/null || exit 1"]
+      interval: 15s
+      timeout: 7s
+      retries: 8
 
   frontend:
     build:
       context: ./apps/web
       dockerfile: Dockerfile
       args:
-        - BACKEND_URL=http://job-blueprint-v2-backend:8081
-        - NEXT_PUBLIC_BASE_PATH=${NEXT_PUBLIC_BASE_PATH}
-        - NEXT_PUBLIC_SAARTHIX_URL=${NEXT_PUBLIC_SAARTHIX_URL}
+        BACKEND_URL: http://backend:8081
+        # Do not use root NEXT_PUBLIC_BASE_PATH here — it forces every route under /job-blueprint-v2/ (404 on /dashboard/...).
+        # Leave unset or empty for http://localhost:3002/dashboard/... Set DOCKER_NEXT_PUBLIC_BASE_PATH=/job-blueprint-v2 when behind nginx.
+        NEXT_PUBLIC_BASE_PATH: ${DOCKER_NEXT_PUBLIC_BASE_PATH:-}
+        NEXT_PUBLIC_SAARTHIX_URL: ${NEXT_PUBLIC_SAARTHIX_URL:-}
     container_name: job-blueprint-v2-frontend
+    # UI: http://localhost:3002/ (no path prefix unless DOCKER_NEXT_PUBLIC_BASE_PATH is set)
     ports:
       - "3002:3001"
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
     environment:
-      - NODE_ENV=production
-    env_file:
-      - .env
-    networks:
-      - saarthix-network
+      NODE_ENV: production
+      BACKEND_URL: http://backend:8081
     restart: unless-stopped
 
 volumes:
   job-blueprint-v2-mongo-data:
-
-networks:
-  saarthix-network:
-    external: true
-    name: somethingx_saarthix-network
 

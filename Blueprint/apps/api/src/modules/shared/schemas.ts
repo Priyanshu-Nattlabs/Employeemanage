@@ -117,6 +117,11 @@ export class CompanyUser {
   @Prop() emailOtpExpiresAt?: Date;
   @Prop() emailOtpLastSentAt?: Date;
 
+  /** Forgot-password flow (Manager/HR portal only); cleared after successful reset or new code. */
+  @Prop() passwordResetOtpHash?: string;
+  @Prop() passwordResetOtpExpiresAt?: Date;
+  @Prop() passwordResetOtpLastSentAt?: Date;
+
   /** Set when a manager/HR invites via bulk upload; cleared after profile + password setup. */
   @Prop({ default: false }) needsProfileCompletion!: boolean;
   /** Invited users must set a new password on first login. */

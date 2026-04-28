@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
-import { orgRegisterEmployee, type OrgCurrentRole } from "@/lib/orgAuth";
+import { orgRegisterEmployee, setOrgAuthInStorage, type OrgCurrentRole } from "@/lib/orgAuth";
 
 function domainFromEmail(email: string) {
   const v = email.trim().toLowerCase();
@@ -51,10 +51,14 @@ export default function EmployeeRegisterPage() {
         reportingManagerEmail,
         companyDomain: inferredDomain
       });
-
-      // If a manager signs up via the Employee signup, they should land on the same preparation flow as employees.
-      const next = "/";
-      window.location.href = `/auth/verify-otp?email=${encodeURIComponent(r.email)}&next=${encodeURIComponent(next)}`;
+      if ("verificationRequired" in r && r.verificationRequired) {
+        const nextPath = currentRole === "MANAGER" ? "/dashboard/manager" : "/target-role";
+        window.location.href = `/auth/verify-otp?email=${encodeURIComponent(r.email)}&next=${encodeURIComponent(nextPath)}`;
+        return;
+      }
+      if (!("token" in r) || !r.token || !r.user) throw new Error("Registration succeeded but login payload missing.");
+      setOrgAuthInStorage(r.token, r.user);
+      window.location.href = currentRole === "MANAGER" ? "/dashboard/manager" : "/target-role";
     } catch (err: any) {
       setError(err?.message || "Registration failed");
     } finally {
@@ -66,7 +70,7 @@ export default function EmployeeRegisterPage() {
     <div style={{ maxWidth: 820, margin: "24px auto", padding: 24, background: "#fff", border: "1px solid #e5e7eb", borderRadius: 14 }}>
       <h1 style={{ margin: 0, fontSize: 22, fontWeight: 900, color: "#0f172a" }}>Employee create account</h1>
       <p style={{ margin: "8px 0 20px", color: "#475569", fontSize: 14, lineHeight: 1.6 }}>
-        Sign up using your <b>company email</b> only. No Google signup.
+        Sign up using your <b>company email</b> only. No Google signup. After you submit, we email a <b>6-digit verification code</b>—enter it on the next screen to activate your account.
       </p>
 
       <form onSubmit={onSubmit} style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
