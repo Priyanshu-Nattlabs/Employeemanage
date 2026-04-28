@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { Suspense, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
@@ -384,6 +385,31 @@ function ManagerDashboardPageInner() {
             ) : null}
           </div>
         ) : null}
+      </div>
+
+      {/* Schedule interviews — same band as invite / activity */}
+      <div style={{ ...card, minWidth: 0, maxWidth: "100%" }}>
+        <div style={cardTitle}>
+          <span style={titleIcon("#0ea5e9")}>📅</span>Schedule interview
+        </div>
+        <div style={cardSub}>
+          View everyone in <b>{scopeLabel}</b> with department, email, and roles they&apos;re preparing for. Schedule a slot and optional location or meeting link. After interviews finish (including in InterviewX), add the report link on that page so it shows in the employee table below.
+        </div>
+        <div style={{ marginTop: 14 }}>
+          <Link
+            href={appPath("/dashboard/manager/schedule-interviews")}
+            style={{
+              ...btnSolid,
+              display: "inline-flex",
+              alignItems: "center",
+              justifyContent: "center",
+              textDecoration: "none",
+              boxSizing: "border-box",
+            }}
+          >
+            Open schedule hub
+          </Link>
+        </div>
       </div>
 
       {/* Trend chart + Activity feed */}

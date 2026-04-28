@@ -8,6 +8,7 @@ import { RolePreparationModule } from "./role-preparation/role-preparation.modul
 import { AiModule } from "./shared/ai.module";
 import { UserProfileModule } from "./user-profile/user-profile.module";
 import { OrgAuthModule } from "./org-auth/org-auth.module";
+import { ScheduledInterviewModule } from "./scheduled-interview/scheduled-interview.module";
 
 @Module({
   imports: [
@@ -31,7 +32,8 @@ import { OrgAuthModule } from "./org-auth/org-auth.module";
     SkillTestModule,
     RolePreparationModule,
     UserProfileModule,
-    OrgAuthModule
+    OrgAuthModule,
+    ScheduledInterviewModule
   ]
 })
 export class AppModule {}
