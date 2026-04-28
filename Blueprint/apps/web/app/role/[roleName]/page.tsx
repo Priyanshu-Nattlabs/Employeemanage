@@ -378,7 +378,7 @@ function RolePageContent() {
     try {
       await orgCreateRecommendation(auth.token, {
         employeeId: recommendFor,
-        role: roleName,
+        roleName,
         note: recommendNote.trim() || undefined,
       });
       const params = new URLSearchParams();
@@ -812,11 +812,11 @@ function RolePageContent() {
     );
   }, [contextualData, data, baseRole]);
 
-  const allRoleSkillNames = useMemo(() => {
+  const allRoleSkillNames = useMemo((): string[] => {
     const fromReq =
       (activeData?.skillRequirements || data?.skillRequirements || baseRole?.skillRequirements || [])
         .map((s: any) => String(s?.skillName || "").trim())
-        .filter(Boolean);
+        .filter((x: string): x is string => Boolean(x));
     return Array.from(new Set(fromReq));
   }, [activeData?.skillRequirements, data?.skillRequirements, baseRole?.skillRequirements]);
 

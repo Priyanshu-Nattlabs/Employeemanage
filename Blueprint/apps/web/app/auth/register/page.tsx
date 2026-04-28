@@ -61,12 +61,23 @@ export default function RegisterPage() {
           reportingManagerEmail,
           companyDomain: inferredDomain
         });
+        if ("verificationRequired" in r && r.verificationRequired) {
+          const nextPath = currentRole === "MANAGER" ? "/dashboard/manager" : "/target-role";
+          window.location.href = `/auth/verify-otp?email=${encodeURIComponent(r.email)}&next=${encodeURIComponent(nextPath)}`;
+          return;
+        }
+        if (!("token" in r)) throw new Error("Unexpected registration response");
         setOrgAuthInStorage(r.token, r.user);
         window.location.href = "/target-role";
         return;
       }
 
       const r = await orgRegisterAdmin({ email, password, fullName, companyName, companyDomain: inferredDomain });
+      if ("verificationRequired" in r && r.verificationRequired) {
+        window.location.href = `/auth/verify-otp?email=${encodeURIComponent(r.email)}&next=${encodeURIComponent("/dashboard/admin")}`;
+        return;
+      }
+      if (!("token" in r)) throw new Error("Unexpected registration response");
       setOrgAuthInStorage(r.token, r.user);
       window.location.href = "/dashboard/admin";
     } catch (err: any) {

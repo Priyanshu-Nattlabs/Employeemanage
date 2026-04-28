@@ -56,6 +56,10 @@ export default function ManagerRegisterPage() {
         reportingManagerEmail,
         companyDomain: inferredDomain
       });
+      if ("verificationRequired" in r && r.verificationRequired) {
+        window.location.href = `/auth/verify-otp?email=${encodeURIComponent(r.email)}&next=${encodeURIComponent("/dashboard/manager")}`;
+        return;
+      }
       if (!("token" in r) || !r.token || !r.user) throw new Error("Registration succeeded but login payload missing.");
       setOrgAuthInStorage(r.token, r.user);
       window.location.href = "/dashboard/manager";
@@ -70,7 +74,7 @@ export default function ManagerRegisterPage() {
     <div style={{ maxWidth: 820, margin: "24px auto", padding: 24, background: "#fff", border: "1px solid #e5e7eb", borderRadius: 14 }}>
       <h1 style={{ margin: 0, fontSize: 22, fontWeight: 900, color: "#0f172a" }}>Manager/HR create account</h1>
       <p style={{ margin: "8px 0 16px", color: "#475569", fontSize: 14, lineHeight: 1.6 }}>
-        Create a workspace account using your <b>company email</b>. Choose <b>Manager</b> to monitor employees in your department, or <b>HR</b> to view all employees across your company.
+        Create a workspace account using your <b>company email</b>. Choose <b>Manager</b> to monitor employees in your department, or <b>HR</b> to view all employees across your company. You will receive a <b>6-digit code by email</b> to verify before your account is active.
       </p>
 
       <div role="tablist" aria-label="Account type" style={tabBar}>
