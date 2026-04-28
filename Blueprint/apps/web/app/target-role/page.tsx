@@ -11,6 +11,11 @@ type OngoingPrep = {
   roleName: string;
 };
 
+type RoleOption = {
+  name: string;
+  level?: string;
+};
+
 function normalizeRoleText(value: string): string {
   return String(value || "")
     .toLowerCase()
@@ -19,9 +24,9 @@ function normalizeRoleText(value: string): string {
     .trim();
 }
 
-function expandQueryTokens(value: string): string[] {
+function expandQueryTokens(value: string): string[][] {
   const base = normalizeRoleText(value).split(" ").filter(Boolean);
-  const out = new Set<string>(base);
+  const out: string[][] = [];
   const aliases: Record<string, string[]> = {
     developer: ["development", "engineer", "engineering", "dev"],
     development: ["developer", "engineer", "engineering", "dev"],
@@ -32,18 +37,26 @@ function expandQueryTokens(value: string): string[] {
     fullstack: ["full stack", "full-stack"],
   };
   for (const token of base) {
-    for (const alt of aliases[token] || []) out.add(alt);
+    out.push([token, ...(aliases[token] || [])]);
   }
-  return Array.from(out);
+  return out;
+}
+
+function inferLevel(name: string, explicitLevel?: string): string {
+  const clean = String(explicitLevel || "").trim();
+  if (clean) return clean;
+  const m = /(?:^|[-\s])([1-3])$/.exec(String(name || "").trim());
+  return m?.[1] || "";
 }
 
 export default function TargetRolePage() {
-  const [roles, setRoles] = useState<string[]>([]);
+  const [roles, setRoles] = useState<RoleOption[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [savingRole, setSavingRole] = useState("");
   const [error, setError] = useState("");
   const [targetDurationMonths, setTargetDurationMonths] = useState("");
+  const [selectedLevel, setSelectedLevel] = useState("");
 
   useEffect(() => {
     const auth = getOrgAuthFromStorage();
@@ -62,22 +75,19 @@ export default function TargetRolePage() {
 
         const allData = await allRes.json().catch(() => []);
         const ongoingData = await ongoingRes.json().catch(() => []);
-        const roleNames = Array.isArray(allData)
+        const roleRows = Array.isArray(allData)
           ? allData
               .filter((d: any) => String(d?.type || "").toLowerCase() === "role")
-              .map((d: any) => String(d?.name || "").trim())
-              .filter(Boolean)
+              .map((d: any) => ({
+                name: String(d?.name || "").trim(),
+                level: inferLevel(String(d?.name || "").trim(), d?.level !== undefined && d?.level !== null ? String(d.level).trim() : ""),
+              }))
+              .filter((d: RoleOption) => d.name)
           : [];
-        setRoles(roleNames);
+        setRoles(roleRows);
 
-        // If user already has an active target role, continue directly.
-        if (Array.isArray(ongoingData) && ongoingData.length > 0) {
-          const first = ongoingData[0] as OngoingPrep;
-          if (first?.roleName) {
-            window.location.href = `/role/${encodeURIComponent(first.roleName)}`;
-            return;
-          }
-        }
+        // Keep role picker visible so user can intentionally switch target role.
+        // "Go to your preparation" CTA on homepage handles direct resume flow.
       } catch (e: any) {
         setError(e?.message || "Unable to load roles.");
       } finally {
@@ -90,15 +100,18 @@ export default function TargetRolePage() {
 
   const filteredRoles = useMemo(() => {
     const q = search.trim();
-    if (!q) return roles;
-    const terms = expandQueryTokens(q);
-    return roles.filter((r) => {
-      const name = normalizeRoleText(r);
-      return terms.every((t) => name.includes(normalizeRoleText(t)));
+    const byLevel = selectedLevel ? roles.filter((r) => String(r.level || "") === selectedLevel) : roles;
+    if (!q) return byLevel;
+    const tokenGroups = expandQueryTokens(q);
+    return byLevel.filter((r) => {
+      const hay = normalizeRoleText(`${r.name} level ${r.level || ""}`);
+      return tokenGroups.every((group) =>
+        group.some((term) => hay.includes(normalizeRoleText(term)))
+      );
     });
-  }, [roles, search]);
+  }, [roles, search, selectedLevel]);
 
-  const selectRole = async (roleName: string) => {
+  const selectRole = async (role: RoleOption) => {
     const auth = getOrgAuthFromStorage();
     if (!auth?.user?.id) {
       window.location.href = "/auth/employee/login";
@@ -113,6 +126,7 @@ export default function TargetRolePage() {
       setError("Please keep completion span between 1 and 60 months.");
       return;
     }
+    const roleName = role.name;
     setSavingRole(roleName);
     setError("");
     try {
@@ -125,6 +139,8 @@ export default function TargetRolePage() {
         targetStartDate: toIsoDate(start),
         targetCompletionDate: toIsoDate(end),
       });
+      const effectiveLevel = String(role.level || "").trim() || selectedLevel;
+      if (effectiveLevel) q.set("employeeLevel", effectiveLevel);
       window.location.href = `/role/${encodeURIComponent(roleName)}?${q.toString()}`;
     } catch (e: any) {
       setError(e?.message || "Could not save target role.");
@@ -168,6 +184,16 @@ export default function TargetRolePage() {
           disabled={loading}
         />
 
+        <label style={dateField}>
+          <span style={dateLabel}>Level (optional)</span>
+          <select value={selectedLevel} onChange={(e) => setSelectedLevel(e.target.value)} style={dateInput}>
+            <option value="">Any level</option>
+            <option value="1">1</option>
+            <option value="2">2</option>
+            <option value="3">3</option>
+          </select>
+        </label>
+
         {error ? <div style={err}>{error}</div> : null}
 
         <div style={list}>
@@ -178,15 +204,17 @@ export default function TargetRolePage() {
           ) : (
             filteredRoles.map((role) => (
               <button
-                key={role}
+                key={`${role.name}|${role.level || ""}`}
                 onClick={() => selectRole(role)}
                 disabled={!!savingRole}
                 style={roleBtn}
-                title={`Set ${role} as target role`}
+                title={`Set ${role.name}${role.level ? ` (Level ${role.level})` : ""} as target role`}
               >
-                <span style={{ fontWeight: 700, color: "#0f172a", textAlign: "left" }}>{role}</span>
+                <span style={{ fontWeight: 700, color: "#0f172a", textAlign: "left" }}>
+                  {role.name}{role.level ? ` (Level ${role.level})` : ""}
+                </span>
                 <span style={{ fontSize: 12, color: "#2563eb", fontWeight: 700 }}>
-                  {savingRole === role ? "Opening..." : "Open Blueprint"}
+                  {savingRole === role.name ? "Opening..." : "Open Blueprint"}
                 </span>
               </button>
             ))

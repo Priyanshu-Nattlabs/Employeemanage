@@ -1,5 +1,6 @@
 "use client";
 
+export const dynamic = "force-dynamic";
 import { Suspense, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
@@ -27,7 +28,7 @@ const DEPARTMENT_COMPARE_PREVIEW = 6;
 /** Collapsed employee table shows this many rows; "View more" reveals the rest. */
 const EMPLOYEE_TABLE_PREVIEW_ROWS = 8;
 
-function ManagerDashboardPageInner() {
+function ManagerDashboardContent() {
   const [{ token, user }, setAuth] = useState<{ token: string; user: any | null }>({ token: "", user: null });
   const [rows, setRows] = useState<EmployeeRow[]>([]);
   const [activity, setActivity] = useState<OrgManagerActivity | null>(null);
@@ -593,8 +594,8 @@ function ManagerDashboardPageInner() {
 
 export default function ManagerDashboardPage() {
   return (
-    <Suspense fallback={<div style={{ padding: 24, color: "#64748b", fontSize: 14 }}>Loading dashboard…</div>}>
-      <ManagerDashboardPageInner />
+    <Suspense fallback={null}>
+      <ManagerDashboardContent />
     </Suspense>
   );
 }
