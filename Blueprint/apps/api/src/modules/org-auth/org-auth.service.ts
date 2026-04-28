@@ -678,9 +678,12 @@ export class OrgAuthService {
     if (!user) throw new UnauthorizedException("Invalid email or password");
     const ok = await bcrypt.compare(password, user.passwordHash);
     if (!ok) throw new UnauthorizedException("Invalid email or password");
+<<<<<<< HEAD
     if (!user.emailVerified) {
       throw new UnauthorizedException("Email not verified. Please verify your email with OTP.");
     }
+=======
+>>>>>>> 8007d8add7ffb5169243b63bf257c1c952a75835
     const token = this.signToken(user);
     return { token, user: this.serializeOrgUser(user.toObject ? user.toObject() : user) };
   }
