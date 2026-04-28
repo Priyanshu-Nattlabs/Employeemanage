@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { orgLogin, setOrgAuthInStorage } from "@/lib/orgAuth";
+import { appPath } from "@/lib/apiBase";
 
 export default function EmployeeLoginPage() {
   const [email, setEmail] = useState("");
@@ -18,8 +19,12 @@ export default function EmployeeLoginPage() {
       const r = await orgLogin({ email, password });
       if (r.user.accountType !== "EMPLOYEE") throw new Error("Please use Admin login.");
       setOrgAuthInStorage(r.token, r.user);
+      if (r.user.needsProfileCompletion || r.user.mustChangePassword) {
+        window.location.href = appPath("/auth/employee/complete-profile");
+        return;
+      }
       // If a manager logs in via the Employee login, they should see the same preparation flow as employees.
-      window.location.href = "/target-role";
+      window.location.href = appPath("/target-role");
     } catch (err: any) {
       setError(err?.message || "Login failed");
     } finally {

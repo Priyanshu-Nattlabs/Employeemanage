@@ -1,6 +1,27 @@
-import { Body, Controller, Get, Headers, Param, Patch, Post, Query, UnauthorizedException } from "@nestjs/common";
+import {
+  BadRequestException,
+  Body,
+  Controller,
+  Get,
+  Headers,
+  Param,
+  Patch,
+  Post,
+  Query,
+  UnauthorizedException,
+  UploadedFile,
+  UseInterceptors,
+} from "@nestjs/common";
+import { FileInterceptor } from "@nestjs/platform-express";
 import { OrgAuthService } from "./org-auth.service";
-import { LoginDto, RegisterAdminDto, RegisterEmployeeDto, ResendEmailOtpDto, VerifyEmailOtpDto } from "./org-auth.dto";
+import {
+  CompleteInviteDto,
+  LoginDto,
+  RegisterAdminDto,
+  RegisterEmployeeDto,
+  ResendEmailOtpDto,
+  VerifyEmailOtpDto,
+} from "./org-auth.dto";
 
 function getBearerToken(authHeader?: string): string {
   const h = (authHeader || "").trim();
@@ -59,6 +80,29 @@ export class OrgAuthController {
     if (!token) throw new UnauthorizedException("Missing token");
     const me = this.service.verifyToken(token);
     return this.service.updateProfileById(me?.sub, body || {});
+  }
+
+  /** Invited employees: submit required profile fields and set a new password (after manager bulk upload). */
+  @Post("me/complete-invite")
+  async completeInvite(@Headers("authorization") authorization?: string, @Body() body?: CompleteInviteDto) {
+    const token = getBearerToken(authorization);
+    if (!token) throw new UnauthorizedException("Missing token");
+    const me = this.service.verifyToken(token);
+    return this.service.completeInviteProfile(me?.sub, body as any);
+  }
+
+  /** Manager / HR: bulk-create employees from first sheet of an Excel file (Email + Name columns; Department required per row for HR). */
+  @Post("manager/invite-employees")
+  @UseInterceptors(FileInterceptor("file", { limits: { fileSize: 2 * 1024 * 1024 } }))
+  async managerInviteEmployees(
+    @Headers("authorization") authorization?: string,
+    @UploadedFile() file?: Express.Multer.File,
+  ) {
+    const token = getBearerToken(authorization);
+    if (!token) throw new UnauthorizedException("Missing token");
+    const me = this.service.verifyToken(token);
+    if (!file?.buffer?.length) throw new BadRequestException("Missing file");
+    return this.service.bulkInviteEmployeesFromExcel({ actorJwt: me, file });
   }
 
   /** Manager / HR view: list employees for the user's company domain. Manager scoped to their department, HR sees all. */

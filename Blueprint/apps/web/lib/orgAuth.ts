@@ -16,6 +16,9 @@ export type OrgUser = {
   employeeId?: string;
   mobileNo?: string;
   reportingManagerEmail?: string;
+  /** Manager bulk invite: user must finish profile + new password */
+  needsProfileCompletion?: boolean;
+  mustChangePassword?: boolean;
 };
 
 export type OrgRegisterResponse = { verificationRequired: true; email: string };
@@ -108,6 +111,42 @@ export async function orgLogin(body: { email: string; password: string }) {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body)
+  });
+}
+
+export type OrgBulkInviteResult = {
+  ok: true;
+  created: number;
+  invited: Array<{ email: string; employeeId: string }>;
+  errors: Array<{ row: number; email: string; message: string }>;
+};
+
+export async function orgManagerBulkInviteEmployees(token: string, file: File) {
+  const prefix = getApiPrefix();
+  const fd = new FormData();
+  fd.append("file", file);
+  const res = await fetch(`${prefix}/api/org-auth/manager/invite-employees`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+    body: fd,
+  });
+  const text = await res.text();
+  const data = text ? (JSON.parse(text) as any) : null;
+  if (!res.ok) {
+    const msg = data?.message || data?.error || `Request failed (${res.status})`;
+    throw new Error(Array.isArray(msg) ? msg.join(", ") : String(msg));
+  }
+  return data as OrgBulkInviteResult;
+}
+
+export async function orgCompleteInvite(
+  token: string,
+  body: { newPassword: string; fullName?: string; designation: string; mobileNo: string; employeeId?: string },
+) {
+  return apiJson<{ token: string; user: OrgUser }>("/api/org-auth/me/complete-invite", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+    body: JSON.stringify(body),
   });
 }
 
