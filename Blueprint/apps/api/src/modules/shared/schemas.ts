@@ -187,6 +187,41 @@ export type CompanyUserDocument = HydratedDocument<CompanyUser>;
 export type CompanyOrgStructureDocument = HydratedDocument<CompanyOrgStructure>;
 export type RoleRecommendationDocument = HydratedDocument<RoleRecommendation>;
 
+export type ScheduledInterviewStatus = "SCHEDULED" | "COMPLETED" | "CANCELLED";
+
+/**
+ * Manager-scheduled interviews for team members (Blueprint-native). Optional `reportUrl`
+ * can point at an external system (e.g. InterviewX) after the interview — no coupling in code.
+ */
+@Schema({ collection: "scheduled_interviews", timestamps: true })
+export class ScheduledInterview {
+  @Prop({ required: true, lowercase: true, trim: true }) companyDomain!: string;
+
+  @Prop({ required: true }) employeeId!: string;
+  @Prop({ required: true, lowercase: true, trim: true }) employeeEmail!: string;
+  @Prop() employeeName?: string;
+  @Prop() employeeDepartment?: string;
+
+  /** Role the employee is preparing for (matches preparation / InterviewX context). */
+  @Prop({ required: true }) targetRoleName!: string;
+
+  @Prop({ required: true }) scheduledAt!: Date;
+  @Prop() durationMinutes?: number;
+  @Prop() location?: string;
+  @Prop() meetingLink?: string;
+  @Prop() notes?: string;
+
+  @Prop({ default: "SCHEDULED" }) status!: ScheduledInterviewStatus;
+
+  /** External report URL (e.g. InterviewX report page); set when interview is done. */
+  @Prop() reportUrl?: string;
+
+  @Prop({ required: true }) scheduledById!: string;
+  @Prop({ required: true, lowercase: true, trim: true }) scheduledByEmail!: string;
+}
+
+export type ScheduledInterviewDocument = HydratedDocument<ScheduledInterview>;
+
 export const BlueprintSchema = SchemaFactory.createForClass(Blueprint);
 export const RolePreparationSchema = SchemaFactory.createForClass(RolePreparation);
 export const SkillTestSchema = SchemaFactory.createForClass(SkillTest);
@@ -194,4 +229,5 @@ export const UserProfileSchema = SchemaFactory.createForClass(UserProfile);
 export const CompanyUserSchema = SchemaFactory.createForClass(CompanyUser);
 export const CompanyOrgStructureSchema = SchemaFactory.createForClass(CompanyOrgStructure);
 export const RoleRecommendationSchema = SchemaFactory.createForClass(RoleRecommendation);
+export const ScheduledInterviewSchema = SchemaFactory.createForClass(ScheduledInterview);
 
