@@ -415,6 +415,7 @@ function RolePageContent() {
   const [savingKnownSkills, setSavingKnownSkills] = useState(false);
   const [previousLevelSkills, setPreviousLevelSkills] = useState<string[]>([]);
   const [skillCompareLoading, setSkillCompareLoading] = useState(false);
+  const [proficiencyDelta, setProficiencyDelta] = useState<Array<{ skillName: string; increasePct: number; reason?: string }>>([]);
   /** Base role doc (JD + skills) when chart snapshot omits them */
   const [baseRole,        setBaseRole]        = useState<any>(null);
 
@@ -590,20 +591,33 @@ function RolePageContent() {
     const currentLevel = Number(employeeLevel);
     if (!Number.isFinite(currentLevel) || currentLevel <= 1) {
       setPreviousLevelSkills([]);
+      setProficiencyDelta([]);
       return;
     }
     const previousLevel = String(currentLevel - 1);
     setSkillCompareLoading(true);
-    fetch(`${API}/api/blueprint/role/${enc(roleName)}?level=${enc(previousLevel)}`)
-      .then((r) => r.json())
-      .catch(() => null)
-      .then((d) => {
+    Promise.all([
+      fetch(`${API}/api/blueprint/role/${enc(roleName)}?level=${enc(previousLevel)}`).then((r) => r.json()).catch(() => null),
+      fetch(`${API}/api/blueprint/role/${enc(roleName)}/proficiency-delta?level=${enc(employeeLevel)}`).then((r) => r.json()).catch(() => null),
+    ])
+      .then(([d, delta]) => {
         const reqSkills = Array.isArray(d?.skillRequirements)
           ? d.skillRequirements.map((s: any) => String(s?.skillName || "").trim()).filter(Boolean)
           : [];
         const legacyTech = Array.isArray(d?.skills?.technical) ? d.skills.technical.map((s: any) => String(s || "").trim()).filter(Boolean) : [];
         const legacySoft = Array.isArray(d?.skills?.soft) ? d.skills.soft.map((s: any) => String(s || "").trim()).filter(Boolean) : [];
         setPreviousLevelSkills(Array.from(new Set([...reqSkills, ...legacyTech, ...legacySoft])));
+        const items = Array.isArray(delta?.items)
+          ? delta.items
+              .map((x: any) => ({
+                skillName: String(x?.skillName || "").trim(),
+                increasePct: Math.max(5, Math.min(70, Number(x?.increasePct) || 0)),
+                reason: String(x?.reason || "").trim(),
+              }))
+              .filter((x: any) => x.skillName)
+              .sort((a: any, b: any) => b.increasePct - a.increasePct)
+          : [];
+        setProficiencyDelta(items);
       })
       .finally(() => setSkillCompareLoading(false));
   }, [roleName, employeeLevel]);
@@ -852,8 +866,9 @@ function RolePageContent() {
   const previousSkillKeySet = useMemo(() => {
     const out = new Set<string>();
     for (const s of previousLevelSkills) out.add(String(s || "").trim().toLowerCase());
+    for (const p of proficiencyDelta) out.add(String(p?.skillName || "").trim().toLowerCase());
     return out;
-  }, [previousLevelSkills]);
+  }, [previousLevelSkills, proficiencyDelta]);
 
   const knownSkillsSet = new Set<string>((knownSkillsSelection || []).map((s) => String(s)));
   const testQueueSkills: string[] = Array.isArray(prep?.knownSkillsForTest) ? prep.knownSkillsForTest : [];
@@ -959,6 +974,27 @@ function RolePageContent() {
             <p style={{ margin: "0 0 10px", fontSize: 13, color: "#64748b" }}>
               Select skills you already know. These move to the test section and are removed from the learning blueprint for now.
             </p>
+            {proficiencyDelta.length > 0 && (
+              <div style={{ marginBottom: 12, border: "1px solid #dbeafe", background: "#f8fbff", borderRadius: 10, padding: 10 }}>
+                <div style={{ fontSize: 12, fontWeight: 800, color: "#1e3a8a", marginBottom: 8 }}>
+                  AI estimated proficiency growth vs Level {Number(employeeLevel) - 1}
+                </div>
+                <div style={{ display: "grid", gap: 8 }}>
+                  {proficiencyDelta.slice(0, 8).map((p) => (
+                    <div key={p.skillName}>
+                      <div style={{ display: "flex", justifyContent: "space-between", gap: 8, fontSize: 12 }}>
+                        <span style={{ color: "#0f172a", fontWeight: 700 }}>{p.skillName}</span>
+                        <span style={{ color: "#1e40af", fontWeight: 800 }}>+{p.increasePct}%</span>
+                      </div>
+                      <div style={{ height: 6, background: "#e2e8f0", borderRadius: 999, overflow: "hidden", marginTop: 4 }}>
+                        <div style={{ width: `${p.increasePct}%`, height: "100%", background: "linear-gradient(90deg,#22c55e,#3b82f6)" }} />
+                      </div>
+                      {p.reason ? <div style={{ marginTop: 3, fontSize: 11, color: "#64748b" }}>{p.reason}</div> : null}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
             {Number(employeeLevel) > 1 && (
               <div style={{ margin: "0 0 10px", fontSize: 12, color: "#475569", display: "flex", gap: 10, flexWrap: "wrap" }}>
                 <span style={{ background: "#ECFDF5", border: "1px solid #86EFAC", borderRadius: 999, padding: "4px 10px", fontWeight: 700, color: "#166534" }}>
@@ -1278,6 +1314,27 @@ function RolePageContent() {
           <p style={{ margin: "0 0 10px", fontSize: 13, color: "#64748b" }}>
             Select skills you already know. These move to the test section and are removed from the learning blueprint for now.
           </p>
+          {proficiencyDelta.length > 0 && (
+            <div style={{ marginBottom: 12, border: "1px solid #dbeafe", background: "#f8fbff", borderRadius: 10, padding: 10 }}>
+              <div style={{ fontSize: 12, fontWeight: 800, color: "#1e3a8a", marginBottom: 8 }}>
+                AI estimated proficiency growth vs Level {Number(employeeLevel) - 1}
+              </div>
+              <div style={{ display: "grid", gap: 8 }}>
+                {proficiencyDelta.slice(0, 8).map((p) => (
+                  <div key={p.skillName}>
+                    <div style={{ display: "flex", justifyContent: "space-between", gap: 8, fontSize: 12 }}>
+                      <span style={{ color: "#0f172a", fontWeight: 700 }}>{p.skillName}</span>
+                      <span style={{ color: "#1e40af", fontWeight: 800 }}>+{p.increasePct}%</span>
+                    </div>
+                    <div style={{ height: 6, background: "#e2e8f0", borderRadius: 999, overflow: "hidden", marginTop: 4 }}>
+                      <div style={{ width: `${p.increasePct}%`, height: "100%", background: "linear-gradient(90deg,#22c55e,#3b82f6)" }} />
+                    </div>
+                    {p.reason ? <div style={{ marginTop: 3, fontSize: 11, color: "#64748b" }}>{p.reason}</div> : null}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
           {Number(employeeLevel) > 1 && (
             <div style={{ margin: "0 0 10px", fontSize: 12, color: "#475569", display: "flex", gap: 10, flexWrap: "wrap" }}>
               <span style={{ background: "#ECFDF5", border: "1px solid #86EFAC", borderRadius: 999, padding: "4px 10px", fontWeight: 700, color: "#166534" }}>
@@ -1352,7 +1409,7 @@ function RolePageContent() {
           <div style={{ ...card, borderTop: "3px solid #2563EB" }}>
             <h3 style={{ margin: "0 0 8px", fontSize: 15, color: "#0F1724" }}>🧠 Combined Test Section</h3>
             <p style={{ margin: "0 0 10px", fontSize: 12, color: "#64748b" }}>
-              One medium-hard test is generated for all selected known skills (20-30 questions).
+              One medium-hard test is generated with 5 questions per selected skill. Passing is evaluated per skill at 80%.
             </p>
             {testQueueSkills.length === 0 ? (
               <p style={{ margin: 0, fontSize: 13, color: "#94a3b8" }}>No known skills selected for test.</p>
