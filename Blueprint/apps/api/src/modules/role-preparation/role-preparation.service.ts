@@ -21,7 +21,8 @@ export class RolePreparationService {
     ganttChartData?: Record<string, unknown>,
     targetStartDate?: string,
     targetCompletionDate?: string,
-    activate = true
+    activate = true,
+    employeeLevel?: string
   ) {
     let prep = await this.prepModel.findOne({ studentId, roleName });
 
@@ -53,6 +54,7 @@ export class RolePreparationService {
         roleName,
         preparationStartDate: targetStartDate || new Date().toISOString().slice(0, 10),
         targetCompletionDate: targetCompletionDate || undefined,
+        employeeLevel: employeeLevel || undefined,
         isActive: activate,
         knownSkillsConfigured: false,
         knownSkillsTestSubmitted: false,
@@ -63,6 +65,7 @@ export class RolePreparationService {
       prep.isActive = activate;
       if (targetStartDate) prep.preparationStartDate = targetStartDate;
       if (targetCompletionDate) prep.targetCompletionDate = targetCompletionDate;
+      if (employeeLevel) prep.employeeLevel = employeeLevel;
       if (ganttChartData) {
         prep.ganttChartData = ganttChartData;
         // Sync skillProgress to match the newly saved chart tasks

@@ -62,6 +62,22 @@ services:
       BACKEND_URL: http://backend:8081
     restart: unless-stopped
 
+  # One-shot DB seed from Excel (repo root mounted at /app). Does not start with `docker compose up`.
+  # Run: docker compose --profile seed run --rm seed
+  seed:
+    profiles: ["seed"]
+    image: node:22-bookworm-slim
+    working_dir: /app/apps/api
+    volumes:
+      - .:/app
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    environment:
+      MONGODB_URI: mongodb://mongodb:27017/job_blueprint_v2
+      BLUEPRINT_SEED_SOURCES: "/app/Job_Blueprint_Final_Phase13.xlsx,/app/NEW JD.xlsx"
+    command: ["sh", "-c", "npm install && node src/scripts/seed-from-xlsx.mjs"]
+
 volumes:
   job-blueprint-v2-mongo-data:
 

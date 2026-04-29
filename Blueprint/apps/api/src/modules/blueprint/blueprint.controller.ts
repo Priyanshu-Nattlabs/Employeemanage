@@ -12,7 +12,10 @@ export class BlueprintController {
   @Get("educations") getEducations() { return this.service.getNamesByType("education"); }
   @Get("specializations") getSpecializations() { return this.service.getNamesByType("specialization"); }
   @Get("roles") getRoles() { return this.service.getNamesByType("role"); }
-  @Get(["role/:roleName", "role/:roleName/"]) getRole(@Param("roleName") roleName: string) { return this.service.getRole(decodeURIComponent(roleName)); }
+  @Get(["role/:roleName", "role/:roleName/"])
+  getRole(@Param("roleName") roleName: string, @Query("level") level?: string) {
+    return this.service.getRole(decodeURIComponent(roleName), level ? decodeURIComponent(level) : undefined);
+  }
   @Get(["role/:roleName/trending-jobs", "role/:roleName/trending-jobs/"])
   getRoleTrendingJobs(
     @Param("roleName") roleName: string,
@@ -31,8 +34,18 @@ export class BlueprintController {
   @Get("role/:roleName/mappings") getRoleMappings(@Param("roleName") roleName: string) { return this.service.roleMappings(decodeURIComponent(roleName)); }
 
   @Get("role/:roleName/gantt")
-  getRoleGantt(@Param("roleName") roleName: string, @Query("userId") userId: string, @Query("duration") duration?: string) {
-    return this.service.getRoleWithGantt(decodeURIComponent(roleName), userId, duration ? Number(duration) : undefined);
+  getRoleGantt(
+    @Param("roleName") roleName: string,
+    @Query("userId") userId: string,
+    @Query("duration") duration?: string,
+    @Query("level") level?: string
+  ) {
+    return this.service.getRoleWithGantt(
+      decodeURIComponent(roleName),
+      userId,
+      duration ? Number(duration) : undefined,
+      level ? decodeURIComponent(level) : undefined
+    );
   }
 
   @Post("role/:roleName/gantt/replan")
@@ -49,12 +62,14 @@ export class BlueprintController {
     @Query("industry")  industry?: string,
     @Query("education") education?: string,
     @Query("specialization") specialization?: string,
+    @Query("level") level?: string,
   ) {
     return this.service.getContextualRole(
       decodeURIComponent(roleName),
       industry  ? decodeURIComponent(industry)  : undefined,
       education ? decodeURIComponent(education) : undefined,
       specialization ? decodeURIComponent(specialization) : undefined,
+      level ? decodeURIComponent(level) : undefined,
     );
   }
 

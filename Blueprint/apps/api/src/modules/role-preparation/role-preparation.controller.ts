@@ -13,7 +13,8 @@ export class RolePreparationController {
       body?.ganttChartData,
       body?.targetStartDate,
       body?.targetCompletionDate,
-      body?.activate ?? true
+      body?.activate ?? true,
+      body?.employeeLevel
     );
   }
 

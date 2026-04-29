@@ -34,13 +34,16 @@ export class BlueprintService {
       })
       .lean();
   }
-  async getRole(roleName: string) {
+  async getRole(roleName: string, level?: string) {
     const rn = String(roleName || "").trim();
+    const lvl = String(level || "").trim();
+    const query: any = {
+      type: { $regex: "^role$", $options: "i" },
+      name: { $regex: `^${this.escapeRegex(rn)}$`, $options: "i" },
+    };
+    if (lvl) query.level = { $regex: `^${this.escapeRegex(lvl)}$`, $options: "i" };
     const role: any = await this.blueprintModel
-      .findOne({
-        type: { $regex: "^role$", $options: "i" },
-        name: { $regex: `^${this.escapeRegex(rn)}$`, $options: "i" },
-      })
+      .findOne(query)
       .lean();
     if (!role) return null;
     const skillRequirements = (role.skillRequirements || []).length
@@ -62,9 +65,9 @@ export class BlueprintService {
     return all;
   }
 
-  async getRoleWithGantt(roleName: string, userId: string, duration?: number) {
+  async getRoleWithGantt(roleName: string, userId: string, duration?: number, level?: string) {
     try {
-      const role = await this.getRole(roleName);
+      const role = await this.getRole(roleName, level);
       if (!role) return null;
       const prep = await this.prepModel.findOne({ studentId: userId, roleName }).lean().catch(() => null);
       const completed = Object.entries((prep as any)?.skillProgress || {})
@@ -81,7 +84,7 @@ export class BlueprintService {
       return { ...role, description, skillRequirements, plan };
     } catch (e) {
       this.logger.error(`getRoleWithGantt: unexpected error for "${roleName}" / user "${userId}": ${e}`);
-      const role = await this.getRole(roleName).catch(() => null);
+      const role = await this.getRole(roleName, level).catch(() => null);
       if (!role) return null;
       const plan = this.generateDeterministicPlan(role.skillRequirements || [], [], 12);
       return { ...role, plan, aiEnhanced: false, _fallback: true };
@@ -120,8 +123,8 @@ export class BlueprintService {
    * AI-generated contextual JD + skills for a role within a specific
    * industry / education / specialization combination.
    */
-  async getContextualRole(roleName: string, industry?: string, education?: string, specialization?: string) {
-    const role = await this.getRole(roleName);
+  async getContextualRole(roleName: string, industry?: string, education?: string, specialization?: string, level?: string) {
+    const role = await this.getRole(roleName, level);
     if (!role) return null;
     if (!industry && !education && !specialization) return role;
 
