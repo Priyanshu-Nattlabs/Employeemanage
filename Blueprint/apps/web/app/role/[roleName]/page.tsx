@@ -802,7 +802,7 @@ function RolePageContent() {
         candidateEmail: email,
         candidateName: fullName,
       });
-      if (typeof window !== "undefined") window.open(ixUrl, "_blank", "noopener,noreferrer");
+      if (typeof window !== "undefined") window.location.assign(ixUrl);
     } finally {
       setTimeout(() => setMockInterviewLaunching(false), 700);
     }

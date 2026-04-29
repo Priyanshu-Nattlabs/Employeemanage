@@ -9,10 +9,8 @@ function clean(v?: string) {
 }
 
 export function buildInterviewXAiInterviewUrl(input: BuildInterviewXUrlInput): string {
-  const base =
-    clean(process.env.NEXT_PUBLIC_INTERVIEWX_AI_INTERVIEW_URL) ||
-    clean(process.env.NEXT_PUBLIC_INTERVIEWX_URL) ||
-    "https://app.interviewx.ai/ai-interview";
+  // Force local InterviewX route for direct technical interview start.
+  const base = "http://localhost:3300/students/interview-preparation/technical";
 
   const url = new URL(base);
   const role = clean(input.prefillRole);
