@@ -394,7 +394,7 @@ function ManagerDashboardContent() {
           <span style={titleIcon("#0ea5e9")}>📅</span>Schedule interview
         </div>
         <div style={cardSub}>
-          View everyone in <b>{scopeLabel}</b> with department, email, and roles they&apos;re preparing for. Schedule a slot and optional location or meeting link. After interviews finish (including in InterviewX), add the report link on that page so it shows in the employee table below.
+          View everyone in <b>{scopeLabel}</b> with department, email, and roles they&apos;re preparing for. Interview slots and report links are no longer stored in Blueprint — use InterviewX (or your tooling) for scheduling; open the hub to copy handoffs and deep links.
         </div>
         <div style={{ marginTop: 14 }}>
           <Link

@@ -181,6 +181,25 @@ export class RoleRecommendation {
   @Prop() respondedAt?: Date;
 }
 
+@Schema({ collection: "interviewx_employee_interviews", timestamps: true })
+export class InterviewXEmployeeInterview {
+  @Prop({ required: true, lowercase: true, trim: true }) companyDomain!: string;
+  @Prop({ required: true, trim: true }) employeeId!: string;
+
+  @Prop({ required: true, trim: true }) interviewConfigId!: string;
+  @Prop({ trim: true }) candidateId?: string;
+
+  @Prop({ required: true, trim: true }) candidateName!: string;
+  @Prop({ required: true, lowercase: true, trim: true }) candidateEmail!: string;
+  @Prop({ required: true, trim: true }) loginLink!: string;
+  @Prop({ required: true, trim: true }) password!: string;
+  @Prop({ required: true, trim: true }) loginUrl!: string;
+
+  // Stored as local datetime strings `YYYY-MM-DDTHH:mm:ss` (no timezone suffix)
+  @Prop() interviewStartDateTime?: string;
+  @Prop() interviewEndDateTime?: string;
+}
+
 export type BlueprintDocument = HydratedDocument<Blueprint>;
 export type RolePreparationDocument = HydratedDocument<RolePreparation>;
 export type SkillTestDocument = HydratedDocument<SkillTest>;
@@ -188,6 +207,7 @@ export type UserProfileDocument = HydratedDocument<UserProfile>;
 export type CompanyUserDocument = HydratedDocument<CompanyUser>;
 export type CompanyOrgStructureDocument = HydratedDocument<CompanyOrgStructure>;
 export type RoleRecommendationDocument = HydratedDocument<RoleRecommendation>;
+export type InterviewXEmployeeInterviewDocument = HydratedDocument<InterviewXEmployeeInterview>;
 
 export const BlueprintSchema = SchemaFactory.createForClass(Blueprint);
 export const RolePreparationSchema = SchemaFactory.createForClass(RolePreparation);
@@ -196,4 +216,5 @@ export const UserProfileSchema = SchemaFactory.createForClass(UserProfile);
 export const CompanyUserSchema = SchemaFactory.createForClass(CompanyUser);
 export const CompanyOrgStructureSchema = SchemaFactory.createForClass(CompanyOrgStructure);
 export const RoleRecommendationSchema = SchemaFactory.createForClass(RoleRecommendation);
+export const InterviewXEmployeeInterviewSchema = SchemaFactory.createForClass(InterviewXEmployeeInterview);
 
