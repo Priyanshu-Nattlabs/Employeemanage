@@ -56,6 +56,197 @@ export class BlueprintService {
       "";
     return { ...role, skillRequirements, description };
   }
+
+  private extractRoleSkillNames(role: any): string[] {
+    const fromReq = Array.isArray(role?.skillRequirements)
+      ? role.skillRequirements.map((s: any) => String(s?.skillName || "").trim()).filter(Boolean)
+      : [];
+    const fromTech = Array.isArray(role?.skills?.technical)
+      ? role.skills.technical.map((s: any) => String(s || "").trim()).filter(Boolean)
+      : [];
+    const fromSoft = Array.isArray(role?.skills?.soft)
+      ? role.skills.soft.map((s: any) => String(s || "").trim()).filter(Boolean)
+      : [];
+    return Array.from(new Set([...fromReq, ...fromTech, ...fromSoft]));
+  }
+
+  async getSkillProficiencyDelta(roleName: string, level?: string) {
+    const lvl = Number(String(level || "").trim());
+    if (!Number.isFinite(lvl) || lvl <= 1) {
+      return { roleName, level: String(level || ""), previousLevel: "", items: [] as any[] };
+    }
+
+    const current = await this.getRole(roleName, String(lvl));
+    const previous = await this.getRole(roleName, String(lvl - 1));
+    if (!current || !previous) {
+      return { roleName, level: String(lvl), previousLevel: String(lvl - 1), items: [] as any[] };
+    }
+
+    const currentSkills = this.extractRoleSkillNames(current);
+    const previousSkills = this.extractRoleSkillNames(previous);
+    const norm = (v: string) => String(v || "").toLowerCase().replace(/[^a-z0-9\s]/g, " ").replace(/\s+/g, " ").trim();
+    const prevMap = new Map(previousSkills.map((s) => [norm(s), s]));
+    const exactMatches = currentSkills
+      .map((s) => ({ currentSkill: s, previousSkill: prevMap.get(norm(s)) || null, similarityType: "exact" as const }))
+      .filter((x) => !!x.previousSkill);
+
+    const unmatchedCurrent = currentSkills.filter((s) => !prevMap.has(norm(s)));
+    const unmatchedPrevSet = new Set(previousSkills.map((s) => s.toLowerCase()));
+    const unmatchedPrevious = previousSkills.filter((s) => !exactMatches.some((m) => String(m.previousSkill || "").toLowerCase() === s.toLowerCase()));
+
+    const tokenSet = (v: string) => new Set(norm(v).split(" ").filter(Boolean));
+    const heuristicSimilar: Array<{ currentSkill: string; previousSkill: string; similarityType: "similar" }> = [];
+    for (const cur of unmatchedCurrent) {
+      let bestPrev = "";
+      let bestScore = 0;
+      const curNorm = norm(cur);
+      const curTokens = tokenSet(cur);
+      for (const prevSkill of unmatchedPrevious) {
+        if (!unmatchedPrevSet.has(prevSkill.toLowerCase())) continue;
+        const prevNorm = norm(prevSkill);
+        let score = 0;
+        if (curNorm.includes(prevNorm) || prevNorm.includes(curNorm)) score += 3;
+        const prevTokens = tokenSet(prevSkill);
+        const inter = Array.from(curTokens).filter((t) => prevTokens.has(t)).length;
+        if (inter > 0) score += inter;
+        if (score > bestScore) {
+          bestScore = score;
+          bestPrev = prevSkill;
+        }
+      }
+      if (bestPrev && bestScore >= 2) {
+        heuristicSimilar.push({ currentSkill: cur, previousSkill: bestPrev, similarityType: "similar" });
+        unmatchedPrevSet.delete(bestPrev.toLowerCase());
+      }
+    }
+
+    const aiPairFallback = heuristicSimilar.map((m) => ({ currentSkill: m.currentSkill, previousSkill: m.previousSkill, similarityType: "similar" }));
+    const aiPairSystem = `You map skill names across adjacent levels. Return ONLY valid JSON.`;
+    const aiPairPrompt = `Role: ${roleName}
+Current level: ${lvl}
+Previous level: ${lvl - 1}
+
+Current level skills not matched exactly:
+${unmatchedCurrent.map((s) => `- ${s}`).join("\n") || "- none"}
+
+Previous level skills available:
+${unmatchedPrevious.map((s) => `- ${s}`).join("\n") || "- none"}
+
+Map only truly similar skills (examples: "Excel" and "Advanced Excel", "SQL" and "Advanced SQL").
+
+Return:
+{
+  "pairs": [
+    { "currentSkill": "current name", "previousSkill": "previous name", "similarityType": "similar" }
+  ]
+}
+
+Rules:
+- Do not invent new names
+- Use exact names from provided lists
+- Include only high-confidence similar pairs
+- No markdown`;
+    const aiPairsOut = await this.ai.chatJson<any>(aiPairPrompt, aiPairSystem, { pairs: aiPairFallback });
+    const aiPairs = Array.isArray(aiPairsOut?.pairs) ? aiPairsOut.pairs : aiPairFallback;
+    const aiSimilar = aiPairs
+      .map((p: any) => ({
+        currentSkill: String(p?.currentSkill || "").trim(),
+        previousSkill: String(p?.previousSkill || "").trim(),
+        similarityType: "similar" as const,
+      }))
+      .filter((p: any) => p.currentSkill && p.previousSkill && unmatchedCurrent.includes(p.currentSkill) && unmatchedPrevious.includes(p.previousSkill));
+
+    const matchedByCurrent = new Map<string, { previousSkill: string; similarityType: "exact" | "similar" }>();
+    for (const m of exactMatches) matchedByCurrent.set(m.currentSkill, { previousSkill: String(m.previousSkill), similarityType: "exact" });
+    for (const m of heuristicSimilar) if (!matchedByCurrent.has(m.currentSkill)) matchedByCurrent.set(m.currentSkill, { previousSkill: m.previousSkill, similarityType: "similar" });
+    for (const m of aiSimilar) if (!matchedByCurrent.has(m.currentSkill)) matchedByCurrent.set(m.currentSkill, { previousSkill: m.previousSkill, similarityType: "similar" });
+
+    const matchedCurrentSkills = Array.from(matchedByCurrent.keys());
+    if (!matchedCurrentSkills.length) {
+      return { roleName, level: String(lvl), previousLevel: String(lvl - 1), items: [] as any[] };
+    }
+
+    const currentReqMap = new Map(
+      (current.skillRequirements || []).map((s: any) => [String(s?.skillName || "").trim().toLowerCase(), s])
+    );
+    const previousReqMap = new Map(
+      (previous.skillRequirements || []).map((s: any) => [String(s?.skillName || "").trim().toLowerCase(), s])
+    );
+
+    const fallbackItems = matchedCurrentSkills.map((skillName) => {
+      const pair = matchedByCurrent.get(skillName)!;
+      const c = currentReqMap.get(skillName.toLowerCase()) || {};
+      const p = previousReqMap.get(String(pair.previousSkill || "").toLowerCase()) || {};
+      const cMonths = Math.max(1, Number(c?.timeRequiredMonths || 1));
+      const pMonths = Math.max(1, Number(p?.timeRequiredMonths || 1));
+      const monthDelta = Math.max(0, cMonths - pMonths);
+      const diffRank = (d: string) => {
+        const x = String(d || "").toLowerCase();
+        if (x.includes("advanced")) return 3;
+        if (x.includes("intermediate")) return 2;
+        return 1;
+      };
+      const diffDelta = Math.max(0, diffRank(c?.difficulty) - diffRank(p?.difficulty));
+      const similarityBonus = pair.similarityType === "similar" ? 6 : 0;
+      const increasePct = Math.min(70, Math.max(8, 12 + monthDelta * 6 + diffDelta * 10 + similarityBonus));
+      return {
+        skillName,
+        increasePct,
+        reason: pair.similarityType === "similar"
+          ? `Progression from "${pair.previousSkill}" to deeper variant.`
+          : "More depth and practical complexity expected at this level.",
+        previousSkill: pair.previousSkill,
+        similarityType: pair.similarityType,
+      };
+    });
+
+    const system = `You are a technical learning evaluator. Return ONLY valid JSON.`;
+    const prompt = `Role: ${roleName}
+Current level: ${lvl}
+Previous level: ${lvl - 1}
+
+Estimate proficiency increase for these matched skills from previous level to current level.
+Matched skills:
+${matchedCurrentSkills.map((s) => {
+  const p = matchedByCurrent.get(s)!;
+  return `- current: ${s} | previous: ${p.previousSkill} | type: ${p.similarityType}`;
+}).join("\n")}
+
+Return JSON object:
+{
+  "items": [
+    { "skillName": "name", "increasePct": number_between_5_and_70, "reason": "short reason under 12 words", "previousSkill": "name", "similarityType": "exact_or_similar" }
+  ]
+}
+
+Rules:
+- Include ONLY the listed matched current skills
+- Keep skillName exactly as provided for current skill
+- increasePct should reflect higher depth/complexity at current level
+- For similar pairs (e.g., Excel -> Advanced Excel), assign meaningful increase
+- No markdown`;
+
+    const aiOut = await this.ai.chatJson<any>(prompt, system, { items: fallbackItems });
+    const rawItems = Array.isArray(aiOut?.items) ? aiOut.items : fallbackItems;
+    const allowed = new Set(matchedCurrentSkills.map((s) => s.toLowerCase()));
+    const normalized = rawItems
+      .map((it: any) => ({
+        skillName: String(it?.skillName || "").trim(),
+        increasePct: Math.max(5, Math.min(70, Number(it?.increasePct) || 0)),
+        reason: String(it?.reason || "").trim(),
+        previousSkill: String(it?.previousSkill || "").trim(),
+        similarityType: String(it?.similarityType || "").toLowerCase() === "similar" ? "similar" : "exact",
+      }))
+      .filter((it: any) => it.skillName && allowed.has(it.skillName.toLowerCase()));
+
+    const dedup = new Map<string, any>();
+    for (const it of normalized) {
+      const k = it.skillName.toLowerCase();
+      if (!dedup.has(k)) dedup.set(k, it);
+    }
+    const items = Array.from(dedup.values());
+    return { roleName, level: String(lvl), previousLevel: String(lvl - 1), items: items.length ? items : fallbackItems };
+  }
   async getAllSkillNames(query?: string) {
     const docs = await this.blueprintModel.find().lean();
     const set = new Set<string>();

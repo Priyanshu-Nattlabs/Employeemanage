@@ -31,6 +31,13 @@ export class BlueprintController {
     );
   }
   @Get("skills") getSkills(@Query("query") query?: string) { return this.service.getAllSkillNames(query); }
+  @Get("role/:roleName/proficiency-delta")
+  getRoleProficiencyDelta(@Param("roleName") roleName: string, @Query("level") level?: string) {
+    return this.service.getSkillProficiencyDelta(
+      decodeURIComponent(roleName),
+      level ? decodeURIComponent(level) : undefined
+    );
+  }
   @Get("role/:roleName/mappings") getRoleMappings(@Param("roleName") roleName: string) { return this.service.roleMappings(decodeURIComponent(roleName)); }
 
   @Get("role/:roleName/gantt")
