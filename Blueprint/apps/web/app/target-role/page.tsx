@@ -111,6 +111,8 @@ export default function TargetRolePage() {
     });
   }, [roles, search, selectedLevel]);
 
+  const hasSearchInput = search.trim().length > 0;
+
   const selectRole = async (role: RoleOption) => {
     const auth = getOrgAuthFromStorage();
     if (!auth?.user?.id) {
@@ -199,6 +201,8 @@ export default function TargetRolePage() {
         <div style={list}>
           {loading ? (
             <div style={muted}>Loading roles...</div>
+          ) : !hasSearchInput ? (
+            <div style={muted}>Type in search box to see role suggestions.</div>
           ) : filteredRoles.length === 0 ? (
             <div style={muted}>No matching roles found.</div>
           ) : (
