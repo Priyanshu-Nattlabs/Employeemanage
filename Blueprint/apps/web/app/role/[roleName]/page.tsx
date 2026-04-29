@@ -6,6 +6,7 @@ import Link from "next/link";
 
 import { getApiPrefix } from "@/lib/apiBase";
 import { getOrgAuthFromStorage, orgCreateRecommendation } from "@/lib/orgAuth";
+import { buildInterviewXAiInterviewUrl } from "@/lib/interviewx";
 
 const API = getApiPrefix();
 
@@ -47,6 +48,27 @@ const btn = (color:string, bg:string, border=bg): React.CSSProperties => ({
   background:bg, color, fontWeight:600, fontSize:13, cursor:"pointer",
   display:"inline-flex", alignItems:"center", gap:6, transition:"opacity .15s"
 });
+
+const normSkill = (v: string) =>
+  String(v || "")
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+const skillTokens = (v: string) => new Set(normSkill(v).split(" ").filter(Boolean));
+
+const skillsAreSimilar = (a: string, b: string) => {
+  const na = normSkill(a);
+  const nb = normSkill(b);
+  if (!na || !nb) return false;
+  if (na === nb) return true;
+  if (na.includes(nb) || nb.includes(na)) return true;
+  const ta = skillTokens(na);
+  const tb = skillTokens(nb);
+  const inter = Array.from(ta).filter((t) => tb.has(t)).length;
+  return inter >= 1;
+};
 
 /** Search links for this topic only (not role/skill). */
 function topicPrepUrls(topic: string) {
@@ -413,9 +435,10 @@ function RolePageContent() {
   const [trendingErr,     setTrendingErr]     = useState<string>("");
   const [knownSkillsSelection, setKnownSkillsSelection] = useState<string[]>([]);
   const [savingKnownSkills, setSavingKnownSkills] = useState(false);
+  const [mockInterviewLaunching, setMockInterviewLaunching] = useState(false);
   const [previousLevelSkills, setPreviousLevelSkills] = useState<string[]>([]);
   const [skillCompareLoading, setSkillCompareLoading] = useState(false);
-  const [proficiencyDelta, setProficiencyDelta] = useState<Array<{ skillName: string; increasePct: number; reason?: string }>>([]);
+  const [proficiencyDelta, setProficiencyDelta] = useState<Array<{ skillName: string; increasePct: number; reason?: string; previousSkill?: string }>>([]);
   /** Base role doc (JD + skills) when chart snapshot omits them */
   const [baseRole,        setBaseRole]        = useState<any>(null);
 
@@ -613,6 +636,7 @@ function RolePageContent() {
                 skillName: String(x?.skillName || "").trim(),
                 increasePct: Math.max(5, Math.min(70, Number(x?.increasePct) || 0)),
                 reason: String(x?.reason || "").trim(),
+                previousSkill: String(x?.previousSkill || "").trim(),
               }))
               .filter((x: any) => x.skillName)
               .sort((a: any, b: any) => b.increasePct - a.increasePct)
@@ -766,6 +790,24 @@ function RolePageContent() {
     await load();
   };
 
+  const startMockInterview = () => {
+    if (mockInterviewLaunching) return;
+    const auth = getOrgAuthFromStorage();
+    const fullName = String(auth?.user?.fullName || "").trim();
+    const email = String(auth?.user?.email || "").trim();
+    setMockInterviewLaunching(true);
+    try {
+      const ixUrl = buildInterviewXAiInterviewUrl({
+        prefillRole: roleName,
+        candidateEmail: email,
+        candidateName: fullName,
+      });
+      if (typeof window !== "undefined") window.open(ixUrl, "_blank", "noopener,noreferrer");
+    } finally {
+      setTimeout(() => setMockInterviewLaunching(false), 700);
+    }
+  };
+
   const toggleTopicDone = async (skillName: string, month: number, topicIndex: number, completed: boolean) => {
     const res = await fetch(
       `${API}/api/role-preparation/subtopic/${enc(roleName)}/${enc(skillName)}?studentId=${enc(userId)}&month=${month}&topicIndex=${topicIndex}&completed=${completed}`,
@@ -814,6 +856,7 @@ function RolePageContent() {
   const completedCount = prep ? Object.values(prep.skillProgress||{}).filter((v:any)=>v?.completed).length : 0;
   const totalCount     = tasks.length;
   const pct            = totalCount ? Math.round((completedCount/totalCount)*100) : 0;
+  const mockInterviewEligible = true;
 
   const { techSkills, softSkills } = useMemo(() => {
     const extract = (r: any) => {
@@ -867,8 +910,26 @@ function RolePageContent() {
     const out = new Set<string>();
     for (const s of previousLevelSkills) out.add(String(s || "").trim().toLowerCase());
     for (const p of proficiencyDelta) out.add(String(p?.skillName || "").trim().toLowerCase());
+    for (const p of proficiencyDelta) out.add(String(p?.previousSkill || "").trim().toLowerCase());
     return out;
   }, [previousLevelSkills, proficiencyDelta]);
+
+  const previousComparableSkills = useMemo(() => {
+    const out = new Set<string>();
+    for (const s of previousLevelSkills) out.add(String(s || "").trim());
+    for (const p of proficiencyDelta) {
+      if (p?.skillName) out.add(String(p.skillName).trim());
+      if (p?.previousSkill) out.add(String(p.previousSkill).trim());
+    }
+    return Array.from(out).filter(Boolean);
+  }, [previousLevelSkills, proficiencyDelta]);
+
+  const isSkillCommonWithPrevious = (skill: string) => {
+    const key = String(skill || "").trim().toLowerCase();
+    if (!key) return false;
+    if (previousSkillKeySet.has(key)) return true;
+    return previousComparableSkills.some((prevSkill) => skillsAreSimilar(skill, prevSkill));
+  };
 
   const knownSkillsSet = new Set<string>((knownSkillsSelection || []).map((s) => String(s)));
   const testQueueSkills: string[] = Array.isArray(prep?.knownSkillsForTest) ? prep.knownSkillsForTest : [];
@@ -945,6 +1006,7 @@ function RolePageContent() {
     : null;
   const tooltipIsLoading = tooltip ? !!topicsLoading[tooltip.topKey] : false;
   const showSkillSelectionOnly = !prep?.knownSkillsConfigured;
+  const waitForSkillComparison = Number(employeeLevel) > 1 && skillCompareLoading;
 
   if (showSkillSelectionOnly) {
     return (
@@ -966,9 +1028,43 @@ function RolePageContent() {
           <p style={{ margin:"8px 0 0", color:"rgba(255,255,255,.78)", fontSize:14 }}>
             Step 1: select skills you already know. Step 2: take one combined test. Then start preparation.
           </p>
+          <div style={{ marginTop: 10, display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <Link href={`/role/${enc(roleName)}/analytics`} style={{ textDecoration: "none" }}>
+              <button style={{ ...btn("white","rgba(255,255,255,.1)","rgba(255,255,255,.25)"), fontSize:13 }}>📊 Analytics</button>
+            </Link>
+            <button
+              onClick={startMockInterview}
+              disabled={!mockInterviewEligible || mockInterviewLaunching}
+              title={
+                mockInterviewEligible
+                  ? "Start InterviewX technical mock interview directly"
+                  : "Complete all target-role skills to unlock mock interview"
+              }
+              style={{
+                ...btn(
+                  "white",
+                  mockInterviewEligible ? "rgba(20,184,166,.28)" : "rgba(148,163,184,.24)",
+                  mockInterviewEligible ? "rgba(45,212,191,.7)" : "rgba(148,163,184,.4)"
+                ),
+                fontSize: 13,
+                opacity: mockInterviewEligible ? 1 : 0.65,
+                cursor: mockInterviewEligible ? "pointer" : "not-allowed",
+              }}
+            >
+              {mockInterviewLaunching ? "Opening..." : "🎤 Mock Interview"}
+            </button>
+          </div>
         </div>
 
-        {allRoleSkillNames.length > 0 && (
+        {waitForSkillComparison && (
+          <div style={{ ...card, marginBottom: 16, borderLeft: "4px solid #3170A5" }}>
+            <h3 style={{ margin: "0 0 6px", fontSize: 16, color: "#0F1724" }}>Step 2: Skills you already know</h3>
+            <p style={{ margin: 0, fontSize: 13, color: "#64748b" }}>
+              Comparing with previous level… Please wait.
+            </p>
+          </div>
+        )}
+        {allRoleSkillNames.length > 0 && !waitForSkillComparison && (
           <div style={{ ...card, marginBottom: 16, borderLeft: "4px solid #3170A5" }}>
             <h3 style={{ margin: "0 0 6px", fontSize: 16, color: "#0F1724" }}>Step 2: Skills you already know</h3>
             <p style={{ margin: "0 0 10px", fontSize: 13, color: "#64748b" }}>
@@ -1003,13 +1099,12 @@ function RolePageContent() {
                 <span style={{ background: "#FFF7ED", border: "1px solid #FDBA74", borderRadius: 999, padding: "4px 10px", fontWeight: 700, color: "#9A3412" }}>
                   New at Level {employeeLevel}
                 </span>
-                {skillCompareLoading && <span style={{ color: "#64748b" }}>Comparing with previous level…</span>}
               </div>
             )}
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 8, marginBottom: 12 }}>
               {allRoleSkillNames.map((skill) => {
                 const checked = knownSkillsSet.has(skill);
-                const isCommon = previousSkillKeySet.has(String(skill || "").trim().toLowerCase());
+                const isCommon = isSkillCommonWithPrevious(skill);
                 const baseBg = isCommon ? "#ECFDF5" : "#FFF7ED";
                 const baseBorder = isCommon ? "#86EFAC" : "#FDBA74";
                 return (
@@ -1269,6 +1364,27 @@ function RolePageContent() {
               <Link href={`/role/${enc(roleName)}/analytics`} style={{ textDecoration:"none" }}>
                 <button style={{ ...btn("white","rgba(255,255,255,.1)","rgba(255,255,255,.25)"), fontSize:13 }}>📊 Analytics</button>
               </Link>
+              <button
+                onClick={startMockInterview}
+                disabled={!mockInterviewEligible || mockInterviewLaunching}
+                title={
+                  mockInterviewEligible
+                    ? "Start InterviewX technical mock interview directly"
+                    : "Complete all target-role skills to unlock mock interview"
+                }
+                style={{
+                  ...btn(
+                    "white",
+                    mockInterviewEligible ? "rgba(20,184,166,.28)" : "rgba(148,163,184,.24)",
+                    mockInterviewEligible ? "rgba(45,212,191,.7)" : "rgba(148,163,184,.4)"
+                  ),
+                  fontSize: 13,
+                  opacity: mockInterviewEligible ? 1 : 0.65,
+                  cursor: mockInterviewEligible ? "pointer" : "not-allowed",
+                }}
+              >
+                {mockInterviewLaunching ? "Opening..." : "🎤 Mock Interview"}
+              </button>
             </div>
           </div>
           {savedMsg && <p style={{ marginTop:10, color:"#bbf7d0", fontWeight:600 }}>{savedMsg}</p>}
@@ -1308,7 +1424,16 @@ function RolePageContent() {
         </div>
       )}
 
-      {(!prep?.knownSkillsConfigured) && allRoleSkillNames.length > 0 && (
+      {(!prep?.knownSkillsConfigured) && waitForSkillComparison && (
+        <div style={{ ...card, marginBottom: 16, borderLeft: "4px solid #3170A5" }}>
+          <h3 style={{ margin: "0 0 6px", fontSize: 16, color: "#0F1724" }}>Step 2: Skills you already know</h3>
+          <p style={{ margin: 0, fontSize: 13, color: "#64748b" }}>
+            Comparing with previous level… Please wait.
+          </p>
+        </div>
+      )}
+
+      {(!prep?.knownSkillsConfigured) && allRoleSkillNames.length > 0 && !waitForSkillComparison && (
         <div style={{ ...card, marginBottom: 16, borderLeft: "4px solid #3170A5" }}>
           <h3 style={{ margin: "0 0 6px", fontSize: 16, color: "#0F1724" }}>Step 2: Skills you already know</h3>
           <p style={{ margin: "0 0 10px", fontSize: 13, color: "#64748b" }}>
@@ -1343,13 +1468,12 @@ function RolePageContent() {
               <span style={{ background: "#FFF7ED", border: "1px solid #FDBA74", borderRadius: 999, padding: "4px 10px", fontWeight: 700, color: "#9A3412" }}>
                 New at Level {employeeLevel}
               </span>
-              {skillCompareLoading && <span style={{ color: "#64748b" }}>Comparing with previous level…</span>}
             </div>
           )}
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 8, marginBottom: 12 }}>
             {allRoleSkillNames.map((skill) => {
               const checked = knownSkillsSet.has(skill);
-              const isCommon = previousSkillKeySet.has(String(skill || "").trim().toLowerCase());
+              const isCommon = isSkillCommonWithPrevious(skill);
               const baseBg = isCommon ? "#ECFDF5" : "#FFF7ED";
               const baseBorder = isCommon ? "#86EFAC" : "#FDBA74";
               return (

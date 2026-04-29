@@ -124,14 +124,27 @@ export default function HomePage() {
       }
       const r = await fetch(`${getApiPrefix()}/api/role-preparation/ongoing?studentId=${encodeURIComponent(userId)}`);
       const ongoing = await r.json().catch(() => []);
-      if (Array.isArray(ongoing) && ongoing.length > 0 && ongoing[0]?.roleName) {
-        window.location.href = `/role/${encodeURIComponent(ongoing[0].roleName)}`;
-        return;
+      if (Array.isArray(ongoing) && ongoing.length > 0) {
+        const latest = [...ongoing]
+          .filter((x: any) => x?.roleName)
+          .sort((a: any, b: any) => {
+            const ta = new Date(String(a?.preparationStartDate || "")).getTime();
+            const tb = new Date(String(b?.preparationStartDate || "")).getTime();
+            return (Number.isFinite(tb) ? tb : 0) - (Number.isFinite(ta) ? ta : 0);
+          })[0];
+        if (latest?.roleName) {
+          window.location.href = `/role/${encodeURIComponent(latest.roleName)}`;
+          return;
+        }
       }
       window.location.href = "/target-role";
     } finally {
       setResuming(false);
     }
+  };
+
+  const goToTargetNewRole = () => {
+    window.location.href = "/target-role";
   };
 
   return (
@@ -284,6 +297,22 @@ export default function HomePage() {
                   }}
                 >
                   {resuming ? "Opening..." : "Go to your preparation"}
+                </button>
+                <button
+                  onClick={goToTargetNewRole}
+                  style={{
+                    display: "inline-block",
+                    padding: "10px 20px",
+                    borderRadius: 9,
+                    border: "2px solid #0f766e",
+                    background: "#0f766e",
+                    color: "#fff",
+                    fontSize: 14,
+                    fontWeight: 700,
+                    cursor: "pointer",
+                  }}
+                >
+                  Target New Role
                 </button>
                 <Link
                   href="/role/"
@@ -509,6 +538,24 @@ export default function HomePage() {
               }}
             >
               {resuming ? "Opening..." : "Go to your preparation"}
+            </button>
+            <button
+              onClick={goToTargetNewRole}
+              className="jb-cta-btn"
+              style={{
+                display: "inline-block",
+                marginLeft: 12,
+                padding: "12px 28px",
+                borderRadius: 9,
+                border: "2px solid #14b8a6",
+                background: "#14b8a6",
+                color: "#fff",
+                fontSize: 15,
+                fontWeight: 700,
+                cursor: "pointer",
+              }}
+            >
+              Target New Role
             </button>
           </div>
         </div>
