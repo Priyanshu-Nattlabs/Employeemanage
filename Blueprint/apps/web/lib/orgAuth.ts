@@ -350,3 +350,57 @@ export async function orgUpdateRecommendationStatus(token: string, id: string, s
   });
 }
 
+export type ScheduledInterviewEmployeeSummary = {
+  id: string;
+  status: string;
+  scheduledAt?: string | null;
+  targetRoleName?: string;
+  reportUrl?: string;
+};
+
+export async function orgListScheduledInterviews(token: string) {
+  return apiJson<any[]>(`/api/org-auth/scheduled-interviews`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
+export async function orgScheduledInterviewSummaryByEmployee(token: string) {
+  return apiJson<Record<string, ScheduledInterviewEmployeeSummary>>(`/api/org-auth/scheduled-interviews/summary-by-employee`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
+export async function orgCreateScheduledInterview(
+  token: string,
+  body: {
+    employeeId: string;
+    targetRoleName: string;
+    scheduledAt: string;
+    durationMinutes?: number;
+    location?: string;
+    meetingLink?: string;
+    notes?: string;
+  }
+) {
+  return apiJson<any>(`/api/org-auth/scheduled-interviews`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+    body: JSON.stringify(body),
+  });
+}
+
+export async function orgPatchScheduledInterview(
+  token: string,
+  id: string,
+  patch: {
+    status?: string;
+    reportUrl?: string;
+  }
+) {
+  return apiJson<any>(`/api/org-auth/scheduled-interviews/${encodeURIComponent(id)}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+    body: JSON.stringify(patch),
+  });
+}
+

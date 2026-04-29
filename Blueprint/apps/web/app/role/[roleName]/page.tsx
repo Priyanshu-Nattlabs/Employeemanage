@@ -6,6 +6,7 @@ import Link from "next/link";
 
 import { getApiPrefix } from "@/lib/apiBase";
 import { getOrgAuthFromStorage, orgCreateRecommendation } from "@/lib/orgAuth";
+import { buildInterviewXAiInterviewUrl } from "@/lib/interviewx";
 
 const API = getApiPrefix();
 
@@ -434,6 +435,7 @@ function RolePageContent() {
   const [trendingErr,     setTrendingErr]     = useState<string>("");
   const [knownSkillsSelection, setKnownSkillsSelection] = useState<string[]>([]);
   const [savingKnownSkills, setSavingKnownSkills] = useState(false);
+  const [mockInterviewLaunching, setMockInterviewLaunching] = useState(false);
   const [previousLevelSkills, setPreviousLevelSkills] = useState<string[]>([]);
   const [skillCompareLoading, setSkillCompareLoading] = useState(false);
   const [proficiencyDelta, setProficiencyDelta] = useState<Array<{ skillName: string; increasePct: number; reason?: string; previousSkill?: string }>>([]);
@@ -788,6 +790,24 @@ function RolePageContent() {
     await load();
   };
 
+  const startMockInterview = () => {
+    if (mockInterviewLaunching) return;
+    const auth = getOrgAuthFromStorage();
+    const fullName = String(auth?.user?.fullName || "").trim();
+    const email = String(auth?.user?.email || "").trim();
+    setMockInterviewLaunching(true);
+    try {
+      const ixUrl = buildInterviewXAiInterviewUrl({
+        prefillRole: roleName,
+        candidateEmail: email,
+        candidateName: fullName,
+      });
+      if (typeof window !== "undefined") window.open(ixUrl, "_blank", "noopener,noreferrer");
+    } finally {
+      setTimeout(() => setMockInterviewLaunching(false), 700);
+    }
+  };
+
   const toggleTopicDone = async (skillName: string, month: number, topicIndex: number, completed: boolean) => {
     const res = await fetch(
       `${API}/api/role-preparation/subtopic/${enc(roleName)}/${enc(skillName)}?studentId=${enc(userId)}&month=${month}&topicIndex=${topicIndex}&completed=${completed}`,
@@ -836,6 +856,7 @@ function RolePageContent() {
   const completedCount = prep ? Object.values(prep.skillProgress||{}).filter((v:any)=>v?.completed).length : 0;
   const totalCount     = tasks.length;
   const pct            = totalCount ? Math.round((completedCount/totalCount)*100) : 0;
+  const mockInterviewEligible = true;
 
   const { techSkills, softSkills } = useMemo(() => {
     const extract = (r: any) => {
@@ -1007,6 +1028,32 @@ function RolePageContent() {
           <p style={{ margin:"8px 0 0", color:"rgba(255,255,255,.78)", fontSize:14 }}>
             Step 1: select skills you already know. Step 2: take one combined test. Then start preparation.
           </p>
+          <div style={{ marginTop: 10, display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <Link href={`/role/${enc(roleName)}/analytics`} style={{ textDecoration: "none" }}>
+              <button style={{ ...btn("white","rgba(255,255,255,.1)","rgba(255,255,255,.25)"), fontSize:13 }}>📊 Analytics</button>
+            </Link>
+            <button
+              onClick={startMockInterview}
+              disabled={!mockInterviewEligible || mockInterviewLaunching}
+              title={
+                mockInterviewEligible
+                  ? "Start InterviewX technical mock interview directly"
+                  : "Complete all target-role skills to unlock mock interview"
+              }
+              style={{
+                ...btn(
+                  "white",
+                  mockInterviewEligible ? "rgba(20,184,166,.28)" : "rgba(148,163,184,.24)",
+                  mockInterviewEligible ? "rgba(45,212,191,.7)" : "rgba(148,163,184,.4)"
+                ),
+                fontSize: 13,
+                opacity: mockInterviewEligible ? 1 : 0.65,
+                cursor: mockInterviewEligible ? "pointer" : "not-allowed",
+              }}
+            >
+              {mockInterviewLaunching ? "Opening..." : "🎤 Mock Interview"}
+            </button>
+          </div>
         </div>
 
         {waitForSkillComparison && (
@@ -1317,6 +1364,27 @@ function RolePageContent() {
               <Link href={`/role/${enc(roleName)}/analytics`} style={{ textDecoration:"none" }}>
                 <button style={{ ...btn("white","rgba(255,255,255,.1)","rgba(255,255,255,.25)"), fontSize:13 }}>📊 Analytics</button>
               </Link>
+              <button
+                onClick={startMockInterview}
+                disabled={!mockInterviewEligible || mockInterviewLaunching}
+                title={
+                  mockInterviewEligible
+                    ? "Start InterviewX technical mock interview directly"
+                    : "Complete all target-role skills to unlock mock interview"
+                }
+                style={{
+                  ...btn(
+                    "white",
+                    mockInterviewEligible ? "rgba(20,184,166,.28)" : "rgba(148,163,184,.24)",
+                    mockInterviewEligible ? "rgba(45,212,191,.7)" : "rgba(148,163,184,.4)"
+                  ),
+                  fontSize: 13,
+                  opacity: mockInterviewEligible ? 1 : 0.65,
+                  cursor: mockInterviewEligible ? "pointer" : "not-allowed",
+                }}
+              >
+                {mockInterviewLaunching ? "Opening..." : "🎤 Mock Interview"}
+              </button>
             </div>
           </div>
           {savedMsg && <p style={{ marginTop:10, color:"#bbf7d0", fontWeight:600 }}>{savedMsg}</p>}
