@@ -48,6 +48,27 @@ const btn = (color:string, bg:string, border=bg): React.CSSProperties => ({
   display:"inline-flex", alignItems:"center", gap:6, transition:"opacity .15s"
 });
 
+const normSkill = (v: string) =>
+  String(v || "")
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+const skillTokens = (v: string) => new Set(normSkill(v).split(" ").filter(Boolean));
+
+const skillsAreSimilar = (a: string, b: string) => {
+  const na = normSkill(a);
+  const nb = normSkill(b);
+  if (!na || !nb) return false;
+  if (na === nb) return true;
+  if (na.includes(nb) || nb.includes(na)) return true;
+  const ta = skillTokens(na);
+  const tb = skillTokens(nb);
+  const inter = Array.from(ta).filter((t) => tb.has(t)).length;
+  return inter >= 1;
+};
+
 /** Search links for this topic only (not role/skill). */
 function topicPrepUrls(topic: string) {
   const t = topic.trim().replace(/\s+/g, " ");
@@ -415,7 +436,7 @@ function RolePageContent() {
   const [savingKnownSkills, setSavingKnownSkills] = useState(false);
   const [previousLevelSkills, setPreviousLevelSkills] = useState<string[]>([]);
   const [skillCompareLoading, setSkillCompareLoading] = useState(false);
-  const [proficiencyDelta, setProficiencyDelta] = useState<Array<{ skillName: string; increasePct: number; reason?: string }>>([]);
+  const [proficiencyDelta, setProficiencyDelta] = useState<Array<{ skillName: string; increasePct: number; reason?: string; previousSkill?: string }>>([]);
   /** Base role doc (JD + skills) when chart snapshot omits them */
   const [baseRole,        setBaseRole]        = useState<any>(null);
 
@@ -613,6 +634,7 @@ function RolePageContent() {
                 skillName: String(x?.skillName || "").trim(),
                 increasePct: Math.max(5, Math.min(70, Number(x?.increasePct) || 0)),
                 reason: String(x?.reason || "").trim(),
+                previousSkill: String(x?.previousSkill || "").trim(),
               }))
               .filter((x: any) => x.skillName)
               .sort((a: any, b: any) => b.increasePct - a.increasePct)
@@ -867,8 +889,26 @@ function RolePageContent() {
     const out = new Set<string>();
     for (const s of previousLevelSkills) out.add(String(s || "").trim().toLowerCase());
     for (const p of proficiencyDelta) out.add(String(p?.skillName || "").trim().toLowerCase());
+    for (const p of proficiencyDelta) out.add(String(p?.previousSkill || "").trim().toLowerCase());
     return out;
   }, [previousLevelSkills, proficiencyDelta]);
+
+  const previousComparableSkills = useMemo(() => {
+    const out = new Set<string>();
+    for (const s of previousLevelSkills) out.add(String(s || "").trim());
+    for (const p of proficiencyDelta) {
+      if (p?.skillName) out.add(String(p.skillName).trim());
+      if (p?.previousSkill) out.add(String(p.previousSkill).trim());
+    }
+    return Array.from(out).filter(Boolean);
+  }, [previousLevelSkills, proficiencyDelta]);
+
+  const isSkillCommonWithPrevious = (skill: string) => {
+    const key = String(skill || "").trim().toLowerCase();
+    if (!key) return false;
+    if (previousSkillKeySet.has(key)) return true;
+    return previousComparableSkills.some((prevSkill) => skillsAreSimilar(skill, prevSkill));
+  };
 
   const knownSkillsSet = new Set<string>((knownSkillsSelection || []).map((s) => String(s)));
   const testQueueSkills: string[] = Array.isArray(prep?.knownSkillsForTest) ? prep.knownSkillsForTest : [];
@@ -945,6 +985,7 @@ function RolePageContent() {
     : null;
   const tooltipIsLoading = tooltip ? !!topicsLoading[tooltip.topKey] : false;
   const showSkillSelectionOnly = !prep?.knownSkillsConfigured;
+  const waitForSkillComparison = Number(employeeLevel) > 1 && skillCompareLoading;
 
   if (showSkillSelectionOnly) {
     return (
@@ -968,7 +1009,15 @@ function RolePageContent() {
           </p>
         </div>
 
-        {allRoleSkillNames.length > 0 && (
+        {waitForSkillComparison && (
+          <div style={{ ...card, marginBottom: 16, borderLeft: "4px solid #3170A5" }}>
+            <h3 style={{ margin: "0 0 6px", fontSize: 16, color: "#0F1724" }}>Step 2: Skills you already know</h3>
+            <p style={{ margin: 0, fontSize: 13, color: "#64748b" }}>
+              Comparing with previous level… Please wait.
+            </p>
+          </div>
+        )}
+        {allRoleSkillNames.length > 0 && !waitForSkillComparison && (
           <div style={{ ...card, marginBottom: 16, borderLeft: "4px solid #3170A5" }}>
             <h3 style={{ margin: "0 0 6px", fontSize: 16, color: "#0F1724" }}>Step 2: Skills you already know</h3>
             <p style={{ margin: "0 0 10px", fontSize: 13, color: "#64748b" }}>
@@ -1003,13 +1052,12 @@ function RolePageContent() {
                 <span style={{ background: "#FFF7ED", border: "1px solid #FDBA74", borderRadius: 999, padding: "4px 10px", fontWeight: 700, color: "#9A3412" }}>
                   New at Level {employeeLevel}
                 </span>
-                {skillCompareLoading && <span style={{ color: "#64748b" }}>Comparing with previous level…</span>}
               </div>
             )}
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 8, marginBottom: 12 }}>
               {allRoleSkillNames.map((skill) => {
                 const checked = knownSkillsSet.has(skill);
-                const isCommon = previousSkillKeySet.has(String(skill || "").trim().toLowerCase());
+                const isCommon = isSkillCommonWithPrevious(skill);
                 const baseBg = isCommon ? "#ECFDF5" : "#FFF7ED";
                 const baseBorder = isCommon ? "#86EFAC" : "#FDBA74";
                 return (
@@ -1308,7 +1356,16 @@ function RolePageContent() {
         </div>
       )}
 
-      {(!prep?.knownSkillsConfigured) && allRoleSkillNames.length > 0 && (
+      {(!prep?.knownSkillsConfigured) && waitForSkillComparison && (
+        <div style={{ ...card, marginBottom: 16, borderLeft: "4px solid #3170A5" }}>
+          <h3 style={{ margin: "0 0 6px", fontSize: 16, color: "#0F1724" }}>Step 2: Skills you already know</h3>
+          <p style={{ margin: 0, fontSize: 13, color: "#64748b" }}>
+            Comparing with previous level… Please wait.
+          </p>
+        </div>
+      )}
+
+      {(!prep?.knownSkillsConfigured) && allRoleSkillNames.length > 0 && !waitForSkillComparison && (
         <div style={{ ...card, marginBottom: 16, borderLeft: "4px solid #3170A5" }}>
           <h3 style={{ margin: "0 0 6px", fontSize: 16, color: "#0F1724" }}>Step 2: Skills you already know</h3>
           <p style={{ margin: "0 0 10px", fontSize: 13, color: "#64748b" }}>
@@ -1343,13 +1400,12 @@ function RolePageContent() {
               <span style={{ background: "#FFF7ED", border: "1px solid #FDBA74", borderRadius: 999, padding: "4px 10px", fontWeight: 700, color: "#9A3412" }}>
                 New at Level {employeeLevel}
               </span>
-              {skillCompareLoading && <span style={{ color: "#64748b" }}>Comparing with previous level…</span>}
             </div>
           )}
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 8, marginBottom: 12 }}>
             {allRoleSkillNames.map((skill) => {
               const checked = knownSkillsSet.has(skill);
-              const isCommon = previousSkillKeySet.has(String(skill || "").trim().toLowerCase());
+              const isCommon = isSkillCommonWithPrevious(skill);
               const baseBg = isCommon ? "#ECFDF5" : "#FFF7ED";
               const baseBorder = isCommon ? "#86EFAC" : "#FDBA74";
               return (
