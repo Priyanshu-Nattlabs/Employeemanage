@@ -36,7 +36,7 @@ export class SkillTestService {
     const existing = await this.testModel.findOne({ studentId, roleName, testType: "KNOWN_SKILLS", status: "IN_PROGRESS" });
     if (existing) return existing;
 
-    const questions = await this.generateKnownSkillsQuestions(roleName, skills).catch(() => this.buildKnownSkillsFallback(skills, 20));
+    const questions = await this.generateKnownSkillsQuestions(roleName, skills).catch(() => this.buildKnownSkillsFallback(skills, skills.length * 5));
     return this.testModel.create({
       studentId,
       roleName,
@@ -53,23 +53,24 @@ export class SkillTestService {
   private async generateQuestions(roleName: string, skillName: string) {
     const fallback = this.buildFallback(skillName);
 
-    const system = `You are a technical interviewer. Return ONLY a valid JSON array of exactly 20 MCQ objects. No markdown, no extra text.
+    const system = `You are a technical interviewer. Return ONLY a valid JSON array of exactly 5 MCQ objects. No markdown, no extra text.
 Each object must have exactly these keys:
-  "questionNumber": integer (1-20)
+  "questionNumber": integer (1-5)
   "questionText": string (the question)
   "options": array of exactly 4 strings (the answer choices, not labeled A/B/C/D)
   "correctAnswer": string (must exactly match one of the options strings)
+  "skillName": string (must be exactly "${skillName}")
 Example:
-[{"questionNumber":1,"questionText":"What is X?","options":["Option1","Option2","Option3","Option4"],"correctAnswer":"Option1"}]`;
+[{"questionNumber":1,"questionText":"What is X?","options":["Option1","Option2","Option3","Option4"],"correctAnswer":"Option1","skillName":"${skillName}"}]`;
 
-    const prompt = `Generate exactly 20 purely ${skillName}-focused MCQ questions for the role "${roleName}".
+    const prompt = `Generate exactly 5 purely ${skillName}-focused MCQ questions for the role "${roleName}".
 Do not ask generic aptitude, communication, or unrelated role questions.
-Difficulty split must be exact:
-- 5 easy questions
-- 10 medium questions
-- 5 tough questions
+Difficulty split must be exact (medium to hard only):
+- 3 medium questions
+- 2 hard questions
 Questions should be practical and directly test ${skillName} knowledge and application.
-Set question numbers from 1 to 20 in ascending order.
+Set question numbers from 1 to 5 in ascending order.
+Set "skillName" to "${skillName}" for every question.
 Return ONLY the JSON array, nothing else.`;
 
     const raw = await this.ai.chatJson<any>(prompt, system, null);
@@ -100,21 +101,22 @@ Return ONLY the JSON array, nothing else.`;
           questionNumber: i + 1,
           questionText: String(q.questionText).trim(),
           options: opts,
-          correctAnswer: correct
+          correctAnswer: correct,
+          skillName: String(q.skillName || skillName).trim() || skillName,
         };
       })
-      .slice(0, 20);
+      .slice(0, 5);
 
-    // Pad to 20 if AI returned fewer
-    while (cleaned.length < 20) cleaned.push(fallback[cleaned.length]);
+    // Pad to 5 if AI returned fewer
+    while (cleaned.length < 5) cleaned.push(fallback[cleaned.length]);
 
     return cleaned;
   }
 
   private async generateKnownSkillsQuestions(roleName: string, selectedSkills: string[]) {
-    const questionCount = Math.min(30, Math.max(20, selectedSkills.length * 4));
-    const hardCount = Math.max(6, Math.floor(questionCount * 0.35));
-    const mediumCount = questionCount - hardCount;
+    const questionCount = selectedSkills.length * 5;
+    const mediumCount = selectedSkills.length * 3;
+    const hardCount = selectedSkills.length * 2;
     const fallback = this.buildKnownSkillsFallback(selectedSkills, questionCount);
     const skillList = selectedSkills.join(", ");
     const system = `You are a technical interviewer. Return ONLY a valid JSON array of exactly ${questionCount} MCQ objects. No markdown, no extra text.
@@ -122,14 +124,15 @@ Each object must have exactly these keys:
   "questionNumber": integer (1-${questionCount})
   "questionText": string
   "options": array of exactly 4 strings
-  "correctAnswer": string (must exactly match one option).`;
+  "correctAnswer": string (must exactly match one option)
+  "skillName": string (must be exactly one value from: ${skillList}).`;
     const prompt = `Create one combined technical MCQ test for role "${roleName}" covering these known skills: ${skillList}.
-Generate exactly ${questionCount} questions, medium to hard only.
+Generate exactly ${questionCount} questions, medium to hard only, with exactly 5 questions per skill.
 Difficulty split:
-- ${mediumCount} medium
-- ${hardCount} hard
+- ${mediumCount} medium (3 per skill)
+- ${hardCount} hard (2 per skill)
 Questions must be practical and strictly skill-related. Avoid aptitude, HR, communication, or generic questions.
-Distribute questions across all listed skills.
+Every question must include "skillName" and each listed skill must appear exactly 5 times.
 Set question numbers from 1 to ${questionCount} in order.
 Return only JSON array.`;
 
@@ -151,20 +154,39 @@ Return only JSON array.`;
           questionText: String(q.questionText).trim(),
           options: opts,
           correctAnswer: correct,
+          skillName: String(q.skillName || "").trim(),
         };
       })
       .slice(0, questionCount);
 
-    while (cleaned.length < questionCount) cleaned.push(fallback[cleaned.length]);
-    return cleaned;
+    const allowedSkills = new Set(selectedSkills.map((s) => s.toLowerCase()));
+    const bySkillCount: Record<string, number> = {};
+    const normalized = cleaned.map((q) => {
+      const key = String(q.skillName || "").trim().toLowerCase();
+      const fallbackSkill = selectedSkills[(q.questionNumber - 1) % selectedSkills.length];
+      const chosen = key && allowedSkills.has(key) ? (selectedSkills.find((s) => s.toLowerCase() === key) || fallbackSkill) : fallbackSkill;
+      bySkillCount[chosen] = (bySkillCount[chosen] || 0) + 1;
+      return { ...q, skillName: chosen };
+    });
+
+    const targetPerSkill = 5;
+    for (const skill of selectedSkills) {
+      let count = bySkillCount[skill] || 0;
+      while (count < targetPerSkill && normalized.length < questionCount) {
+        const idx = normalized.length + 1;
+        const { questionText, options, correctAnswer } = this.buildClearFallbackMcq(skill, "implementation and debugging", "medium");
+        normalized.push({ questionNumber: idx, questionText, options, correctAnswer, skillName: skill });
+        count++;
+      }
+      bySkillCount[skill] = count;
+    }
+
+    while (normalized.length < questionCount) normalized.push(fallback[normalized.length]);
+    return normalized.slice(0, questionCount).map((q, i) => ({ ...q, questionNumber: i + 1 }));
   }
 
   private buildFallback(skillName: string) {
-    const plan = [
-      ...Array.from({ length: 5 }, () => "easy"),
-      ...Array.from({ length: 10 }, () => "medium"),
-      ...Array.from({ length: 5 }, () => "tough"),
-    ];
+    const plan = [...Array.from({ length: 3 }, () => "medium"), ...Array.from({ length: 2 }, () => "tough")];
     const easyTopics = ["fundamentals", "basic syntax", "simple use-case", "core definitions", "intro setup"];
     const mediumTopics = [
       "best practices",
@@ -180,18 +202,14 @@ Return only JSON array.`;
     ];
     const toughTopics = ["advanced optimization", "architecture trade-offs", "security hardening", "complex debugging", "scalability design"];
     return plan.map((level, i) => {
-      const topic =
-        level === "easy"
-          ? easyTopics[i % easyTopics.length]
-          : level === "medium"
-          ? mediumTopics[(i - 5) % mediumTopics.length]
-          : toughTopics[(i - 15) % toughTopics.length];
+      const topic = level === "medium" ? mediumTopics[i % mediumTopics.length] : toughTopics[i % toughTopics.length];
       const { questionText, options, correctAnswer } = this.buildClearFallbackMcq(skillName, topic, level as "easy" | "medium" | "tough");
       return ({
         questionNumber: i + 1,
         questionText,
         options,
         correctAnswer,
+        skillName,
       });
     });
   }
@@ -218,6 +236,7 @@ Return only JSON array.`;
         questionText,
         options,
         correctAnswer,
+        skillName: skill,
       };
     });
   }
@@ -301,9 +320,37 @@ Return only JSON array.`;
     const score = Math.round((correct * 100) / Math.max(1, questions.length));
     test.answers = merged;
     test.markModified("answers");
-    test.score    = score;
-    test.passed   = score >= 75;
-    test.status   = test.passed ? "COMPLETED" : "FAILED";
+    test.score = score;
+
+    const passThreshold = 80;
+    const breakdown: Record<string, { correct: number; total: number; score: number; passed: boolean }> = {};
+    if (test.testType === "KNOWN_SKILLS") {
+      const selected = this.uniq((test.selectedSkills || []).map((s) => String(s || "").trim()).filter(Boolean));
+      for (const s of selected) breakdown[s] = { correct: 0, total: 0, score: 0, passed: false };
+      for (const q of questions as any[]) {
+        const qSkill = String((q as any)?.skillName || "").trim();
+        const skill = selected.includes(qSkill) ? qSkill : selected.find((s) => (q.questionText || "").toLowerCase().includes(s.toLowerCase())) || selected[0];
+        if (!skill) continue;
+        breakdown[skill] = breakdown[skill] || { correct: 0, total: 0, score: 0, passed: false };
+        breakdown[skill].total += 1;
+        const key = String(q.questionNumber);
+        const given = (merged[key] || "").trim().toLowerCase();
+        const expected = String(q.correctAnswer || "").trim().toLowerCase();
+        if (given && given === expected) breakdown[skill].correct += 1;
+      }
+      for (const [skill, row] of Object.entries(breakdown)) {
+        row.score = Math.round((row.correct * 100) / Math.max(1, row.total));
+        row.passed = row.score >= passThreshold;
+      }
+      test.skillBreakdown = breakdown;
+      test.markModified("skillBreakdown");
+      const allSkillPass = Object.values(breakdown).every((r) => r.passed);
+      test.passed = allSkillPass;
+      test.status = allSkillPass ? "COMPLETED" : "FAILED";
+    } else {
+      test.passed = score >= passThreshold;
+      test.status = test.passed ? "COMPLETED" : "FAILED";
+    }
     test.completedAt = new Date().toISOString();
     await test.save();
 
@@ -313,8 +360,10 @@ Return only JSON array.`;
         await this.prepService.markKnownSkillsTestSubmitted(test.studentId, test.roleName);
         const skills = this.uniq((test.selectedSkills || []).map((s) => String(s || "").trim()).filter(Boolean));
         for (const skill of skills) {
-          if (test.passed) {
-            await this.prepService.markKnownSkillPassed(test.studentId, test.roleName, skill, score);
+          const row = (test.skillBreakdown || {})[skill];
+          const skillScore = typeof row?.score === "number" ? row.score : score;
+          if (row?.passed) {
+            await this.prepService.markKnownSkillPassed(test.studentId, test.roleName, skill, skillScore);
           } else {
             await this.prepService.markKnownSkillFailed(test.studentId, test.roleName, skill);
           }
@@ -361,32 +410,63 @@ Return only JSON array.`;
     if (!tests.length) return [];
 
     // Group by skill so we can show attempt numbers
-    const bySkill = new Map<string, typeof tests>();
+    type Expanded = { skillName: string; test: any; score: number | null; passed: boolean; totalQ: number; correctQ: number | null; testType: string; selectedSkills: string[] };
+    const expanded: Expanded[] = [];
     for (const t of tests) {
-      if (!t.skillName) continue;
-      const arr = bySkill.get(t.skillName) ?? [];
-      arr.push(t);
-      bySkill.set(t.skillName, arr);
+      if (t.testType === "KNOWN_SKILLS" && t.skillBreakdown && typeof t.skillBreakdown === "object") {
+        for (const [skill, rowAny] of Object.entries(t.skillBreakdown as any)) {
+          const row: any = rowAny || {};
+          expanded.push({
+            skillName: skill,
+            test: t,
+            score: typeof row.score === "number" ? row.score : null,
+            passed: !!row.passed,
+            totalQ: Number(row.total || 0),
+            correctQ: typeof row.correct === "number" ? row.correct : null,
+            testType: "KNOWN_SKILLS",
+            selectedSkills: Array.isArray(t.selectedSkills) ? t.selectedSkills : [],
+          });
+        }
+      } else if (t.skillName) {
+        const total = t.questions?.length ?? 0;
+        const correct = (typeof t.score === "number" && total)
+          ? Math.round((t.score / 100) * total)
+          : null;
+        expanded.push({
+          skillName: t.skillName,
+          test: t,
+          score: typeof t.score === "number" ? t.score : null,
+          passed: t.passed === true,
+          totalQ: total,
+          correctQ: correct,
+          testType: t.testType || "SINGLE_SKILL",
+          selectedSkills: Array.isArray(t.selectedSkills) ? t.selectedSkills : [],
+        });
+      }
+    }
+
+    const bySkill = new Map<string, Expanded[]>();
+    for (const e of expanded) {
+      const arr = bySkill.get(e.skillName) ?? [];
+      arr.push(e);
+      bySkill.set(e.skillName, arr);
     }
 
     const results: any[] = [];
     for (const [skillName, attempts] of bySkill) {
       for (let i = 0; i < attempts.length; i++) {
-        const t = attempts[i];
-        const total   = t.questions?.length ?? 0;
-        const correct = (typeof t.score === "number" && total)
-          ? Math.round((t.score / 100) * total)
-          : null;
+        const a = attempts[i];
+        const t = a.test;
         results.push({
           skillName,
-          testType: t.testType || "SINGLE_SKILL",
-          selectedSkills: Array.isArray(t.selectedSkills) ? t.selectedSkills : [],
-          score:        typeof t.score === "number" ? t.score : null,
-          passed:       t.passed === true,
+          testType: a.testType || "SINGLE_SKILL",
+          selectedSkills: a.selectedSkills,
+          score: a.score,
+          passed: a.passed,
           status:       t.status,
           completedAt:  t.completedAt ?? null,
-          totalQ:       total,
-          correctQ:     correct,
+          totalQ:       a.totalQ,
+          correctQ:     a.correctQ,
           attemptNo:    i + 1,             // 1 = latest, 2 = second-latest, …
           totalAttempts: attempts.length,
           isLatest:     i === 0,

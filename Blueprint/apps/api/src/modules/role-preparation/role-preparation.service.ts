@@ -182,7 +182,7 @@ export class RolePreparationService {
   }
 
   async markCompletedAfterTest(studentId: string, roleName: string, skillName: string, score: number) {
-    if (score < 75) throw new Error("Score must be >= 75");
+    if (score < 80) throw new Error("Score must be >= 80");
     let prep = await this.prepModel.findOne({ studentId, roleName });
     // Ensure completion always gets reflected even if a prep record is missing.
     if (!prep) prep = await this.start(studentId, roleName);

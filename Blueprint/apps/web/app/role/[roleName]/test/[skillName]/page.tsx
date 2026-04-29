@@ -8,7 +8,7 @@ import { getOrgAuthFromStorage } from "@/lib/orgAuth";
 
 const API = getApiPrefix();
 
-type Q = { questionNumber: number; questionText: string; options: string[]; correctAnswer?: string };
+type Q = { questionNumber: number; questionText: string; options: string[]; correctAnswer?: string; skillName?: string };
 type TestType = {
   _id?: string; id?: string; status: string;
   score?: number; passed?: boolean;
@@ -35,7 +35,7 @@ function ScoreRing({ pct, size = 140, stroke = 13 }: { pct: number; size?: numbe
   const r = (size - stroke) / 2;
   const circ = 2 * Math.PI * r;
   const offset = circ - (circ * pct) / 100;
-  const color = pct >= 75 ? "#22c55e" : "#ef4444";
+  const color = pct >= 80 ? "#22c55e" : "#ef4444";
   return (
     <svg width={size} height={size} style={{ transform: "rotate(-90deg)" }}>
       <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="#ffffff22" strokeWidth={stroke} />
@@ -495,7 +495,7 @@ export default function SkillTestPage() {
 
   /* ── Result screen ── */
   if (test.status !== "IN_PROGRESS") {
-    const passed = (test.score ?? 0) >= 75;
+    const passed = (test.score ?? 0) >= 80;
     const score  = test.score ?? 0;
     const today  = new Date().toLocaleDateString("en-US", { year:"numeric", month:"long", day:"numeric" });
     const liText = `🏆 I just passed the "${displayTestTitle}" skill assessment for ${roleName} on JobBlueprint with a score of ${score}%! Career roadmaps and skill tracking. #CareerDevelopment #JobBlueprint`;
@@ -578,7 +578,7 @@ export default function SkillTestPage() {
 
                 <div style={{ background:"rgba(239,68,68,.12)", border:"1px solid rgba(239,68,68,.25)", borderRadius:14, padding:"14px 20px", marginBottom:24 }}>
                   <p style={{ margin:"0 0 4px", color:"#fca5a5", fontWeight:700, fontSize:14 }}>
-                    Need ≥ 75% to pass — you scored {score}%
+                    Need ≥ 80% to pass — you scored {score}%
                   </p>
                   <p style={{ margin:0, color:"rgba(255,255,255,.45)", fontSize:12 }}>
                     Review the learning topics from the Gantt chart then retry.

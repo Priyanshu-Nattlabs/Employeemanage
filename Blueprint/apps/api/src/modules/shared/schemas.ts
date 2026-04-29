@@ -62,6 +62,7 @@ export class SkillQuestion {
   @Prop({ type: [String], default: [] }) options!: string[];
   @Prop() correctAnswer!: string;
   @Prop() questionNumber!: number;
+  @Prop() skillName?: string;
 }
 
 @Schema({ collection: "skill_tests", timestamps: true })
@@ -73,6 +74,7 @@ export class SkillTest {
   @Prop({ type: [String], default: [] }) selectedSkills!: string[];
   @Prop({ type: [Object], default: [] }) questions!: SkillQuestion[];
   @Prop({ type: Object, default: {} }) answers!: Record<string, string>;
+  @Prop({ type: Object, default: {} }) skillBreakdown?: Record<string, { correct: number; total: number; score: number; passed: boolean }>;
   @Prop() score?: number;
   @Prop() passed?: boolean;
   @Prop() startedAt?: string;
