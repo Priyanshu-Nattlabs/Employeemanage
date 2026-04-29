@@ -308,132 +308,118 @@ function ManagerDashboardContent() {
       {/* Engagement strip */}
       <EngagementStrip activity={activity} />
 
-      {/* Bulk invite (manager: dept inherited; HR: Department column per row) */}
-      <div style={{ ...card, minWidth: 0, maxWidth: "100%" }}>
-        <div style={cardTitle}><span style={titleIcon("#10b981")}>📤</span>Invite employees from Excel</div>
-        <div style={cardSub}>
-          Upload a spreadsheet with <b>Email</b> and <b>Name</b> columns (first sheet).
-          {isHR ? (
-            <> Each row must also include a <b>Department</b> column.</>
-          ) : (
-            <> New accounts are created in <b>{myDepartment || "your"}</b> department and report to you.</>
-          )}{" "}
-          Each person receives an email with a temporary password and must complete their profile after first login.
-        </div>
-        <div style={{ marginTop: 14, display: "flex", flexWrap: "wrap", gap: 10, alignItems: "center" }}>
-          <input
-            type="file"
-            accept=".xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel"
-            onChange={(e) => {
-              setInviteResult(null);
-              setInviteError("");
-              const f = e.target.files?.[0] || null;
-              setInviteFile(f);
-            }}
-            style={{ fontSize: 13 }}
-          />
-          <button
-            type="button"
-            disabled={!inviteFile || inviteLoading || !token}
-            onClick={async () => {
-              if (!inviteFile || !token) return;
-              setInviteLoading(true);
-              setInviteError("");
-              setInviteResult(null);
-              try {
-                const r = await orgManagerBulkInviteEmployees(token, inviteFile);
-                setInviteResult(r);
-                void (async () => {
-                  try {
-                    const summary = await orgListEmployeesManagerSummary(token);
-                    setRows(Array.isArray(summary) ? summary : []);
-                  } catch {
-                    /* ignore */
-                  }
-                })();
-              } catch (e: any) {
-                setInviteError(e?.message || "Upload failed");
-              } finally {
-                setInviteLoading(false);
-              }
-            }}
-            style={{ ...btnSolid, opacity: !inviteFile || inviteLoading ? 0.6 : 1 }}
-          >
-            {inviteLoading ? "Uploading…" : "Upload & invite"}
-          </button>
-        </div>
-        {inviteError ? <div style={{ ...errorStyle, marginTop: 12 }}>{inviteError}</div> : null}
-        {inviteResult ? (
-          <div style={{ marginTop: 14, fontSize: 13, lineHeight: 1.6, color: "#0f172a" }}>
-            <div style={{ fontWeight: 900, color: "#065f46" }}>
-              Created {inviteResult.created} account{inviteResult.created === 1 ? "" : "s"}
-            </div>
-            {inviteResult.errors?.length ? (
-              <div style={{ marginTop: 10 }}>
-                <div style={{ fontWeight: 800, color: "#991b1b" }}>Row errors ({inviteResult.errors.length})</div>
-                <ul style={{ margin: "8px 0 0", paddingLeft: 18, color: "#475569" }}>
-                  {inviteResult.errors.slice(0, 12).map((err, i) => (
-                    <li key={i}>
-                      Row {err.row}
-                      {err.email ? ` · ${err.email}` : ""}: {err.message}
-                    </li>
-                  ))}
-                </ul>
-                {inviteResult.errors.length > 12 ? (
-                  <div style={{ color: "#64748b", marginTop: 6 }}>…and {inviteResult.errors.length - 12} more</div>
-                ) : null}
-              </div>
-            ) : null}
-          </div>
-        ) : null}
-      </div>
-
-      {/* Schedule interviews — same band as invite / activity */}
-      <div style={{ ...card, minWidth: 0, maxWidth: "100%" }}>
-        <div style={cardTitle}>
-          <span style={titleIcon("#0ea5e9")}>📅</span>Schedule interview
-        </div>
-        <div style={cardSub}>
-          View everyone in <b>{scopeLabel}</b> with department, email, and roles they&apos;re preparing for. Schedule a slot and optional location or meeting link. After interviews finish (including in InterviewX), add the report link on that page so it shows in the employee table below.
-        </div>
-        <div style={{ marginTop: 14 }}>
-          <Link
-            href={appPath("/dashboard/manager/schedule-interviews")}
-            style={{
-              ...btnSolid,
-              display: "inline-flex",
-              alignItems: "center",
-              justifyContent: "center",
-              textDecoration: "none",
-              boxSizing: "border-box",
-            }}
-          >
-            Open schedule hub
-          </Link>
-        </div>
-      </div>
-
-      {/* Trend chart + Activity feed */}
+      {/* Bulk invite + Schedule interviews (two cards in one row) */}
       <div className="manager-two-col">
         <div style={{ ...card, minWidth: 0, maxWidth: "100%" }}>
-          <div style={cardTitle}><span style={titleIcon("#16a34a")}>📈</span>Test activity (last 14 days)</div>
-          <div style={cardSub}>Daily test attempts split by pass / fail, with average score line.</div>
-          <TrendChart series={activity?.dailySeries || []} />
+          <div style={cardTitle}><span style={titleIcon("#10b981")}>📤</span>Invite employees from Excel</div>
+          <div style={cardSub}>
+            Upload a spreadsheet with <b>Email</b> and <b>Name</b> columns (first sheet).
+            {isHR ? (
+              <> Each row must also include a <b>Department</b> column.</>
+            ) : (
+              <> New accounts are created in <b>{myDepartment || "your"}</b> department and report to you.</>
+            )}{" "}
+            Each person receives an email with a temporary password and must complete their profile after first login.
+          </div>
+          <div style={{ marginTop: 14, display: "flex", flexWrap: "wrap", gap: 10, alignItems: "center" }}>
+            <input
+              type="file"
+              accept=".xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel"
+              onChange={(e) => {
+                setInviteResult(null);
+                setInviteError("");
+                const f = e.target.files?.[0] || null;
+                setInviteFile(f);
+              }}
+              style={{ fontSize: 13 }}
+            />
+            <button
+              type="button"
+              disabled={!inviteFile || inviteLoading || !token}
+              onClick={async () => {
+                if (!inviteFile || !token) return;
+                setInviteLoading(true);
+                setInviteError("");
+                setInviteResult(null);
+                try {
+                  const r = await orgManagerBulkInviteEmployees(token, inviteFile);
+                  setInviteResult(r);
+                  void (async () => {
+                    try {
+                      const summary = await orgListEmployeesManagerSummary(token);
+                      setRows(Array.isArray(summary) ? summary : []);
+                    } catch {
+                      /* ignore */
+                    }
+                  })();
+                } catch (e: any) {
+                  setInviteError(e?.message || "Upload failed");
+                } finally {
+                  setInviteLoading(false);
+                }
+              }}
+              style={{ ...btnSolid, opacity: !inviteFile || inviteLoading ? 0.6 : 1 }}
+            >
+              {inviteLoading ? "Uploading…" : "Upload & invite"}
+            </button>
+          </div>
+          {inviteError ? <div style={{ ...errorStyle, marginTop: 12 }}>{inviteError}</div> : null}
+          {inviteResult ? (
+            <div style={{ marginTop: 14, fontSize: 13, lineHeight: 1.6, color: "#0f172a" }}>
+              <div style={{ fontWeight: 900, color: "#065f46" }}>
+                Created {inviteResult.created} account{inviteResult.created === 1 ? "" : "s"}
+              </div>
+              {inviteResult.errors?.length ? (
+                <div style={{ marginTop: 10 }}>
+                  <div style={{ fontWeight: 800, color: "#991b1b" }}>Row errors ({inviteResult.errors.length})</div>
+                  <ul style={{ margin: "8px 0 0", paddingLeft: 18, color: "#475569" }}>
+                    {inviteResult.errors.slice(0, 12).map((err, i) => (
+                      <li key={i}>
+                        Row {err.row}
+                        {err.email ? ` · ${err.email}` : ""}: {err.message}
+                      </li>
+                    ))}
+                  </ul>
+                  {inviteResult.errors.length > 12 ? (
+                    <div style={{ color: "#64748b", marginTop: 6 }}>…and {inviteResult.errors.length - 12} more</div>
+                  ) : null}
+                </div>
+              ) : null}
+            </div>
+          ) : null}
         </div>
 
+        <div style={{ ...card, minWidth: 0, maxWidth: "100%" }}>
+          <div style={cardTitle}>
+            <span style={titleIcon("#0ea5e9")}>📅</span>Schedule interview
+          </div>
+          <div style={cardSub}>
+            View everyone in <b>{scopeLabel}</b> with department, email, and roles they&apos;re preparing for. Interview slots and report links are no longer stored in Blueprint — use InterviewX (or your tooling) for scheduling; open the hub to copy handoffs and deep links.
+          </div>
+          <div style={{ marginTop: 14 }}>
+            <Link
+              href={appPath("/dashboard/manager/schedule-interviews")}
+              style={{
+                ...btnSolid,
+                display: "inline-flex",
+                alignItems: "center",
+                justifyContent: "center",
+                textDecoration: "none",
+                boxSizing: "border-box",
+              }}
+            >
+              Open schedule hub
+            </Link>
+          </div>
+        </div>
+      </div>
+
+      {/* Activity + Role distribution (two cards in one row) */}
+      <div className="manager-two-col">
         <div style={{ ...card, minWidth: 0, maxWidth: "100%" }}>
           <div style={cardTitle}><span style={titleIcon("#db2777")}>⚡</span>Live activity feed</div>
           <div style={cardSub}>Latest preparation actions and test results across {isHR ? "the company" : "your department"}.</div>
           <ActivityFeed feed={activity?.activityFeed || []} />
-        </div>
-      </div>
-
-      {/* Top skills + Role distribution */}
-      <div className="manager-two-col">
-        <div style={{ ...card, minWidth: 0, maxWidth: "100%" }}>
-          <div style={cardTitle}><span style={titleIcon("#f59e0b")}>🧠</span>Skill mastery — most attempted</div>
-          <div style={cardSub}>Where the team is strong and where they struggle. Pass rate is across all attempts.</div>
-          <TopSkills items={activity?.topSkills || []} />
         </div>
 
         <div style={{ ...card, minWidth: 0, maxWidth: "100%" }}>
