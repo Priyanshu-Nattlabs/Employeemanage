@@ -14,7 +14,6 @@ export type BuildInterviewXUrlInput = {
 function clean(v?: string) {
   return String(v || "").trim();
 }
-
 function interviewXBase(): string {
   const raw = clean(
     typeof process !== "undefined" && process.env.NEXT_PUBLIC_INTERVIEWX_ORIGIN ? process.env.NEXT_PUBLIC_INTERVIEWX_ORIGIN : "",
