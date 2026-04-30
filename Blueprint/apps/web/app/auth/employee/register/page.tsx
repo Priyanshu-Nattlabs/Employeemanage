@@ -74,13 +74,14 @@ export default function EmployeeRegisterPage() {
         companyDomain: inferredDomain
       });
       if ("verificationRequired" in r && r.verificationRequired) {
-        const nextPath = currentRole === "MANAGER" ? "/dashboard/manager" : "/target-role";
-        window.location.href = `/auth/verify-otp?email=${encodeURIComponent(r.email)}&next=${encodeURIComponent(nextPath)}`;
+        const nextPath = currentRole === "MANAGER" ? "/dashboard/manager/hub" : "/target-role";
+        const debugOtpQuery = r.debugOtp ? `&debugOtp=${encodeURIComponent(r.debugOtp)}` : "";
+        window.location.href = `/auth/verify-otp?email=${encodeURIComponent(r.email)}&next=${encodeURIComponent(nextPath)}${debugOtpQuery}`;
         return;
       }
       if (!("token" in r) || !r.token || !r.user) throw new Error("Registration succeeded but login payload missing.");
       setOrgAuthInStorage(r.token, r.user);
-      window.location.href = currentRole === "MANAGER" ? "/dashboard/manager" : "/target-role";
+      window.location.href = currentRole === "MANAGER" ? "/dashboard/manager/hub" : "/target-role";
     } catch (err: any) {
       setError(err?.message || "Registration failed");
     } finally {
