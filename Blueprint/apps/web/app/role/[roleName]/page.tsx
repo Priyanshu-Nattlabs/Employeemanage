@@ -815,11 +815,24 @@ function RolePageContent() {
     const email = String(auth?.user?.email || "").trim();
     setMockInterviewLaunching(true);
     try {
-      const ixUrl = buildInterviewXAiInterviewUrl({
-        prefillRole: roleName,
-        candidateEmail: email,
-        candidateName: fullName,
-      });
+      const ixUrl = new URL("http://localhost:3300/students/interview-preparation/technical");
+      if (roleName) {
+        ixUrl.searchParams.set("role", roleName);
+        ixUrl.searchParams.set("targetRole", roleName);
+      }
+      if (fullName) {
+        ixUrl.searchParams.set("candidateName", fullName);
+        ixUrl.searchParams.set("name", fullName);
+      }
+      if (email) {
+        ixUrl.searchParams.set("candidateEmail", email);
+        ixUrl.searchParams.set("email", email);
+      }
+      ixUrl.searchParams.set("interviewType", "technical");
+      ixUrl.searchParams.set("mode", "technical");
+      ixUrl.searchParams.set("autoStart", "1");
+      ixUrl.searchParams.set("start", "1");
+      ixUrl.searchParams.set("skipForm", "1");
       if (typeof window !== "undefined") window.location.assign(ixUrl);
     } finally {
       setTimeout(() => setMockInterviewLaunching(false), 700);

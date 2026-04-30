@@ -18,6 +18,7 @@ export function NavBar() {
 
   const [orgAuth, setOrgAuth] = useState<{ token: string; user: any | null }>({ token: "", user: null });
   const [mounted, setMounted] = useState(false);
+  const [authMenuOpen, setAuthMenuOpen] = useState(false);
 
   // Notifications (employee-side). For managers/HR/admin we skip polling entirely.
   const [notifs, setNotifs] = useState<RoleRecommendation[]>([]);
@@ -45,6 +46,10 @@ export function NavBar() {
   const isHR = Boolean(user && user.accountType === "EMPLOYEE" && user.currentRole === "HR");
   const isManagerOrHR = isManager || isHR;
   const isEmployee = Boolean(user && user.accountType === "EMPLOYEE" && !isManagerOrHR);
+
+  useEffect(() => {
+    setAuthMenuOpen(false);
+  }, [pathname, isLoggedIn]);
 
   // Poll inbox for employees only — they get the notification bell + popup.
   useEffect(() => {
@@ -134,7 +139,7 @@ export function NavBar() {
           href="/"
           style={{ display: "flex", alignItems: "center", textDecoration: "none", color: "#0f172a", gap: 8 }}
         >
-          <div style={{ fontWeight: 900, fontSize: 16, letterSpacing: "-0.02em" }}>Employee Portal</div>
+          <div style={{ fontWeight: 900, fontSize: 16, letterSpacing: "-0.02em" }}>Employee Development</div>
         </Link>
 
         <div style={{ flex: 1, minWidth: 0 }} />
@@ -215,13 +220,21 @@ export function NavBar() {
             </button>
           </div>
         ) : mounted ? (
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <Link href="/auth/employee/login" style={portalLoginStyle}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, position: "relative" }}>
+            <button type="button" style={portalLoginStyle} onClick={() => setAuthMenuOpen((v) => !v)}>
               Login / Signup
-            </Link>
-            <Link href="/auth/manager/login" style={portalCreateStyle}>
-              Manager/HR
-            </Link>
+            </button>
+            {authMenuOpen ? (
+              <div style={authMenuCard}>
+                <div style={{ fontSize: 12, fontWeight: 800, color: "#64748b", marginBottom: 8 }}>Choose login type</div>
+                <Link href="/auth/employee/login" style={authMenuItem}>
+                  Login as Employee
+                </Link>
+                <Link href="/auth/manager/login" style={authMenuItem}>
+                  Login as Manager / HR
+                </Link>
+              </div>
+            ) : null}
           </div>
         ) : null}
 
@@ -266,7 +279,8 @@ const portalLoginStyle: CSSProperties = {
   fontSize: 14,
   fontWeight: 800,
   lineHeight: "20px",
-  background: "#fff"
+  background: "#fff",
+  cursor: "pointer",
 };
 
 const portalCreateStyle: CSSProperties = {
@@ -278,6 +292,32 @@ const portalCreateStyle: CSSProperties = {
   fontSize: 14,
   fontWeight: 900,
   lineHeight: "20px"
+};
+
+const authMenuCard: CSSProperties = {
+  position: "absolute",
+  right: 0,
+  top: "calc(100% + 8px)",
+  width: 230,
+  background: "#fff",
+  border: "1px solid #e5e7eb",
+  borderRadius: 12,
+  boxShadow: "0 16px 34px -14px rgba(15,23,42,0.28)",
+  padding: 10,
+  zIndex: 100,
+};
+
+const authMenuItem: CSSProperties = {
+  display: "block",
+  textDecoration: "none",
+  color: "#0f172a",
+  border: "1px solid #e2e8f0",
+  borderRadius: 9,
+  padding: "8px 10px",
+  fontSize: 13,
+  fontWeight: 700,
+  marginTop: 6,
+  background: "#f8fafc",
 };
 
 const portalDashStyle: CSSProperties = {

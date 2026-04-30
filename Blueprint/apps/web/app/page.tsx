@@ -4,6 +4,7 @@ import Link from "next/link";
 import { getApiPrefix, publicAssetUrl } from "@/lib/apiBase";
 import { getOrgAuthFromStorage } from "@/lib/orgAuth";
 import { SiteFooter } from "@/app/components/SiteFooter";
+import { PublicHomePage } from "@/app/components/PublicHomePage";
 
 function normalizeSearch(s: string) {
   return s.toLowerCase().trim().replace(/\s+/g, " ");
@@ -92,6 +93,21 @@ export default function HomePage() {
   const [roles, setRoles] = useState<string[]>([]);
   const [search, setSearch] = useState("");
   const [resuming, setResuming] = useState(false);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+
+  useEffect(() => {
+    const refreshAuth = () => {
+      const auth = getOrgAuthFromStorage();
+      setIsAuthenticated(Boolean(auth?.token && auth?.user?.id));
+    };
+    refreshAuth();
+    window.addEventListener("jbv2-org-auth-changed", refreshAuth);
+    window.addEventListener("storage", refreshAuth);
+    return () => {
+      window.removeEventListener("jbv2-org-auth-changed", refreshAuth);
+      window.removeEventListener("storage", refreshAuth);
+    };
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -146,6 +162,10 @@ export default function HomePage() {
   const goToTargetNewRole = () => {
     window.location.href = "/target-role";
   };
+
+  if (!isAuthenticated) {
+    return <PublicHomePage />;
+  }
 
   return (
     <div
