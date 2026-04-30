@@ -33,6 +33,62 @@ function normalizeEmail(email: string): string {
   return (email || "").trim().toLowerCase();
 }
 
+/**
+ * Normalizes department names for resilient matching.
+ * Examples:
+ * - "IT" -> "it"
+ * - "Information Technology" -> "it"
+ * - "Developement" -> "development"
+ * - "Sales & Marketing" -> "salesmarketing"
+ */
+function normalizeDepartmentKey(raw: string): string {
+  const s = String(raw || "").trim().toLowerCase();
+  if (!s) return "";
+  const compact = s.replace(/[^a-z0-9]+/g, "");
+  // common aliases / misspellings
+  if (compact === "informationtechnology") return "it";
+  if (compact === "infotech") return "it";
+  if (compact === "developement") return "development";
+  if (compact === "softwaredevelopment") return "development";
+  if (compact === "engineering") return "development";
+  return compact;
+}
+
+function domainBucketForRoleName(roleName: string): string {
+  const n = " " + String(roleName || "").toLowerCase() + " ";
+  const has = (list: string[]) => list.some((k) => n.includes(k));
+  if (has(["developer", "engineer", "programmer", "software", "web", "mobile", "devops", "cloud", "data", "ml ", "ai ", "security", "network", "it ", "system", "database", "frontend", "backend", "fullstack"])) return "Technology";
+  if (has(["manager", "director", "head", "lead", "chief", "officer", "president", "vp ", "cto", "ceo", "cfo", "coo", "executive"])) return "Management";
+  if (has(["design", "ux", "ui ", "graphic", "creative", "visual", "artist", "animator", "illustrat"])) return "Design & Creative";
+  if (has(["finance", "account", "audit", "tax", "invest", "banking", "actuari", "financial analyst", "cfo"])) return "Finance & Accounting";
+  if (has(["sales", "marketing", "brand", "growth", "digital market", "seo", "advertis", "business development"])) return "Sales & Marketing";
+  if (has(["doctor", "nurse", "physician", "surgeon", "therapist", "pharmacist", "medical", "clinical", "health"])) return "Healthcare";
+  if (has(["teacher", "professor", "lecturer", "researcher", "scientist", "academic", "trainer", "instructor"])) return "Education & Research";
+  if (has(["operations", "logistics", "supply chain", "procurement", "warehouse", "quality", "production"])) return "Operations & Logistics";
+  if (has(["lawyer", "attorney", "legal", "compliance", "law ", "paralegal", "advocate"])) return "Legal & Compliance";
+  if (has(["hr ", "human resource", "recruiter", "talent", "people", "culture", "payroll"])) return "Human Resources";
+  if (has(["analyst", "analytics", "data scientist", "business intelligence", "bi ", "statistics", "quantitative"])) return "Analytics & Data";
+  return "All";
+}
+
+function isKnownDomainDepartment(rawDept: string): boolean {
+  const d = String(rawDept || "").trim();
+  if (!d) return false;
+  return [
+    "Technology",
+    "Management",
+    "Design & Creative",
+    "Finance & Accounting",
+    "Sales & Marketing",
+    "Healthcare",
+    "Education & Research",
+    "Operations & Logistics",
+    "Legal & Compliance",
+    "Human Resources",
+    "Analytics & Data",
+  ].includes(d);
+}
+
 function emailDomain(email: string): string {
   const at = normalizeEmail(email).split("@");
   return at.length === 2 ? at[1] : "";
@@ -1201,6 +1257,21 @@ export class OrgAuthService {
   }
 
   /**
+   * Public: department names for signup dropdowns.
+   * Returns [] when structure isn't configured.
+   */
+  async listPublicDepartments(companyDomain: string): Promise<string[]> {
+    const domain = String(companyDomain || "").trim().toLowerCase();
+    if (!domain) return [];
+    const structure = await this.orgStructureModel.findOne({ companyDomain: domain }).lean();
+    const list = Array.isArray((structure as any)?.departments) ? (structure as any).departments : [];
+    const names = list
+      .map((d: any) => String(d?.name || "").trim())
+      .filter(Boolean);
+    return Array.from(new Set(names)).sort((a, b) => a.localeCompare(b));
+  }
+
+  /**
    * Roles a manager can recommend to the given employee. Looks up the employee's
    * department, then returns roles tied to that department in the company's
    * org-structure document. Falls back to the global role list (intersected with
@@ -1230,7 +1301,9 @@ export class OrgAuthService {
     // Managers may only recommend within their own department; HR can recommend to any.
     if (input.managerRole === "MANAGER") {
       const mgrDept = String(input.managerDepartment || "").trim();
-      if (!mgrDept || !empDept || mgrDept.toLowerCase() !== empDept.toLowerCase()) {
+      const mgrKey = normalizeDepartmentKey(mgrDept);
+      const empKey = normalizeDepartmentKey(empDept);
+      if (!mgrKey || !empKey || mgrKey !== empKey) {
         throw new UnauthorizedException("Managers can only recommend roles to their own department");
       }
     }
@@ -1238,8 +1311,13 @@ export class OrgAuthService {
     const structure = await this.orgStructureModel.findOne({ companyDomain: domain }).lean();
     const all = (structure?.departments || []) as Array<{ name: string; roles: string[]; description?: string }>;
 
-    // Match the employee's department case-insensitively.
-    const match = all.find((d) => String(d.name || "").trim().toLowerCase() === empDept.toLowerCase());
+    // Role catalog scope:
+    // - Managers: recommend roles for their own department (the department they chose).
+    // - HR: recommend roles for the employee's department (can work across departments).
+    const targetDeptRaw =
+      input.managerRole === "MANAGER" ? String(input.managerDepartment || "").trim() : empDept;
+    const targetKey = normalizeDepartmentKey(targetDeptRaw);
+    const match = all.find((d) => normalizeDepartmentKey(String(d.name || "")) === targetKey);
 
     return {
       employee: {
@@ -1250,7 +1328,7 @@ export class OrgAuthService {
         designation: (employee as any).designation || null,
       },
       hasStructure: Boolean(structure),
-      department: match?.name || empDept || null,
+      department: match?.name || targetDeptRaw || null,
       roles: match?.roles || [],
       allDepartments: all,
     };
@@ -1285,24 +1363,44 @@ export class OrgAuthService {
 
     if (input.manager.role === "MANAGER") {
       const mgrDept = String(input.manager.department || "").trim();
-      if (!mgrDept || !empDept || mgrDept.toLowerCase() !== empDept.toLowerCase()) {
+      const mgrKey = normalizeDepartmentKey(mgrDept);
+      const empKey = normalizeDepartmentKey(empDept);
+      if (!mgrKey || !empKey || mgrKey !== empKey) {
         throw new UnauthorizedException("Managers can only recommend roles within their own department");
       }
     }
 
     // If the company has explicitly mapped roles for the employee's department,
-    // enforce that the suggested role lives in that mapping. When no mapping is
-    // defined for that department we accept any role so the manager isn't blocked.
+    // enforce that the suggested role lives in the correct mapping:
+    // - Managers: their own department mapping (department they chose)
+    // - HR: the employee's department mapping
+    // When no mapping is defined for that department we accept any role so the sender isn't blocked.
     const structure = await this.orgStructureModel.findOne({ companyDomain: domain }).lean();
     if (structure) {
+      const mappingDeptRaw =
+        input.manager.role === "MANAGER" ? String(input.manager.department || "").trim() : empDept;
       const match = (structure.departments || []).find(
-        (d: any) => String(d.name || "").trim().toLowerCase() === empDept.toLowerCase(),
+        (d: any) => normalizeDepartmentKey(String(d.name || "")) === normalizeDepartmentKey(mappingDeptRaw),
       );
       const mappedRoles: string[] = (match?.roles || []) as string[];
       if (mappedRoles.length > 0) {
         const ok = mappedRoles.some((r) => r.trim().toLowerCase() === role.toLowerCase());
         if (!ok) {
-          throw new BadRequestException(`Role "${role}" is not part of the ${empDept || "employee's"} department`);
+          throw new BadRequestException(
+            `Role "${role}" is not part of the ${match?.name || mappingDeptRaw || "selected"} department`,
+          );
+        }
+      }
+    }
+
+    // If org structure isn't configured for the manager's department but the department is a known domain
+    // bucket (Technology/Management/...), enforce that the role name matches that domain.
+    if (input.manager.role === "MANAGER") {
+      const dept = String(input.manager.department || "").trim();
+      if (isKnownDomainDepartment(dept)) {
+        const bucket = domainBucketForRoleName(role);
+        if (bucket !== dept) {
+          throw new BadRequestException(`Role "${role}" does not match manager department "${dept}"`);
         }
       }
     }

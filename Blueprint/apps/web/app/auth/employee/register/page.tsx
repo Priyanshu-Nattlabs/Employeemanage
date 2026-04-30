@@ -4,6 +4,20 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 import { orgRegisterEmployee, setOrgAuthInStorage, type OrgCurrentRole } from "@/lib/orgAuth";
 
+const DEPARTMENT_OPTIONS = [
+  "Technology",
+  "Management",
+  "Design & Creative",
+  "Finance & Accounting",
+  "Sales & Marketing",
+  "Healthcare",
+  "Education & Research",
+  "Operations & Logistics",
+  "Legal & Compliance",
+  "Human Resources",
+  "Analytics & Data",
+];
+
 function domainFromEmail(email: string) {
   const v = email.trim().toLowerCase();
   const at = v.indexOf("@");
@@ -21,6 +35,8 @@ export default function EmployeeRegisterPage() {
   const [companyName, setCompanyName] = useState("");
   const [designation, setDesignation] = useState("");
   const [department, setDepartment] = useState("");
+  const [deptMode, setDeptMode] = useState<"PICK" | "OTHER">("PICK");
+  const [deptOther, setDeptOther] = useState("");
   const [employeeId, setEmployeeId] = useState("");
   const [currentRole, setCurrentRole] = useState<OrgCurrentRole>("EMPLOYEE");
   const [mobileNo, setMobileNo] = useState("");
@@ -28,6 +44,11 @@ export default function EmployeeRegisterPage() {
 
   const inferredDomain = useMemo(() => domainFromEmail(email), [email]);
   const inferredMgrDomain = useMemo(() => domainFromEmail(reportingManagerEmail), [reportingManagerEmail]);
+
+  const effectiveDepartment = useMemo(() => {
+    if (deptMode === "OTHER") return deptOther.trim();
+    return department.trim();
+  }, [deptMode, deptOther, department]);
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -37,13 +58,14 @@ export default function EmployeeRegisterPage() {
       if (!inferredDomain) throw new Error("Please enter a valid company email");
       if (!reportingManagerEmail.trim()) throw new Error("Reporting manager email is required");
       if (inferredMgrDomain && inferredMgrDomain !== inferredDomain) throw new Error("Reporting manager email must be in the same company domain");
+      if (!effectiveDepartment) throw new Error("Department is required");
 
       const r = await orgRegisterEmployee({
         email,
         password,
         fullName,
         designation,
-        department,
+        department: effectiveDepartment,
         companyName,
         employeeId,
         currentRole,
@@ -93,7 +115,43 @@ export default function EmployeeRegisterPage() {
           <input value={designation} onChange={(e) => setDesignation(e.target.value)} required style={inputStyle} placeholder="e.g. Software Engineer" />
         </Field>
         <Field label="Department">
-          <input value={department} onChange={(e) => setDepartment(e.target.value)} required style={inputStyle} placeholder="e.g. Engineering" />
+          <div style={{ display: "grid", gap: 8 }}>
+            <select
+              value={deptMode === "OTHER" ? "__OTHER__" : (department || "")}
+              onChange={(e) => {
+                const v = e.target.value;
+                if (v === "__OTHER__") {
+                  setDeptMode("OTHER");
+                  setDepartment("");
+                } else {
+                  setDeptMode("PICK");
+                  setDepartment(v);
+                }
+              }}
+              required
+              style={inputStyle}
+            >
+              <option value="" disabled>Select department</option>
+              {DEPARTMENT_OPTIONS.map((d) => (
+                <option key={d} value={d}>
+                  {d}
+                </option>
+              ))}
+              <option value="__OTHER__">Other (type…)</option>
+            </select>
+            {deptMode === "OTHER" ? (
+              <input
+                value={deptOther}
+                onChange={(e) => setDeptOther(e.target.value)}
+                required
+                style={inputStyle}
+                placeholder="Type your department"
+              />
+            ) : null}
+            <div style={hintStyle}>
+              Choose from the list, or select <b>Other</b> to type a custom department.
+            </div>
+          </div>
         </Field>
         <Field label="Employee ID">
           <input value={employeeId} onChange={(e) => setEmployeeId(e.target.value)} required style={inputStyle} placeholder="Employee ID" />

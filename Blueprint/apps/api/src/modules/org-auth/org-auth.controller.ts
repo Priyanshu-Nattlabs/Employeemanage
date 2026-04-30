@@ -226,6 +226,19 @@ export class OrgAuthController {
     return this.service.getOrgStructure(domain);
   }
 
+  /**
+   * Public: list department names for a company domain.
+   * Used to populate signup dropdowns before login.
+   *
+   * NOTE: intentionally returns department names only (no roles).
+   */
+  @Get("public/departments")
+  async publicDepartments(@Query("companyDomain") companyDomain?: string) {
+    const domain = String(companyDomain || "").trim().toLowerCase();
+    if (!domain) throw new BadRequestException("Missing companyDomain");
+    return this.service.listPublicDepartments(domain);
+  }
+
   /** Manager / HR: upsert the company's org structure. */
   @Post("org-structure")
   async saveOrgStructure(@Headers("authorization") authorization?: string, @Body() body?: any) {
