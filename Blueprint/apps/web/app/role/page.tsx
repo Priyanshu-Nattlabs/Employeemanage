@@ -3,7 +3,7 @@ import { Suspense, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { getApiPrefix } from "@/lib/apiBase";
-import { getOrgAuthFromStorage, orgGetOrgStructure } from "@/lib/orgAuth";
+import { getOrgAuthFromStorage, orgListRecommendableRoles } from "@/lib/orgAuth";
 
 const API = getApiPrefix();
 
@@ -54,9 +54,19 @@ function RolesPageContent() {
   const [loading, setLoading] = useState(true);
   const [activeCategory, setActiveCategory] = useState("All");
 
-  // Department-scoped role list resolved from the company's org structure (when present).
-  const [deptRoles, setDeptRoles] = useState<string[] | null>(null);
-  const [deptResolved, setDeptResolved] = useState(false);
+  // Recommend-mode: department-scoped role list from API (enforces manager/HR scope).
+  const [recommendableRoles, setRecommendableRoles] = useState<string[] | null>(null);
+  const [recommendDeptLabel, setRecommendDeptLabel] = useState<string>("");
+  const [recoResolved, setRecoResolved] = useState(false);
+
+  const recommendDeptEffective = useMemo(() => {
+    return String(recommendDeptLabel || recommendDept || "").trim();
+  }, [recommendDeptLabel, recommendDept]);
+
+  const recommendDeptIsKnownDomain = useMemo(() => {
+    if (!recommendDeptEffective) return false;
+    return ROLE_CATEGORIES.slice(1).some((c) => c.label === recommendDeptEffective);
+  }, [recommendDeptEffective]);
 
   // Build the querystring suffix that role cards need to keep recommend-mode alive.
   const recommendQuery = useMemo(() => {
@@ -75,54 +85,73 @@ function RolesPageContent() {
       .then(d => { setRoles(d || []); setLoading(false); });
   }, []);
 
-  // When the manager reaches this page in recommend mode, look up the company's
-  // org structure and pull out the role list for the employee's (or manager's)
-  // department. If nothing is mapped, we fall back to showing all roles below.
+  // When the manager reaches this page in recommend mode, ask the API for the
+  // department-scoped recommendable roles (based on org structure + permissions).
   useEffect(() => {
     if (!isRecommendMode) {
-      setDeptRoles(null);
-      setDeptResolved(true);
+      setRecommendableRoles(null);
+      setRecommendDeptLabel("");
+      setRecoResolved(true);
       return;
     }
     const auth = getOrgAuthFromStorage();
     if (!auth?.token) {
-      setDeptRoles(null);
-      setDeptResolved(true);
+      setRecommendableRoles(null);
+      setRecommendDeptLabel("");
+      setRecoResolved(true);
       return;
     }
     let cancelled = false;
     (async () => {
       try {
-        const structure = await orgGetOrgStructure(auth.token);
         if (cancelled) return;
-        const targetDept = (recommendDept || (auth.user as any)?.department || "").trim();
-        if (!targetDept || !structure || !Array.isArray(structure.departments)) {
-          setDeptRoles(null);
-        } else {
-          const match = structure.departments.find(
-            (d) => String(d.name || "").trim().toLowerCase() === targetDept.toLowerCase(),
-          );
-          const list = (match?.roles || []).filter(Boolean);
-          setDeptRoles(list.length > 0 ? list : null);
-        }
+        const resp = await orgListRecommendableRoles(auth.token, recommendFor);
+        if (cancelled) return;
+        const list = Array.isArray(resp?.roles) ? resp.roles.filter(Boolean) : [];
+        setRecommendableRoles(list.length > 0 ? list : null);
+        setRecommendDeptLabel(String(resp?.department || resp?.employee?.department || recommendDept || "").trim());
       } catch {
-        if (!cancelled) setDeptRoles(null);
+        if (!cancelled) {
+          setRecommendableRoles(null);
+          setRecommendDeptLabel(String(recommendDept || "").trim());
+        }
       } finally {
-        if (!cancelled) setDeptResolved(true);
+        if (!cancelled) setRecoResolved(true);
       }
     })();
     return () => { cancelled = true; };
-  }, [isRecommendMode, recommendDept]);
+  }, [isRecommendMode, recommendFor, recommendDept]);
 
-  // When recommend mode is on, narrow the visible role pool to the department's roles
-  // (if mapped). Otherwise show every role in the catalog so the manager isn't blocked.
-  const recommendableRoles = useMemo(() => {
-    if (!isRecommendMode || !deptRoles || deptRoles.length === 0) return null;
-    const lower = new Set(deptRoles.map((r) => r.toLowerCase()));
-    return roles.filter((r) => lower.has(r.toLowerCase()));
-  }, [isRecommendMode, deptRoles, roles]);
+  // Fallback behavior:
+  // - If org-structure mapping exists, we use that list (recommendableRoles)
+  // - If mapping is missing but the manager dept is one of our known "domain" buckets
+  //   (Technology, Management, etc.), we filter roles by that domain category
+  // - Otherwise, show all roles (keeps "Other" departments usable)
+  const domainDerivedRoles = useMemo(() => {
+    if (!isRecommendMode) return null;
+    if (recommendableRoles && recommendableRoles.length > 0) return null;
+    if (!recoResolved) return null;
+    if (!recommendDeptIsKnownDomain) return null;
+    return roles.filter((r) => getRoleCategory(r) === recommendDeptEffective);
+  }, [isRecommendMode, recommendableRoles, recoResolved, recommendDeptIsKnownDomain, recommendDeptEffective, roles]);
 
-  const visibleRoles = recommendableRoles ?? roles;
+  // When recommend mode is on, narrow the visible role pool.
+  const visibleRoles = useMemo(() => {
+    if (!isRecommendMode) return roles;
+    if (recommendableRoles && recommendableRoles.length > 0) {
+      const lower = new Set(recommendableRoles.map((r) => r.toLowerCase()));
+      return roles.filter((r) => lower.has(r.toLowerCase()));
+    }
+    if (domainDerivedRoles) return domainDerivedRoles;
+    return roles;
+  }, [isRecommendMode, recommendableRoles, roles, domainDerivedRoles]);
+
+  useEffect(() => {
+    if (!isRecommendMode) return;
+    if (!recommendDeptIsKnownDomain) return;
+    // Default to the manager's domain category on entry; user can still switch.
+    setActiveCategory((cur) => (cur === "All" ? recommendDeptEffective : cur));
+  }, [isRecommendMode, recommendDeptIsKnownDomain, recommendDeptEffective]);
 
   const categoryCounts = useMemo(() => {
     const counts: Record<string, number> = { All: visibleRoles.length };
@@ -267,12 +296,15 @@ function RolesPageContent() {
                 {recommendName ? <>Pick a role for <span style={{ color: "#7c3aed" }}>{recommendName}</span></> : "Pick a role to recommend"}
               </div>
               <div style={{ fontSize: 12, color: "#475569", marginTop: 2 }}>
-                {recommendableRoles && recommendableRoles.length > 0 && recommendDept
-                  ? <>Showing <b>{recommendableRoles.length}</b> role{recommendableRoles.length === 1 ? "" : "s"} mapped to <b>{recommendDept}</b>. Click a role to view its job description, then send the recommendation.</>
-                  : deptResolved && recommendDept
-                    ? <>No roles are mapped to <b>{recommendDept}</b> yet — showing all roles. Click any role to open its JD and recommend.</>
-                    : <>Loading recommendable roles…</>
-                }
+                {isRecommendMode && recommendableRoles && recommendableRoles.length > 0 ? (
+                  <>Showing <b>{recommendableRoles.length}</b> role{recommendableRoles.length === 1 ? "" : "s"}{recommendDeptEffective ? <> for <b>{recommendDeptEffective}</b></> : null}. Click a role to view its job description, then send the recommendation.</>
+                ) : recoResolved && recommendDeptEffective && recommendDeptIsKnownDomain ? (
+                  <>No explicit role mapping found for <b>{recommendDeptEffective}</b> yet — showing only <b>{recommendDeptEffective}</b> domain roles. Click a role to open its JD and recommend.</>
+                ) : recoResolved && recommendDeptEffective ? (
+                  <>No role mapping found for <b>{recommendDeptEffective}</b> — showing all roles. Click any role to open its JD and recommend.</>
+                ) : (
+                  <>Loading recommendable roles…</>
+                )}
               </div>
             </div>
             <button

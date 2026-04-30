@@ -307,6 +307,12 @@ export async function orgGetOrgStructure(token: string) {
   });
 }
 
+export async function orgListPublicDepartments(companyDomain: string) {
+  return apiJson<string[]>(
+    `/api/org-auth/public/departments?companyDomain=${encodeURIComponent(companyDomain)}`,
+  );
+}
+
 export async function orgUpsertOrgStructure(token: string, departments: OrgDepartmentSection[]) {
   return apiJson<OrgStructure>(`/api/org-auth/org-structure`, {
     method: "POST",
