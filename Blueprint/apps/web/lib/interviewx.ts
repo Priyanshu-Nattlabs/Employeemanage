@@ -1,10 +1,6 @@
 /**
- * InterviewX deep links used by Blueprint Manager UI.
- *
- * - Preferred (local/dev + current integration): NEXT_PUBLIC_INTERVIEWX_ORIGIN (e.g. http://localhost:3300)
- * - Legacy hosted deep-link (kept for compatibility): NEXT_PUBLIC_INTERVIEWX_AI_INTERVIEW_URL / NEXT_PUBLIC_INTERVIEWX_URL
+ * InterviewX deep links used by Blueprint UI.
  */
-
 export type BuildInterviewXUrlInput = {
   prefillRole?: string;
   candidateName?: string;
@@ -14,75 +10,35 @@ export type BuildInterviewXUrlInput = {
 function clean(v?: string) {
   return String(v || "").trim();
 }
-<<<<<<< HEAD
 
-export function buildInterviewXAiInterviewUrl(input: BuildInterviewXUrlInput): string {
-  // Force local InterviewX route for direct technical interview start.
-  const base = "http://localhost:3300/students/interview-preparation/technical";
-
-  const url = new URL(base);
-  const role = clean(input.prefillRole);
-  const candidateName = clean(input.candidateName);
-  const candidateEmail = clean(input.candidateEmail);
-
-  if (role) {
-    url.searchParams.set("role", role);
-    url.searchParams.set("targetRole", role);
-  }
-  if (candidateName) {
-    url.searchParams.set("candidateName", candidateName);
-    url.searchParams.set("name", candidateName);
-  }
-  if (candidateEmail) {
-    url.searchParams.set("candidateEmail", candidateEmail);
-    url.searchParams.set("email", candidateEmail);
-  }
-
-  // Force technical interview and skip pre-start form where supported.
-  url.searchParams.set("interviewType", "technical");
-  url.searchParams.set("mode", "technical");
-  url.searchParams.set("autoStart", "1");
-  url.searchParams.set("start", "1");
-  url.searchParams.set("skipForm", "1");
-
-  return url.toString();
-=======
 function interviewXBase(): string {
   const raw = clean(
-    typeof process !== "undefined" && process.env.NEXT_PUBLIC_INTERVIEWX_ORIGIN ? process.env.NEXT_PUBLIC_INTERVIEWX_ORIGIN : "",
+    typeof process !== "undefined" && process.env.NEXT_PUBLIC_INTERVIEWX_ORIGIN ? process.env.NEXT_PUBLIC_INTERVIEWX_ORIGIN : ""
   ).replace(/\/$/, "");
   const origin = raw || "http://localhost:3300";
   return origin.endsWith("/") ? origin.slice(0, -1) : origin;
 }
 
 /**
- * Deep-link to InterviewX AI interview flow.
- *
- * If NEXT_PUBLIC_INTERVIEWX_AI_INTERVIEW_URL (or NEXT_PUBLIC_INTERVIEWX_URL) is set, we build the legacy hosted URL with query params.
- * Otherwise, we build the current InterviewX industry route URL using NEXT_PUBLIC_INTERVIEWX_ORIGIN.
+ * Generic InterviewX deep-link builder.
+ * - If NEXT_PUBLIC_INTERVIEWX_AI_INTERVIEW_URL / NEXT_PUBLIC_INTERVIEWX_URL is set, use legacy hosted URL.
+ * - Otherwise use local InterviewX origin routes.
  */
 export function buildInterviewXAiInterviewUrl(
   input:
     | (BuildInterviewXUrlInput & {
         department?: string;
-        /** Blueprint employee id (for traceability in URL; InterviewX may display or log). */
         employeeId?: string;
-        /**
-         * When true, InterviewX creates the interview + candidate in one step (no form).
-         * Forces a new interview for the prep role; ignores NEXT_PUBLIC_INTERVIEWX_INTERVIEW_ID.
-         */
         autoCreate?: boolean;
-        /** Optional prep summary for the interview record (0–100). */
         prepAvgPct?: number | null;
-        /** Optional latest skill test score for context. */
         latestTestScore?: number | null;
       })
-    | BuildInterviewXUrlInput,
+    | BuildInterviewXUrlInput
 ): string {
   const baseFromEnv =
-    clean(process.env.NEXT_PUBLIC_INTERVIEWX_AI_INTERVIEW_URL) || clean(process.env.NEXT_PUBLIC_INTERVIEWX_URL);
+    clean(typeof process !== "undefined" ? process.env.NEXT_PUBLIC_INTERVIEWX_AI_INTERVIEW_URL : "") ||
+    clean(typeof process !== "undefined" ? process.env.NEXT_PUBLIC_INTERVIEWX_URL : "");
 
-  // Legacy hosted builder (restored snippet behavior)
   if (baseFromEnv) {
     const url = new URL(baseFromEnv);
     const role = clean((input as any)?.prefillRole);
@@ -101,8 +57,6 @@ export function buildInterviewXAiInterviewUrl(
       url.searchParams.set("candidateEmail", candidateEmail);
       url.searchParams.set("email", candidateEmail);
     }
-
-    // Force technical interview and skip pre-start form where supported.
     url.searchParams.set("interviewType", "technical");
     url.searchParams.set("mode", "technical");
     url.searchParams.set("autoStart", "1");
@@ -111,7 +65,6 @@ export function buildInterviewXAiInterviewUrl(
     return url.toString();
   }
 
-  // Current (origin-based) builder
   const base = interviewXBase();
   const autoCreate = Boolean((input as any)?.autoCreate);
   const interviewId =
@@ -184,5 +137,4 @@ export function buildInterviewXCandidatesUrl(interviewConfigId: string): string 
   const id = clean(interviewConfigId);
   if (!id) return `${base}/industry/ai-interview`;
   return `${base}/industry/ai-interview/${encodeURIComponent(id)}/candidates`;
->>>>>>> 81960bc84304c8bcbc87271f23b65fb6fae1e68b
 }
