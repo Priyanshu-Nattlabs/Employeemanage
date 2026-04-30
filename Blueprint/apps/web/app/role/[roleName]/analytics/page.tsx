@@ -332,6 +332,8 @@ export default function AnalyticsPage() {
   const inManagerTrack = pathname.startsWith("/dashboard/manager/track");
   const roleName = decodeURIComponent(params.roleName);
 
+  const [me, setMe] = useState<any>(null);
+  const [isViewingOther, setIsViewingOther] = useState(false);
   const [userId,      setUserId]      = useState("demo-student-1");
   const [viewingLabel, setViewingLabel] = useState<string>("");
   const [analytics,   setAnalytics]   = useState<any>(null);
@@ -345,10 +347,12 @@ export default function AnalyticsPage() {
   useEffect(() => {
     const auth = getOrgAuthFromStorage();
     const me = auth?.user || null;
+    setMe(me);
     const meId = me?.id || "demo-student-1";
 
     const requested = (searchParams?.get("studentId") || "").trim();
     const isOther = !!requested && requested !== meId;
+    setIsViewingOther(isOther);
     const canViewOther = me?.accountType === "ADMIN" || me?.currentRole === "MANAGER" || me?.currentRole === "HR";
 
     const uid = isOther
@@ -424,6 +428,8 @@ export default function AnalyticsPage() {
 
     return () => { cancelled = true; };
   }, [roleName, searchParams]);
+
+  const canTakeTests = !inManagerTrack && me?.currentRole === "EMPLOYEE" && !isViewingOther;
 
   const skills = useMemo(() => role?.skillRequirements || [], [role]);
 
@@ -714,16 +720,20 @@ export default function AnalyticsPage() {
                             </span>
                           )}
                         </div>
-                        <Link href={`/role/${encodeURIComponent(roleName)}/test/${encodeURIComponent(skillName)}`} style={{ textDecoration: "none" }}>
-                          <button style={{
-                            padding: "5px 14px", borderRadius: 8, border: "none", cursor: "pointer",
-                            fontWeight: 700, fontSize: 12,
-                            background: latestPassed ? "#dcfce7" : "#fee2e2",
-                            color:      latestPassed ? "#15803d" : "#b91c1c",
-                          }}>
-                            {latestPassed ? "✓ Retake" : "🔄 Retake Test"}
-                          </button>
-                        </Link>
+                        {canTakeTests ? (
+                          <Link href={`/role/${encodeURIComponent(roleName)}/test/${encodeURIComponent(skillName)}`} style={{ textDecoration: "none" }}>
+                            <button style={{
+                              padding: "5px 14px", borderRadius: 8, border: "none", cursor: "pointer",
+                              fontWeight: 700, fontSize: 12,
+                              background: latestPassed ? "#dcfce7" : "#fee2e2",
+                              color:      latestPassed ? "#15803d" : "#b91c1c",
+                            }}>
+                              {latestPassed ? "✓ Retake" : "🔄 Retake Test"}
+                            </button>
+                          </Link>
+                        ) : (
+                          <span style={{ fontSize: 12, fontWeight: 800, color: "#64748b" }}>Tests: employee only</span>
+                        )}
                       </div>
 
                       {/* Each attempt row */}
@@ -850,11 +860,42 @@ export default function AnalyticsPage() {
                       {typeof score==="number" ? `${score}%` : "—"}
                     </td>
                     <td style={{ padding:"14px 16px" }}>
-                      <Link href={`/role/${encodeURIComponent(roleName)}/test/${encodeURIComponent(s.skillName)}`} style={{ textDecoration:"none" }}>
-                        <button style={{ padding:"5px 12px", borderRadius:7, background:"#ede9fe", color:"#5b21b6", border:"none", cursor:"pointer", fontWeight:700, fontSize:12 }}>
-                          🧠 Test
-                        </button>
-                      </Link>
+                      {canTakeTests ? (
+                        typeof score === "number" ? (
+                          <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+                            <span
+                              title={score >= 80 ? "Passed" : "Failed"}
+                              style={{
+                                display: "inline-flex",
+                                alignItems: "center",
+                                gap: 6,
+                                padding: "5px 10px",
+                                borderRadius: 999,
+                                fontSize: 12,
+                                fontWeight: 900,
+                                background: score >= 80 ? "#dcfce7" : "#fee2e2",
+                                color: score >= 80 ? "#15803d" : "#b91c1c",
+                                border: `1px solid ${score >= 80 ? "#bbf7d0" : "#fecaca"}`,
+                              }}
+                            >
+                              {score}% · {score >= 80 ? "Passed" : "Failed"}
+                            </span>
+                            <Link href={`/role/${encodeURIComponent(roleName)}/test/${encodeURIComponent(s.skillName)}`} style={{ textDecoration:"none" }}>
+                              <button style={{ padding:"5px 12px", borderRadius:7, background:"#f1f5f9", color:"#0f172a", border:"1px solid #e2e8f0", cursor:"pointer", fontWeight:800, fontSize:12 }}>
+                                🔄 Retake
+                              </button>
+                            </Link>
+                          </div>
+                        ) : (
+                          <Link href={`/role/${encodeURIComponent(roleName)}/test/${encodeURIComponent(s.skillName)}`} style={{ textDecoration:"none" }}>
+                            <button style={{ padding:"5px 12px", borderRadius:7, background:"#ede9fe", color:"#5b21b6", border:"none", cursor:"pointer", fontWeight:700, fontSize:12 }}>
+                              🧠 Take test
+                            </button>
+                          </Link>
+                        )
+                      ) : (
+                        <span style={{ fontSize: 12, fontWeight: 800, color: "#94a3b8" }}>Blocked</span>
+                      )}
                     </td>
                   </tr>
                 );
