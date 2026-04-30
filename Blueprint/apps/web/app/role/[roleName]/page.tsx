@@ -419,6 +419,7 @@ function RolePageContent() {
   };
 
   const [mounted,         setMounted]         = useState(false);
+  const [viewerRole,      setViewerRole]      = useState<string>("");
   const [userId,          setUserId]          = useState("demo-student-1");
   const [profileRemainingMonths, setProfileRemainingMonths] = useState<number | null>(null);
   const [data,            setData]            = useState<any>(null);
@@ -444,6 +445,10 @@ function RolePageContent() {
   const [proficiencyDelta, setProficiencyDelta] = useState<Array<{ skillName: string; increasePct: number; reason?: string; previousSkill?: string }>>([]);
   /** Base role doc (JD + skills) when chart snapshot omits them */
   const [baseRole,        setBaseRole]        = useState<any>(null);
+
+  // Only employees should be able to open/attempt tests. Managers/HR may view this page via links,
+  // and can recommend roles, but should not see test actions.
+  const canTakeTests = viewerRole === "EMPLOYEE" && !isRecommendMode;
 
   /* ── chart customization modal ── */
   const [showCustomize,      setShowCustomize]      = useState(false);
@@ -533,7 +538,9 @@ function RolePageContent() {
   };
 
   useEffect(() => {
-    const uid = getOrgAuthFromStorage()?.user?.id || "demo-student-1";
+    const authUser = getOrgAuthFromStorage()?.user || null;
+    setViewerRole(String(authUser?.currentRole || ""));
+    const uid = authUser?.id || "demo-student-1";
     setUserId(uid);
 
     // Initial calculation from localStorage to avoid extra fetch if possible,
@@ -1569,11 +1576,20 @@ function RolePageContent() {
                   <p style={{ margin: "0 0 8px", fontSize: 12, color: "#1e3a8a", fontWeight: 700 }}>
                     Included skills: {testQueueSkills.join(", ")}
                   </p>
-                  <Link href={`/role/${enc(roleName)}/test/known-skills`} style={{ textDecoration: "none" }}>
-                    <div style={{ border: "1px solid #93c5fd", borderRadius: 8, padding: "9px 10px", color: "#1e3a8a", fontWeight: 800, background: "white", textAlign: "center" }}>
-                      {knownSkillsTestSubmitted ? "Retake Combined Test" : "Take Combined Test"}
+                  {canTakeTests ? (
+                    <Link href={`/role/${enc(roleName)}/test/known-skills`} style={{ textDecoration: "none" }}>
+                      <div style={{ border: "1px solid #93c5fd", borderRadius: 8, padding: "9px 10px", color: "#1e3a8a", fontWeight: 800, background: "white", textAlign: "center" }}>
+                        {knownSkillsTestSubmitted ? "Retake Combined Test" : "Take Combined Test"}
+                      </div>
+                    </Link>
+                  ) : (
+                    <div
+                      title="Only employees can take tests"
+                      style={{ border: "1px solid #e2e8f0", borderRadius: 8, padding: "9px 10px", color: "#94a3b8", fontWeight: 800, background: "#f8fafc", textAlign: "center" }}
+                    >
+                      🔒 Test blocked (employee only)
                     </div>
-                  </Link>
+                  )}
                 </div>
               </div>
             )}
@@ -2057,20 +2073,34 @@ function RolePageContent() {
                         <td style={{ padding:"8px 10px", textAlign:"center", verticalAlign:"middle" }}>
                           <div style={{ display:"flex", flexDirection:"column", gap:4 }}>
                             {prep?.isActive ? (
-                              <Link href={`/role/${enc(roleName)}/test/${enc(task.name)}`} style={{ textDecoration:"none" }}>
+                              canTakeTests ? (
+                                <Link href={`/role/${enc(roleName)}/test/${enc(task.name)}`} style={{ textDecoration:"none" }}>
+                                  <button
+                                    style={{
+                                      width:"100%", fontSize:11, padding:"6px 0",
+                                      background: isDone ? "#ECFDF5" : "#2563EB",
+                                      color: isDone ? "#065F46" : "white",
+                                      border: isDone ? "1px solid #D1FAE5" : "none",
+                                      borderRadius:6, fontWeight:700, cursor:"pointer",
+                                      display:"flex", alignItems:"center", justifyContent:"center", gap:4,
+                                    }}
+                                  >
+                                    {isDone
+                                      ? (typeof (prep?.skillProgress?.[task.name]?.score) === "number"
+                                          ? `🔄 Retake · ${prep.skillProgress[task.name].score}%`
+                                          : "🔄 Retake")
+                                      : "🧠 Take Test"}
+                                  </button>
+                                </Link>
+                              ) : (
                                 <button
-                                  style={{
-                                    width:"100%", fontSize:11, padding:"6px 0",
-                                    background: isDone ? "#ECFDF5" : "#2563EB",
-                                    color: isDone ? "#065F46" : "white",
-                                    border: isDone ? "1px solid #D1FAE5" : "none",
-                                    borderRadius:6, fontWeight:700, cursor:"pointer",
-                                    display:"flex", alignItems:"center", justifyContent:"center", gap:4,
-                                  }}
+                                  disabled
+                                  title="Only employees can take tests"
+                                  style={{ background:"#F1F5F9", color:"#94a3b8", border:"none", borderRadius:6, width:"100%", fontSize:11, padding:"6px 0", opacity:.85, cursor:"not-allowed", display:"flex", alignItems:"center", justifyContent:"center" }}
                                 >
-                                  {isDone ? "🔄 Retake" : "🧠 Take Test"}
+                                  🔒 Blocked
                                 </button>
-                              </Link>
+                              )
                             ) : (
                               <button
                                 disabled
@@ -2187,17 +2217,29 @@ function RolePageContent() {
                         );
                       })()}
                       {prep?.isActive ? (
-                        <Link href={`/role/${enc(roleName)}/test/${enc(s.skillName)}`} style={{ textDecoration:"none" }} onClick={(e)=>e.stopPropagation()}>
-                          <button style={{
-                            background: isDone ? "#ECFDF5" : "#2563EB",
-                            color: isDone ? "#065F46" : "white",
-                            border: isDone ? "1px solid #D1FAE5" : "none",
-                            borderRadius:8, fontWeight:700, fontSize:11, cursor:"pointer",
-                            padding:"8px 14px", display:"flex", alignItems:"center", gap:4,
-                          }}>
-                            {isDone ? "🔄 Retake" : "🧠 Take Test"}
+                        canTakeTests ? (
+                          <Link href={`/role/${enc(roleName)}/test/${enc(s.skillName)}`} style={{ textDecoration:"none" }} onClick={(e)=>e.stopPropagation()}>
+                            <button style={{
+                              background: isDone ? "#ECFDF5" : "#2563EB",
+                              color: isDone ? "#065F46" : "white",
+                              border: isDone ? "1px solid #D1FAE5" : "none",
+                              borderRadius:8, fontWeight:700, fontSize:11, cursor:"pointer",
+                              padding:"8px 14px", display:"flex", alignItems:"center", gap:4,
+                            }}>
+                              {isDone
+                                ? (typeof score === "number" ? `🔄 Retake · ${score}%` : "🔄 Retake")
+                                : "🧠 Take Test"}
+                            </button>
+                          </Link>
+                        ) : (
+                          <button
+                            disabled
+                            title="Only employees can take tests"
+                            style={{ background:"#F1F5F9", color:"#94a3b8", border:"none", borderRadius:8, fontSize:11, padding:"8px 12px", opacity:.85, cursor:"not-allowed" }}
+                          >
+                            🔒 Blocked
                           </button>
-                        </Link>
+                        )
                       ) : (
                         <button disabled title="Start Preparation first" style={{ background:"#F1F5F9", color:"#94a3b8", border:"none", borderRadius:8, fontSize:11, padding:"8px 12px", opacity:.5, cursor:"not-allowed" }}>
                           🔒 Start Prep
