@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Suspense, useEffect, useMemo, useRef, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { getOrgAuthFromStorage, orgListEmployeesManagerSummary } from "@/lib/orgAuth";
 import { SiteFooter } from "@/app/components/SiteFooter";
@@ -75,7 +75,7 @@ function BarGraph({
   accent,
   maxValue,
 }: {
-  bars: Array<{ id: string; label: string; value: number }>;
+  bars: Array<{ id: string; label: string; value: number; pending?: boolean }>;
   accent: string;
   maxValue?: number;
 }) {
@@ -173,19 +173,25 @@ function BarGraph({
           <div style={{ display: "flex", alignItems: "flex-end", gap: 16, height: 180, padding: "8px 8px 0 12px" }}>
             {bars.map((b, idx) => {
               const pct = Math.max(0, Math.min(100, (b.value / max) * 100));
-              const color = palette[idx % palette.length] || accent;
+              const pending = Boolean(b.pending);
+              const color = pending ? "#94a3b8" : palette[idx % palette.length] || accent;
               const cap = darken(color, -40);
               return (
                 <div key={b.id} style={{ flex: 1, minWidth: 0, display: "grid", gap: 10 }}>
                   <div style={{ position: "relative", height: 180, display: "flex", alignItems: "flex-end" }}>
                     <div
-                      title={`${b.label}: ${b.value}`}
+                      title={pending ? `${b.label}: pending` : `${b.label}: ${b.value}`}
                       style={{
                         width: "100%",
                         height: `${pct}%`,
+                        minHeight: pending ? 4 : undefined,
                         borderRadius: 14,
-                        background: `linear-gradient(180deg, ${cap}, ${color} 40%, ${color}cc)`,
-                        boxShadow: `0 14px 28px rgba(15,23,42,0.18), 0 2px 0 rgba(255,255,255,0.55) inset`,
+                        background: pending
+                          ? "linear-gradient(180deg, #cbd5e1, #e2e8f0)"
+                          : `linear-gradient(180deg, ${cap}, ${color} 40%, ${color}cc)`,
+                        boxShadow: pending
+                          ? "inset 0 0 0 1px rgba(148,163,184,0.6)"
+                          : `0 14px 28px rgba(15,23,42,0.18), 0 2px 0 rgba(255,255,255,0.55) inset`,
                         border: "1px solid rgba(15,23,42,0.10)",
                       }}
                     />
@@ -206,7 +212,7 @@ function BarGraph({
                         whiteSpace: "nowrap",
                       }}
                     >
-                      {b.value}
+                      {pending ? "—" : b.value}
                     </div>
                   </div>
                   <div
@@ -273,6 +279,7 @@ function ScheduleInterviewsInner() {
   >({});
   const [openCredsLoadingId, setOpenCredsLoadingId] = useState<string>("");
   const [openReportLoadingId, setOpenReportLoadingId] = useState<string>("");
+  const silentReportInflightRef = useRef<Set<string>>(new Set());
   const [reportModal, setReportModal] = useState<{
     open: boolean;
     employeeLabel: string;
@@ -365,16 +372,26 @@ function ScheduleInterviewsInner() {
       .map((r) => {
         const e = r.employee || {};
         const id = String(e._id || e.id || "");
+        if (!id) return null;
         const label = (e.fullName || e.email || "Employee").slice(0, 22);
+        const creds = credsByEmployeeId[id];
+        const hasInterview = Boolean(creds?.interviewConfigId);
         const report = reportByEmployeeId[id]?.report;
         const score = report?.overallScore;
-        const value = typeof score === "number" && !Number.isNaN(score) ? Math.max(0, Math.min(10, score)) : null;
-        return { id, label, value };
+        const hasNumeric = typeof score === "number" && !Number.isNaN(score);
+        if (!hasInterview && !hasNumeric) return null;
+        const value = hasNumeric ? Math.max(0, Math.min(10, score)) : 0;
+        const pending = hasInterview && !hasNumeric;
+        return { id, label, value, pending };
       })
-      .filter((x): x is { id: string; label: string; value: number } => Boolean(x.id) && typeof x.value === "number")
-      .sort((a, b) => b.value - a.value)
+      .filter((x): x is { id: string; label: string; value: number; pending: boolean } => x != null)
+      .sort((a, b) => {
+        if (a.pending && !b.pending) return 1;
+        if (!a.pending && b.pending) return -1;
+        return b.value - a.value;
+      })
       .slice(0, 14);
-  }, [rows, reportByEmployeeId]);
+  }, [rows, credsByEmployeeId, reportByEmployeeId]);
 
   function createInterviewXForRow(r: EmployeeRow, interviewStartDateTimeIso: string, interviewEndDateTimeIso: string) {
     const e = r.employee || {};
@@ -447,76 +464,113 @@ function ScheduleInterviewsInner() {
     });
   }
 
-  async function openReportForRow(r: EmployeeRow) {
-    const e = r.employee || {};
-    const id = String(e._id || e.id || "").trim();
-    if (!id) return;
-    if (openReportLoadingId === id) return;
+  const fetchInterviewReportForRow = useCallback(
+    async (r: EmployeeRow, opts?: { openModal?: boolean; silent?: boolean }) => {
+      const openModal = opts?.openModal !== false;
+      const silent = opts?.silent === true;
+      const e = r.employee || {};
+      const id = String(e._id || e.id || "").trim();
+      if (!id) return;
+      if (silent) {
+        if (silentReportInflightRef.current.has(id)) return;
+        silentReportInflightRef.current.add(id);
+      } else if (openReportLoadingId === id) {
+        return;
+      }
 
-    let creds = credsByEmployeeId[id];
-    if (!creds?.interviewConfigId) {
-      // Try to recover from backend (page refresh / new session).
-      try {
-        const resCreds = await fetch(
-          apiUrl(`/api/interviewx/blueprint-latest-credentials?employeeId=${encodeURIComponent(id)}`),
-          { headers: { Authorization: `Bearer ${token}` } },
-        );
-        if (resCreds.ok) {
-          const data = (await resCreds.json()) as InterviewXBlueprintCredentials;
-          if (data?.interviewConfigId) {
-            setCredsByEmployeeId((cur) => ({ ...cur, [id]: data }));
-            creds = data;
+      let creds = credsByEmployeeId[id];
+      if (!creds?.interviewConfigId) {
+        // Try to recover from backend (page refresh / new session).
+        try {
+          const resCreds = await fetch(
+            apiUrl(`/api/interviewx/blueprint-latest-credentials?employeeId=${encodeURIComponent(id)}`),
+            { headers: { Authorization: `Bearer ${token}` } },
+          );
+          if (resCreds.ok) {
+            const data = (await resCreds.json()) as InterviewXBlueprintCredentials;
+            if (data?.interviewConfigId) {
+              setCredsByEmployeeId((cur) => ({ ...cur, [id]: data }));
+              creds = data;
+            }
           }
+        } catch {
+          // ignore
         }
-      } catch {
-        // ignore
-      }
-    }
-
-    if (!creds?.interviewConfigId) {
-      setError("No InterviewX interview found for this employee yet. Please click Schedule Interview first.");
-      return;
-    }
-
-    setOpenReportLoadingId(id);
-    setError("");
-    try {
-      const res = await fetch(apiUrl("/api/interviewx/blueprint-get-interview-report"), {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify({
-          interviewConfigId: creds.interviewConfigId,
-          candidateId: creds.candidateId,
-        }),
-      });
-
-      if (!res.ok) {
-        const text = await res.text().catch(() => "");
-        throw new Error(text || `Failed to fetch report (${res.status})`);
       }
 
-      const data = (await res.json()) as {
-        ready: boolean;
-        message?: string;
-        report?: InterviewXBlueprintReport;
-        detailedReport?: InterviewXBlueprintDetailedReport;
-      };
-      setReportByEmployeeId((cur) => ({ ...cur, [id]: data }));
-      if (data?.ready && data?.detailedReport) {
-        setReportModal({
-          open: true,
-          employeeLabel: String(e.fullName || e.email || "Employee"),
-          report: data.detailedReport,
+      if (!creds?.interviewConfigId) {
+        if (!silent) {
+          setError("No InterviewX interview found for this employee yet. Please click Schedule Interview first.");
+        }
+        if (silent) silentReportInflightRef.current.delete(id);
+        return;
+      }
+
+      if (!silent) {
+        setOpenReportLoadingId(id);
+        setError("");
+      }
+      try {
+        const res = await fetch(apiUrl("/api/interviewx/blueprint-get-interview-report"), {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+          body: JSON.stringify({
+            interviewConfigId: creds.interviewConfigId,
+            candidateId: creds.candidateId,
+          }),
         });
-      } else if (!data?.ready) {
-        setError(data?.message || "Report not generated yet");
+
+        if (!res.ok) {
+          const text = await res.text().catch(() => "");
+          throw new Error(text || `Failed to fetch report (${res.status})`);
+        }
+
+        const data = (await res.json()) as {
+          ready: boolean;
+          message?: string;
+          report?: InterviewXBlueprintReport;
+          detailedReport?: InterviewXBlueprintDetailedReport;
+        };
+        setReportByEmployeeId((cur) => ({ ...cur, [id]: data }));
+        if (openModal && data?.ready && data?.detailedReport) {
+          setReportModal({
+            open: true,
+            employeeLabel: String(e.fullName || e.email || "Employee"),
+            report: data.detailedReport,
+          });
+        } else if (!silent && !data?.ready) {
+          setError(data?.message || "Report not generated yet");
+        }
+      } catch (e: any) {
+        if (!silent) setError(e?.message || "Failed to fetch report");
+        else
+          setReportByEmployeeId((cur) =>
+            cur[id] !== undefined ? cur : { ...cur, [id]: { ready: false, message: "" } },
+          );
+      } finally {
+        if (!silent) setOpenReportLoadingId((cur) => (cur === id ? "" : cur));
+        if (silent) silentReportInflightRef.current.delete(id);
       }
-    } catch (e: any) {
-      setError(e?.message || "Failed to fetch report");
-    } finally {
-      setOpenReportLoadingId((cur) => (cur === id ? "" : cur));
-    }
+    },
+    [token, openReportLoadingId, credsByEmployeeId],
+  );
+
+  function openReportForRow(r: EmployeeRow) {
+    void fetchInterviewReportForRow(r, { openModal: true, silent: false });
   }
+
+  // Load report summaries for the chart as soon as credentials exist (no Report click required).
+  useEffect(() => {
+    if (!token || rows.length === 0) return;
+    for (const r of rows) {
+      const id = String(r.employee?._id || r.employee?.id || "").trim();
+      if (!id) continue;
+      const creds = credsByEmployeeId[id];
+      if (!creds?.interviewConfigId) continue;
+      if (reportByEmployeeId[id] !== undefined) continue;
+      void fetchInterviewReportForRow(r, { openModal: false, silent: true });
+    }
+  }, [token, rows, credsByEmployeeId, reportByEmployeeId, fetchInterviewReportForRow]);
 
   if (!user && typeof window !== "undefined") {
     const { token: t } = getOrgAuthFromStorage();
@@ -874,10 +928,13 @@ function ScheduleInterviewsInner() {
             Interview report score comparison
           </div>
           <p style={{ margin: "4px 0 12px", fontSize: 12, color: "#64748b" }}>
-            Overall interview score (0–10) from InterviewX reports. Use <b>Report</b> per employee to load scores after completion.
+            Overall interview score (0–10) from InterviewX. Scores load automatically for scheduled interviews; use <b>Report</b> for the full
+            write-up.
           </p>
           {interviewReportComparisonBars.length === 0 ? (
-            <div style={{ fontSize: 13, color: "#94a3b8", padding: "12px 0" }}>No interview reports yet.</div>
+            <div style={{ fontSize: 13, color: "#94a3b8", padding: "12px 0" }}>
+              No scheduled interviews yet — use <b>Schedule Interview</b> on a candidate to appear here.
+            </div>
           ) : (
             <BarGraph bars={interviewReportComparisonBars} accent="#10b981" maxValue={10} />
           )}

@@ -2,7 +2,7 @@
 
 export const dynamic = "force-dynamic";
 import Link from "next/link";
-import { Suspense, useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   getOrgAuthFromStorage,
@@ -29,6 +29,13 @@ const DEPARTMENT_COMPARE_PREVIEW = 6;
 /** Collapsed employee table shows this many rows; "View more" reveals the rest. */
 const EMPLOYEE_TABLE_PREVIEW_ROWS = 8;
 
+/** Accent stripe + depth for dashboard section cards */
+function cardAccentTop(accent: string): React.CSSProperties {
+  return {
+    boxShadow: `inset 0 3px 0 0 ${accent}, 0 4px 6px -1px rgba(15,23,42,0.05), 0 14px 44px -22px rgba(15,23,42,0.12)`,
+  };
+}
+
 function ManagerDashboardContent() {
   const [{ token, user }, setAuth] = useState<{ token: string; user: any | null }>({ token: "", user: null });
   const [rows, setRows] = useState<EmployeeRow[]>([]);
@@ -44,6 +51,7 @@ function ManagerDashboardContent() {
   const [sortKey, setSortKey] = useState<"NAME" | "PROGRESS_DESC" | "PROGRESS_ASC" | "RECENT_TEST">("PROGRESS_DESC");
 
   const [inviteFile, setInviteFile] = useState<File | null>(null);
+  const inviteFileInputRef = useRef<HTMLInputElement>(null);
   const [inviteLoading, setInviteLoading] = useState(false);
   const [inviteError, setInviteError] = useState("");
   const [inviteResult, setInviteResult] = useState<OrgBulkInviteResult | null>(null);
@@ -70,7 +78,13 @@ function ManagerDashboardContent() {
     params.set("recommendFor", String(e?._id || e?.id || ""));
     if (e?.fullName) params.set("recommendName", String(e.fullName));
     if (e?.email) params.set("recommendEmail", String(e.email));
-    if (e?.department) params.set("recommendDept", String(e.department));
+    // Recommendable roles should be scoped to the manager's department (not the employee's).
+    // HR can recommend across departments; in that case we still pass the employee department as a hint.
+    if (isHR) {
+      if (e?.department) params.set("recommendDept", String(e.department));
+    } else if (myDepartment) {
+      params.set("recommendDept", String(myDepartment));
+    }
     router.push(`${appPath("/role")}?${params.toString()}`);
   };
 
@@ -86,8 +100,28 @@ function ManagerDashboardContent() {
     if (mounted && !token) window.location.href = "/auth/manager/login";
   }, [mounted, token]);
 
+  // If a non-manager user navigates here (e.g. stale/localStorage session), redirect away
+  // so we don't spam the API with unauthorized requests.
+  useEffect(() => {
+    if (!mounted || !token || !user) return;
+    const isManagerOrHr =
+      (user?.accountType === "EMPLOYEE" && (user?.currentRole === "MANAGER" || user?.currentRole === "HR")) ||
+      user?.currentRole === "MANAGER" ||
+      user?.currentRole === "HR";
+    if (!isManagerOrHr) {
+      window.location.href = appPath("/target-role");
+    }
+  }, [mounted, token, user]);
+
   useEffect(() => {
     if (!token) return;
+    // Guard: only Manager/HR should call manager endpoints.
+    const isManagerOrHr =
+      (user?.accountType === "EMPLOYEE" && (user?.currentRole === "MANAGER" || user?.currentRole === "HR")) ||
+      user?.currentRole === "MANAGER" ||
+      user?.currentRole === "HR";
+    if (!isManagerOrHr) return;
+
     let cancelled = false;
     const fetchAll = async (silent = false) => {
       if (!silent) setLoading(true);
@@ -113,7 +147,7 @@ function ManagerDashboardContent() {
       cancelled = true;
       window.clearInterval(id);
     };
-  }, [token]);
+  }, [token, user]);
 
   const isHR = user?.currentRole === "HR";
   const myDepartment: string = (user?.department || "").trim();
@@ -273,7 +307,7 @@ function ManagerDashboardContent() {
 
       {/* Comparison + Distribution */}
       <div className="manager-two-col">
-        <div style={{ ...card, minWidth: 0, maxWidth: "100%" }}>
+        <div className="manager-dash-card" style={{ ...cardElevated, ...cardAccentTop("#6366f1"), minWidth: 0, maxWidth: "100%" }}>
           <div style={cardTitle}><span style={titleIcon("#6366f1")}>📊</span>Progress distribution</div>
           <div style={cardSub}>How active learners are spread across progress bands.</div>
           <div style={{ marginTop: 14, display: "grid", gap: 10 }}>
@@ -286,7 +320,7 @@ function ManagerDashboardContent() {
           </div>
         </div>
 
-        <div style={{ ...card, minWidth: 0, maxWidth: "100%" }}>
+        <div className="manager-dash-card" style={{ ...cardElevated, ...cardAccentTop("#3b82f6"), minWidth: 0, maxWidth: "100%" }}>
           <div style={cardTitle}>
             <span style={titleIcon("#3b82f6")}>{isHR ? "🏢" : "🏆"}</span>
             {isHR ? "Department comparison" : "Top vs. lagging in your team"}
@@ -310,7 +344,7 @@ function ManagerDashboardContent() {
 
       {/* Bulk invite + Schedule interviews (two cards in one row) */}
       <div className="manager-two-col">
-        <div style={{ ...card, minWidth: 0, maxWidth: "100%" }}>
+        <div className="manager-dash-card" style={{ ...cardElevated, ...cardAccentTop("#10b981"), minWidth: 0, maxWidth: "100%" }}>
           <div style={cardTitle}><span style={titleIcon("#10b981")}>📤</span>Invite employees from Excel</div>
           <div style={cardSub}>
             Upload a spreadsheet with <b>Email</b> and <b>Name</b> columns (first sheet).
@@ -321,47 +355,102 @@ function ManagerDashboardContent() {
             )}{" "}
             Each person receives an email with a temporary password and must complete their profile after first login.
           </div>
-          <div style={{ marginTop: 14, display: "flex", flexWrap: "wrap", gap: 10, alignItems: "center" }}>
-            <input
-              type="file"
-              accept=".xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel"
-              onChange={(e) => {
+          <div style={{ marginTop: 16, display: "flex", flexDirection: "column", gap: 12 }}>
+            <label
+              className="manager-file-zone"
+              style={{ position: "relative" }}
+              onDragOver={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+              }}
+              onDrop={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
                 setInviteResult(null);
                 setInviteError("");
-                const f = e.target.files?.[0] || null;
+                const f = e.dataTransfer.files?.[0] || null;
+                if (!f) return;
+                const ok =
+                  /\.xlsx?$/i.test(f.name) ||
+                  f.type === "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" ||
+                  f.type === "application/vnd.ms-excel";
+                if (!ok) {
+                  setInviteError("Please drop an Excel file (.xlsx or .xls).");
+                  return;
+                }
                 setInviteFile(f);
               }}
-              style={{ fontSize: 13 }}
-            />
-            <button
-              type="button"
-              disabled={!inviteFile || inviteLoading || !token}
-              onClick={async () => {
-                if (!inviteFile || !token) return;
-                setInviteLoading(true);
-                setInviteError("");
-                setInviteResult(null);
-                try {
-                  const r = await orgManagerBulkInviteEmployees(token, inviteFile);
-                  setInviteResult(r);
-                  void (async () => {
-                    try {
-                      const summary = await orgListEmployeesManagerSummary(token);
-                      setRows(Array.isArray(summary) ? summary : []);
-                    } catch {
-                      /* ignore */
-                    }
-                  })();
-                } catch (e: any) {
-                  setInviteError(e?.message || "Upload failed");
-                } finally {
-                  setInviteLoading(false);
-                }
-              }}
-              style={{ ...btnSolid, opacity: !inviteFile || inviteLoading ? 0.6 : 1 }}
             >
-              {inviteLoading ? "Uploading…" : "Upload & invite"}
-            </button>
+              <input
+                ref={inviteFileInputRef}
+                type="file"
+                accept=".xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel"
+                onChange={(e) => {
+                  setInviteResult(null);
+                  setInviteError("");
+                  const f = e.target.files?.[0] || null;
+                  setInviteFile(f);
+                }}
+              />
+              <span style={{ fontSize: 22, lineHeight: 1 }}>📎</span>
+              <span style={{ flex: 1, minWidth: 0 }}>
+                <span style={{ display: "block", fontWeight: 800, fontSize: 13, color: "#0f172a" }}>
+                  {inviteFile ? inviteFile.name : "Choose Excel file"}
+                </span>
+                <span style={{ display: "block", fontSize: 12, color: "#64748b", marginTop: 2 }}>
+                  {inviteFile ? `${(inviteFile.size / 1024).toFixed(1)} KB · click to replace` : ".xlsx or .xls · drag & drop or click"}
+                </span>
+              </span>
+            </label>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 10, alignItems: "center" }}>
+              <button
+                type="button"
+                disabled={!inviteFile || inviteLoading || !token}
+                onClick={async () => {
+                  if (!inviteFile || !token) return;
+                  setInviteLoading(true);
+                  setInviteError("");
+                  setInviteResult(null);
+                  try {
+                    const r = await orgManagerBulkInviteEmployees(token, inviteFile);
+                    setInviteResult(r);
+                    void (async () => {
+                      try {
+                        const summary = await orgListEmployeesManagerSummary(token);
+                        setRows(Array.isArray(summary) ? summary : []);
+                      } catch {
+                        /* ignore */
+                      }
+                    })();
+                  } catch (e: any) {
+                    setInviteError(e?.message || "Upload failed");
+                  } finally {
+                    setInviteLoading(false);
+                  }
+                }}
+                style={{
+                  ...btnInvitePrimary,
+                  opacity: !inviteFile || inviteLoading ? 0.55 : 1,
+                  cursor: !inviteFile || inviteLoading ? "not-allowed" : "pointer",
+                }}
+              >
+                {inviteLoading ? "Uploading…" : "Upload & invite"}
+              </button>
+              {inviteFile ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setInviteFile(null);
+                    setInviteResult(null);
+                    setInviteError("");
+                    if (inviteFileInputRef.current) inviteFileInputRef.current.value = "";
+                  }}
+                  style={btnInviteSecondary}
+                >
+                  Clear file
+                </button>
+              ) : null}
+            </div>
           </div>
           {inviteError ? <div style={{ ...errorStyle, marginTop: 12 }}>{inviteError}</div> : null}
           {inviteResult ? (
@@ -389,25 +478,28 @@ function ManagerDashboardContent() {
           ) : null}
         </div>
 
-        <div style={{ ...card, minWidth: 0, maxWidth: "100%" }}>
+        <div className="manager-dash-card" style={{ ...cardElevated, ...cardAccentTop("#0ea5e9"), minWidth: 0, maxWidth: "100%" }}>
           <div style={cardTitle}>
             <span style={titleIcon("#0ea5e9")}>📅</span>Schedule interview
           </div>
           <div style={cardSub}>
             View everyone in <b>{scopeLabel}</b> with department, email, and roles they&apos;re preparing for. Interview slots and report links are no longer stored in Blueprint — use InterviewX (or your tooling) for scheduling; open the hub to copy handoffs and deep links.
           </div>
-          <div style={{ marginTop: 14 }}>
+          <div style={{ marginTop: 18, display: "flex", flexWrap: "wrap", gap: 10, alignItems: "center" }}>
             <Link
               href={appPath("/dashboard/manager/schedule-interviews")}
+              className="manager-cta-link"
               style={{
-                ...btnSolid,
+                ...btnScheduleHub,
                 display: "inline-flex",
                 alignItems: "center",
                 justifyContent: "center",
+                gap: 8,
                 textDecoration: "none",
                 boxSizing: "border-box",
               }}
             >
+              <span style={{ fontSize: 16 }}>🗓</span>
               Open schedule hub
             </Link>
           </div>
@@ -416,13 +508,13 @@ function ManagerDashboardContent() {
 
       {/* Activity + Role distribution (two cards in one row) */}
       <div className="manager-two-col">
-        <div style={{ ...card, minWidth: 0, maxWidth: "100%" }}>
+        <div className="manager-dash-card" style={{ ...cardElevated, ...cardAccentTop("#db2777"), minWidth: 0, maxWidth: "100%" }}>
           <div style={cardTitle}><span style={titleIcon("#db2777")}>⚡</span>Live activity feed</div>
           <div style={cardSub}>Latest preparation actions and test results across {isHR ? "the company" : "your department"}.</div>
           <ActivityFeed feed={activity?.activityFeed || []} />
         </div>
 
-        <div style={{ ...card, minWidth: 0, maxWidth: "100%" }}>
+        <div className="manager-dash-card" style={{ ...cardElevated, ...cardAccentTop("#7c3aed"), minWidth: 0, maxWidth: "100%" }}>
           <div style={cardTitle}><span style={titleIcon("#7c3aed")}>🎯</span>Roles being prepared for</div>
           <div style={cardSub}>How many active learners per role, and how far along they are.</div>
           <RoleAggregateChart items={activity?.roleAggregates || []} />
@@ -430,29 +522,44 @@ function ManagerDashboardContent() {
       </div>
 
       {/* Toolbar */}
-      <div style={{ ...card, minWidth: 0, maxWidth: "100%" }}>
-        <div style={{ display: "grid", gap: 14 }}>
-          <div style={cardTitle}><span style={titleIcon("#0ea5e9")}>👥</span>Employee preparation database</div>
+      <div className="manager-dash-card" style={{ ...cardElevated, ...cardAccentTop("#6366f1"), minWidth: 0, maxWidth: "100%" }}>
+        <div style={{ display: "grid", gap: 16 }}>
+          <div style={cardTitle}><span style={titleIcon("#6366f1")}>👥</span>Employee preparation database</div>
           <div
             style={{
               display: "grid",
               gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 200px), 1fr))",
-              gap: 10,
-              alignItems: "center",
+              gap: 12,
+              alignItems: "stretch",
+              padding: 14,
+              borderRadius: 14,
+              background: "linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%)",
+              border: "1px solid #e2e8f0",
             }}
           >
             <input
+              className="manager-toolbar-field"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Search name, email, designation…"
               style={{ ...inputStyle, width: "100%", minWidth: 0 }}
             />
-            <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as any)} style={{ ...inputStyle, width: "100%", minWidth: 0 }}>
+            <select
+              className="manager-toolbar-field"
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value as any)}
+              style={{ ...inputStyle, width: "100%", minWidth: 0 }}
+            >
               <option value="ALL">All employees</option>
               <option value="ACTIVE">Actively preparing</option>
               <option value="NOT_STARTED">Not started</option>
             </select>
-            <select value={sortKey} onChange={(e) => setSortKey(e.target.value as any)} style={{ ...inputStyle, width: "100%", minWidth: 0 }}>
+            <select
+              className="manager-toolbar-field"
+              value={sortKey}
+              onChange={(e) => setSortKey(e.target.value as any)}
+              style={{ ...inputStyle, width: "100%", minWidth: 0 }}
+            >
               <option value="PROGRESS_DESC">Sort: progress (high → low)</option>
               <option value="PROGRESS_ASC">Sort: progress (low → high)</option>
               <option value="NAME">Sort: name (A → Z)</option>
@@ -463,12 +570,13 @@ function ManagerDashboardContent() {
 
         <div
           style={{
-            marginTop: 12,
+            marginTop: 14,
             overflowX: "auto",
             WebkitOverflowScrolling: "touch",
-            border: "1px solid #e5e7eb",
-            borderRadius: 14,
+            border: "1px solid #e2e8f0",
+            borderRadius: 16,
             maxWidth: "100%",
+            boxShadow: "inset 0 1px 2px rgba(15,23,42,0.04)",
           }}
         >
           <table style={employeeTableStyle}>
@@ -1067,8 +1175,15 @@ function ActivityFeed({ feed }: { feed: OrgManagerActivity["activityFeed"] }) {
         {visible.map((evt, i) => {
           const meta = eventMeta(evt.type);
           return (
-            <div key={i} style={feedRow}>
-              <div style={{ ...feedDot, background: meta.color }} />
+            <div
+              key={i}
+              style={{
+                ...feedRow,
+                borderLeft: `3px solid ${meta.color}`,
+                boxShadow: "0 1px 3px rgba(15,23,42,0.05)",
+              }}
+            >
+              <div style={{ ...feedDot, background: meta.color, boxShadow: `0 0 0 2px ${meta.color}33` }} />
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: 13, color: "#0f172a" }}>
                   <b>{evt.employeeName}</b>{" "}
@@ -1164,30 +1279,115 @@ function RoleAggregateChart({ items }: { items: OrgManagerActivity["roleAggregat
   }
   const maxLearners = Math.max(1, ...items.map((r) => r.learners));
   return (
-    <div style={{ marginTop: 12, display: "grid", gap: 10 }}>
+    <div style={{ marginTop: 14, display: "grid", gap: 12 }}>
       {items.map((r) => {
         const lw = Math.round((r.learners / maxLearners) * 100);
-        const progColor = r.avgPct >= 75 ? "#16a34a" : r.avgPct >= 40 ? "#0b5fe8" : "#ea580c";
+        const progColor = r.avgPct >= 75 ? "#16a34a" : r.avgPct >= 40 ? "#2563eb" : "#ea580c";
         return (
-          <div key={r.name}>
-            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, fontWeight: 800, color: "#0f172a", marginBottom: 4 }}>
-              <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: "60%" }}>{r.name}</span>
-              <span style={{ color: "#475569", fontWeight: 700 }}>{r.learners} learner{r.learners === 1 ? "" : "s"} · {r.avgPct}% avg</span>
+          <div
+            key={r.name}
+            style={{
+              padding: "14px 16px",
+              borderRadius: 14,
+              border: "1px solid #e8eef3",
+              background: "linear-gradient(145deg, #ffffff 0%, #f8fafc 55%, #f1f5f9 100%)",
+              boxShadow: "0 2px 8px rgba(15,23,42,0.04)",
+            }}
+          >
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 10, marginBottom: 10 }}>
+              <span style={{ fontSize: 14, fontWeight: 900, color: "#0f172a", lineHeight: 1.3, overflow: "hidden", textOverflow: "ellipsis" }}>
+                {r.name}
+              </span>
+              <span
+                style={{
+                  flex: "0 0 auto",
+                  fontSize: 11,
+                  fontWeight: 800,
+                  color: "#475569",
+                  background: "rgba(255,255,255,0.9)",
+                  border: "1px solid #e2e8f0",
+                  borderRadius: 999,
+                  padding: "4px 10px",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                {r.learners} learner{r.learners === 1 ? "" : "s"} · <span style={{ color: progColor }}>{r.avgPct}%</span> avg
+              </span>
             </div>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
-              <div style={{ height: 8, background: "#f1f5f9", borderRadius: 999, overflow: "hidden" }} title="Learners">
-                <div style={{ width: `${lw}%`, background: "#7c3aed", height: "100%" }} />
+            <div style={{ display: "grid", gap: 8 }}>
+              <div>
+                <div style={{ fontSize: 10, fontWeight: 900, color: "#64748b", letterSpacing: 0.5, textTransform: "uppercase", marginBottom: 4 }}>
+                  Learners (relative)
+                </div>
+                <div
+                  style={{
+                    height: 10,
+                    background: "#e2e8f0",
+                    borderRadius: 999,
+                    overflow: "hidden",
+                    boxShadow: "inset 0 1px 2px rgba(15,23,42,0.08)",
+                  }}
+                  title="Learners"
+                >
+                  <div
+                    style={{
+                      width: `${lw}%`,
+                      minWidth: lw > 0 ? 4 : 0,
+                      background: "linear-gradient(90deg, #6d28d9, #7c3aed, #a78bfa)",
+                      height: "100%",
+                      borderRadius: 999,
+                      transition: "width 0.35s ease",
+                    }}
+                  />
+                </div>
               </div>
-              <div style={{ height: 8, background: "#f1f5f9", borderRadius: 999, overflow: "hidden" }} title="Avg progress">
-                <div style={{ width: `${r.avgPct}%`, background: progColor, height: "100%" }} />
+              <div>
+                <div style={{ fontSize: 10, fontWeight: 900, color: "#64748b", letterSpacing: 0.5, textTransform: "uppercase", marginBottom: 4 }}>
+                  Avg progress
+                </div>
+                <div
+                  style={{
+                    height: 10,
+                    background: "#e2e8f0",
+                    borderRadius: 999,
+                    overflow: "hidden",
+                    boxShadow: "inset 0 1px 2px rgba(15,23,42,0.08)",
+                  }}
+                  title="Avg progress"
+                >
+                  <div
+                    style={{
+                      width: `${r.avgPct}%`,
+                      minWidth: r.avgPct > 0 ? 4 : 0,
+                      background: `linear-gradient(90deg, ${progColor}, ${progColor}cc)`,
+                      height: "100%",
+                      borderRadius: 999,
+                      transition: "width 0.35s ease",
+                    }}
+                  />
+                </div>
               </div>
             </div>
           </div>
         );
       })}
-      <div style={{ display: "flex", gap: 14, marginTop: 4, fontSize: 11, color: "#64748b" }}>
+      <div
+        style={{
+          display: "inline-flex",
+          flexWrap: "wrap",
+          gap: 12,
+          marginTop: 2,
+          padding: "8px 12px",
+          borderRadius: 12,
+          background: "rgba(248,250,252,0.95)",
+          border: "1px solid #e2e8f0",
+          fontSize: 11,
+          color: "#64748b",
+          fontWeight: 700,
+        }}
+      >
         <LegendDot color="#7c3aed" label="Learners (relative)" />
-        <LegendDot color="#0b5fe8" label="Avg progress" />
+        <LegendDot color="#2563eb" label="Avg progress" />
       </div>
     </div>
   );
@@ -1243,7 +1443,7 @@ const wrap: React.CSSProperties = {
   marginTop: 2,
   padding: 0,
   display: "grid",
-  gap: 14,
+  gap: 18,
   position: "relative",
   boxSizing: "border-box",
   width: "100%",
@@ -1326,6 +1526,50 @@ const btnSolid: React.CSSProperties = {
 
 const headerCard: React.CSSProperties = { background: "#fff", border: "1px solid #e5e7eb", borderRadius: 18, padding: 18, boxShadow: "0 4px 18px -10px rgba(15,23,42,0.08)" };
 const card: React.CSSProperties = { background: "#fff", border: "1px solid #e5e7eb", borderRadius: 16, padding: 18, boxShadow: "0 4px 18px -10px rgba(15,23,42,0.08)" };
+const cardElevated: React.CSSProperties = {
+  background: "linear-gradient(180deg, #ffffff 0%, #fafbfc 100%)",
+  border: "1px solid #e8eef5",
+  borderRadius: 18,
+  padding: 20,
+};
+const btnInvitePrimary: React.CSSProperties = {
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+  padding: "10px 18px",
+  borderRadius: 12,
+  border: "none",
+  fontWeight: 900,
+  fontSize: 13,
+  cursor: "pointer",
+  color: "#fff",
+  background: "linear-gradient(135deg, #059669 0%, #10b981 45%, #34d399 100%)",
+  boxShadow: "0 4px 14px -4px rgba(16, 185, 129, 0.55), inset 0 1px 0 rgba(255,255,255,0.25)",
+};
+const btnInviteSecondary: React.CSSProperties = {
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+  padding: "10px 14px",
+  borderRadius: 12,
+  border: "1px solid #cbd5e1",
+  background: "#fff",
+  fontWeight: 800,
+  fontSize: 13,
+  cursor: "pointer",
+  color: "#475569",
+};
+const btnScheduleHub: React.CSSProperties = {
+  padding: "12px 20px",
+  borderRadius: 12,
+  border: "none",
+  fontWeight: 900,
+  fontSize: 14,
+  cursor: "pointer",
+  color: "#fff",
+  background: "linear-gradient(135deg, #0369a1 0%, #0ea5e9 50%, #38bdf8 100%)",
+  boxShadow: "0 6px 20px -6px rgba(14, 165, 233, 0.55), inset 0 1px 0 rgba(255,255,255,0.2)",
+};
 const h1: React.CSSProperties = { margin: 0, fontSize: 22, fontWeight: 900, color: "#0f172a" };
 const sub: React.CSSProperties = { marginTop: 6, color: "#475569", fontSize: 13 };
 const cardTitle: React.CSSProperties = { fontSize: 15, fontWeight: 900, color: "#0f172a", display: "flex", alignItems: "center", gap: 10 };
@@ -1407,7 +1651,15 @@ const rankRow: React.CSSProperties = {
 const rankBadge: React.CSSProperties = { width: 24, height: 24, borderRadius: 999, color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 900, flex: "0 0 auto" };
 const emptyHint: React.CSSProperties = { fontSize: 13, color: "#64748b", padding: "10px 12px", border: "1px dashed #e2e8f0", borderRadius: 10, background: "#f8fafc" };
 const engagementCard: React.CSSProperties = { background: "#fff", border: "1px solid #e5e7eb", borderRadius: 14, padding: 14 };
-const feedRow: React.CSSProperties = { display: "flex", alignItems: "flex-start", gap: 10, padding: "8px 10px", border: "1px solid #f1f5f9", borderRadius: 10, background: "#fff" };
+const feedRow: React.CSSProperties = {
+  display: "flex",
+  alignItems: "flex-start",
+  gap: 12,
+  padding: "12px 14px",
+  border: "1px solid #e8eef3",
+  borderRadius: 14,
+  background: "linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)",
+};
 const feedDot: React.CSSProperties = { width: 8, height: 8, borderRadius: 999, marginTop: 6, flex: "0 0 auto" };
 
 const btnRecommend: React.CSSProperties = {

@@ -4,6 +4,20 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 import { orgRegisterEmployee, setOrgAuthInStorage, type OrgCurrentRole } from "@/lib/orgAuth";
 
+const DEPARTMENT_OPTIONS = [
+  "Technology",
+  "Management",
+  "Design & Creative",
+  "Finance & Accounting",
+  "Sales & Marketing",
+  "Healthcare",
+  "Education & Research",
+  "Operations & Logistics",
+  "Legal & Compliance",
+  "Human Resources",
+  "Analytics & Data",
+];
+
 function domainFromEmail(email: string) {
   const v = email.trim().toLowerCase();
   const at = v.indexOf("@");
@@ -24,6 +38,8 @@ export default function ManagerRegisterPage() {
   const [companyName, setCompanyName] = useState("");
   const [designation, setDesignation] = useState("");
   const [department, setDepartment] = useState("");
+  const [deptMode, setDeptMode] = useState<"PICK" | "OTHER">("PICK");
+  const [deptOther, setDeptOther] = useState("");
   const [employeeId, setEmployeeId] = useState("");
   const [mobileNo, setMobileNo] = useState("");
   const [reportingManagerEmail, setReportingManagerEmail] = useState("");
@@ -33,6 +49,11 @@ export default function ManagerRegisterPage() {
 
   const isHR = accountKind === "HR";
 
+  const effectiveDepartment = useMemo(() => {
+    if (deptMode === "OTHER") return deptOther.trim();
+    return department.trim();
+  }, [deptMode, deptOther, department]);
+
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
@@ -41,14 +62,14 @@ export default function ManagerRegisterPage() {
       if (!inferredDomain) throw new Error("Please enter a valid company email");
       if (!reportingManagerEmail.trim()) throw new Error("Reporting manager email is required");
       if (inferredMgrDomain && inferredMgrDomain !== inferredDomain) throw new Error("Reporting manager email must be in the same company domain");
-      if (!isHR && !department.trim()) throw new Error("Department is required for managers");
+      if (!isHR && !effectiveDepartment) throw new Error("Department is required for managers");
 
       const r = await orgRegisterEmployee({
         email,
         password,
         fullName,
         designation,
-        department: isHR ? undefined : department,
+        department: isHR ? undefined : effectiveDepartment,
         companyName,
         employeeId,
         currentRole: accountKind,
@@ -118,7 +139,43 @@ export default function ManagerRegisterPage() {
           </Field>
         ) : (
           <Field label="Department">
-            <input value={department} onChange={(e) => setDepartment(e.target.value)} required style={inputStyle} placeholder="e.g. Engineering" />
+            <div style={{ display: "grid", gap: 8 }}>
+              <select
+                value={deptMode === "OTHER" ? "__OTHER__" : (department || "")}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  if (v === "__OTHER__") {
+                    setDeptMode("OTHER");
+                    setDepartment("");
+                  } else {
+                    setDeptMode("PICK");
+                    setDepartment(v);
+                  }
+                }}
+                required
+                style={inputStyle}
+              >
+                <option value="" disabled>Select department</option>
+                {DEPARTMENT_OPTIONS.map((d) => (
+                  <option key={d} value={d}>
+                    {d}
+                  </option>
+                ))}
+                <option value="__OTHER__">Other (type…)</option>
+              </select>
+              {deptMode === "OTHER" ? (
+                <input
+                  value={deptOther}
+                  onChange={(e) => setDeptOther(e.target.value)}
+                  required
+                  style={inputStyle}
+                  placeholder="Type your department"
+                />
+              ) : null}
+              <div style={hintStyle}>
+                Choose from the list, or select <b>Other</b> to type a custom department.
+              </div>
+            </div>
           </Field>
         )}
 
