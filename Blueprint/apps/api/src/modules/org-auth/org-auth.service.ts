@@ -694,10 +694,9 @@ export class OrgAuthService {
       accountType: "EMPLOYEE" as OrgAccountType,
       mobileNo: input.mobileNo?.trim(),
       reportingManagerEmail: mgrEmail,
-      emailVerified: false,
+      emailVerified: true,
     });
-    await this.setAndSendEmailOtp(created);
-    return { verificationRequired: true as const, email: created.email };
+    return this.authPayload(created);
   }
 
   async registerAdmin(input: { email: string; password: string; fullName: string; companyName: string; companyDomain?: string }) {
@@ -722,10 +721,9 @@ export class OrgAuthService {
       companyDomain,
       currentRole: "EMPLOYEE",
       accountType: "ADMIN" as OrgAccountType,
-      emailVerified: false,
+      emailVerified: true,
     });
-    await this.setAndSendEmailOtp(created);
-    return { verificationRequired: true as const, email: created.email };
+    return this.authPayload(created);
   }
 
   async login(emailRaw: string, password: string) {
