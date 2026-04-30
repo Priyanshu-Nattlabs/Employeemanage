@@ -386,6 +386,9 @@ function RolePageContent() {
   const recommendDept  = searchParams.get("recommendDept")  ?? "";
   const isRecommendMode = !!recommendFor;
 
+  // In recommend mode, clicking a role should open the Job Description first (not prep/tests UI).
+  const jdAnchorRef = useRef<HTMLDivElement | null>(null);
+
   const [recommendNote, setRecommendNote] = useState("");
   const [recommendSending, setRecommendSending] = useState(false);
   const [recommendError, setRecommendError] = useState<string | null>(null);
@@ -449,6 +452,14 @@ function RolePageContent() {
   const [custPriority,       setCustPriority]       = useState<string[]>([]);
 
   useEffect(() => { setMounted(true); }, []);
+
+  useEffect(() => {
+    if (!mounted || !isRecommendMode) return;
+    const id = window.setTimeout(() => {
+      jdAnchorRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 50);
+    return () => window.clearTimeout(id);
+  }, [mounted, isRecommendMode, roleName]);
 
   /* ── load ────────────────────────────────────────────────────────────────
      If an active preparation with a saved chart exists, use that chart so the
@@ -1335,6 +1346,7 @@ function RolePageContent() {
                 {activeData?.description || activeData?.jobDescription?.summary || data?.description || baseRole?.description || baseRole?.jobDescription?.summary || "Career blueprint and personalised learning roadmap for this role."}
               </p>
             </div>
+            {!isRecommendMode ? (
             <div style={{ display:"flex", flexDirection:"column", gap:8, alignItems:"flex-end" }}>
               {prep?.isActive ? (
                 <div style={{ display:"flex", gap:8, flexWrap:"wrap", justifyContent:"flex-end" }}>
@@ -1386,6 +1398,7 @@ function RolePageContent() {
                 {mockInterviewLaunching ? "Opening..." : "🎤 Mock Interview"}
               </button>
             </div>
+            ) : null}
           </div>
           {savedMsg && <p style={{ marginTop:10, color:"#bbf7d0", fontWeight:600 }}>{savedMsg}</p>}
           {((mappings?.industries||[]).length > 0 || (mappings?.educations||[]).length > 0) && (
@@ -1578,6 +1591,7 @@ function RolePageContent() {
       )}
 
       {/* ── JOB DESCRIPTION + SKILLS ─────────────────────────── */}
+      <div ref={jdAnchorRef} />
       {(mergedJobDescription || techSkills.length > 0 || softSkills.length > 0) && (
         <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:14, marginBottom:20 }}>
           {mergedJobDescription && (() => {
