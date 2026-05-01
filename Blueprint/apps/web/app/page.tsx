@@ -184,6 +184,19 @@ export default function HomePage() {
         .jb-fade1 { animation: fadeUp 0.55s ease-out forwards; }
         .jb-fade2 { opacity:0; animation: fadeUp 0.55s ease-out 0.12s forwards; }
         .jb-fade3 { opacity:0; animation: fadeUp 0.55s ease-out 0.24s forwards; }
+        :root {
+          --bg: #f6f8fc;
+          --surface: rgba(255,255,255,0.86);
+          --ink: #0b1220;
+          --muted: #475467;
+          --border: rgba(15, 23, 42, 0.10);
+          --border-strong: rgba(15, 23, 42, 0.14);
+          --shadow: 0 18px 45px rgba(15, 23, 42, 0.10);
+          --shadow-soft: 0 10px 26px rgba(15, 23, 42, 0.07);
+          --brandA: #054a90;
+          --brandC: #4f46e5;
+          --brandMint: #00bfa6;
+        }
         .jb-explore-card { transition: box-shadow 0.2s, transform 0.2s; }
         .jb-explore-card:hover { box-shadow: 0 8px 32px rgba(0,0,0,0.13) !important; transform: translateY(-3px); }
         .jb-explore-btn { transition: background 0.18s, color 0.18s; }
@@ -194,20 +207,70 @@ export default function HomePage() {
         .jb-cta-btn:hover { background: #f3f4f6 !important; transform: scale(1.03); }
         .jb-search-dropdown { position:absolute; top:calc(100% + 4px); left:0; right:0; background:#fff; border:1.5px solid #e5e7eb; border-radius:10px; box-shadow:0 8px 24px rgba(0,0,0,0.12); max-height:220px; overflow-y:auto; z-index:50; }
         .jb-search-item { padding:10px 14px; font-size:14px; color:#374151; cursor:pointer; }
-        .jb-search-item:hover { background:#f5f3ff; }
-        .jb-hero-ref-panel { background:rgba(217,217,217,0.2); border:1px solid rgba(0,0,0,0.1); border-radius:10px; }
-        .jb-hero-ref-title { background:linear-gradient(90deg,#3f1d8f 0%,#0f766e 100%); -webkit-background-clip:text; background-clip:text; color:transparent; -webkit-text-fill-color:transparent; }
+        .jb-search-item:hover { background:#eef5ff; }
+        .jb-hero-ref-panel {
+          background: var(--surface);
+          border: 1px solid var(--border);
+          border-radius: 22px;
+          box-shadow: var(--shadow);
+          backdrop-filter: blur(12px);
+        }
+        .jb-hero-ref-panel::before{
+          content:"";
+          position:absolute;
+          inset:-30%;
+          background:
+            radial-gradient(circle at 18% 24%, rgba(56, 189, 248, 0.22) 0%, transparent 46%),
+            radial-gradient(circle at 82% 18%, rgba(99, 102, 241, 0.16) 0%, transparent 44%),
+            radial-gradient(circle at 70% 82%, rgba(34, 197, 94, 0.12) 0%, transparent 46%);
+          filter: blur(26px);
+          opacity: 0.75;
+          pointer-events:none;
+        }
+        .jb-hero-ref-title { background:linear-gradient(90deg,var(--brandC) 0%,var(--brandA) 55%,var(--brandMint) 100%); -webkit-background-clip:text; background-clip:text; color:transparent; -webkit-text-fill-color:transparent; }
+        .jb-hero-visual {
+          position: relative;
+          border-radius: 22px;
+          border: 1px solid var(--border);
+          background: rgba(255,255,255,0.70);
+          backdrop-filter: blur(10px);
+          box-shadow: var(--shadow);
+          padding: 14px;
+          overflow: hidden;
+        }
+        .jb-hero-visual::after{
+          content:"";
+          position:absolute;
+          inset:0;
+          pointer-events:none;
+          opacity:0.10;
+          mix-blend-mode: overlay;
+          background-image:
+            repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.06) 0 1px, transparent 1px 3px),
+            repeating-linear-gradient(90deg, rgba(0, 0, 0, 0.04) 0 1px, transparent 1px 3px);
+          mask-image: radial-gradient(circle at 30% 35%, rgba(0, 0, 0, 0.9), transparent 70%);
+        }
+        .jb-hero-growth-img {
+          width: min(640px, 42vw);
+          height: auto;
+          display: block;
+          border-radius: 16px;
+          border: 1px solid var(--border);
+          box-shadow: 0 16px 36px rgba(15,23,42,0.16);
+          background: #fff;
+        }
         @media (max-width: 900px) {
           .jb-hero-ref-row { flex-direction:column !important; align-items:stretch !important; }
           .jb-hero-ref-images { justify-content:center !important; margin-top:8px; pointer-events:none; }
           .jb-hero-ref-img-right { margin-left:0 !important; }
+          .jb-hero-growth-img { width: 100% !important; max-width: 760px; margin: 0 auto; }
         }
       `}</style>
 
       {/* ══ HERO (matches UI Reference / Job Blue Print.svg) ═══════════ */}
       <div
         style={{
-          background: "linear-gradient(180deg, #ddd6fe 0%, #cffafe 100%)",
+          background: "linear-gradient(125deg, #dff1ff 0%, #e4e8ff 50%, #e8fff5 100%)",
           overflow: "hidden",
           minHeight: 545,
         }}
@@ -258,7 +321,7 @@ export default function HomePage() {
                 <br />
                 Clearly Tracked
               </h1>
-              <p className="jb-fade2" style={{ margin: "0 0 22px", fontSize: 15, color: "#2a2a2a", lineHeight: 1.65, maxWidth: 620 }}>
+              <p className="jb-fade2" style={{ margin: "0 0 22px", fontSize: 15, color: "rgba(71,84,103,0.92)", lineHeight: 1.75, maxWidth: 620 }}>
                 This platform helps every employee plan their next role, learn required skills, complete assessments, and track progress with clear visibility for both employee and company authority.
               </p>
               <div className="jb-fade3" style={{ position: "relative", maxWidth: 400 }}>
@@ -272,7 +335,7 @@ export default function HomePage() {
                     minHeight: 52,
                     padding: "16px 18px",
                     borderRadius: 10,
-                    border: "2px solid #425D0C",
+                    border: "2px solid rgba(5, 74, 144, 0.32)",
                     fontSize: 15,
                     background: "#fff",
                     outline: "none",
@@ -308,8 +371,8 @@ export default function HomePage() {
                     display: "inline-block",
                     padding: "10px 20px",
                     borderRadius: 9,
-                    border: "2px solid #3f1d8f",
-                    background: "#3f1d8f",
+                    border: "2px solid #4f46e5",
+                    background: "linear-gradient(90deg,#4f46e5 0%,#054a90 55%,#00bfa6 100%)",
                     color: "#fff",
                     fontSize: 14,
                     fontWeight: 700,
@@ -324,8 +387,8 @@ export default function HomePage() {
                     display: "inline-block",
                     padding: "10px 20px",
                     borderRadius: 9,
-                    border: "2px solid #0f766e",
-                    background: "#0f766e",
+                    border: "2px solid #054a90",
+                    background: "#054a90",
                     color: "#fff",
                     fontSize: 14,
                     fontWeight: 700,
@@ -340,9 +403,9 @@ export default function HomePage() {
                     display: "inline-block",
                     padding: "10px 20px",
                     borderRadius: 9,
-                    border: "2px solid #3f1d8f",
+                    border: "2px solid #4f46e5",
                     background: "#fff",
-                    color: "#3f1d8f",
+                    color: "#4f46e5",
                     fontSize: 14,
                     fontWeight: 700,
                     textDecoration: "none",
@@ -353,14 +416,35 @@ export default function HomePage() {
               </div>
             </div>
 
+            <div
+              className="jb-hero-ref-images jb-fade2"
+              style={{
+                flex: "0 0 auto",
+                padding: "clamp(18px, 3vw, 36px)",
+                zIndex: 1,
+                display: "flex",
+                alignItems: "flex-end",
+                justifyContent: "center",
+              }}
+              aria-hidden
+            >
+              <div className="jb-hero-visual">
+                <img
+                  src={publicAssetUrl("/ui-images/employee-growth-steps.png")}
+                  alt=""
+                  className="jb-hero-growth-img"
+                  decoding="async"
+                />
+              </div>
+            </div>
           </div>
         </div>
       </div>
 
       {/* ══ WHY CHOOSE JOB BLUEPRINT? ════════════════════════════════ */}
-      <div style={{ background: "#f5f3ff", padding: "72px 32px" }}>
+      <div style={{ background: "#f6f8fc", padding: "72px 32px" }}>
         <div style={{ maxWidth: 1100, margin: "0 auto" }}>
-          <h2 style={{ textAlign: "center", margin: "0 0 40px", fontSize: 30, fontWeight: 800, color: "#4c1d95", letterSpacing: "-0.5px" }}>
+          <h2 style={{ textAlign: "center", margin: "0 0 40px", fontSize: 30, fontWeight: 800, color: "#054a90", letterSpacing: "-0.5px" }}>
             Why Teams Choose This Platform
           </h2>
 

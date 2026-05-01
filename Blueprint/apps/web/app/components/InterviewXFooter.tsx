@@ -37,8 +37,8 @@ export function InterviewXFooter() {
                   src={logoSrc}
                   alt="Corporate Development"
                   className="ix-site-footer__logo-img"
-                  width={200}
-                  height={40}
+                  width={534}
+                  height={80}
                 />
               </div>
               <p className="ix-site-footer__brand-desc">
