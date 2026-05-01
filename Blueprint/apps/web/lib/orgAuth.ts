@@ -22,7 +22,7 @@ export type OrgUser = {
 };
 
 export type OrgRegisterResponse =
-  | { verificationRequired: true; email: string }
+  | { verificationRequired: true; email: string; debugOtp?: string }
   | { token: string; user: OrgUser };
 
 const TOKEN_KEY = "jbv2_org_token";
@@ -107,7 +107,7 @@ export async function orgVerifyEmailOtp(body: { email: string; otp: string }) {
 }
 
 export async function orgResendEmailOtp(body: { email: string }) {
-  return apiJson<{ ok: true; message?: string }>("/api/org-auth/resend-email-otp", {
+  return apiJson<{ ok: true; message?: string; debugOtp?: string }>("/api/org-auth/resend-email-otp", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),

@@ -87,6 +87,20 @@ export class InterviewXController {
     return this.service.getInterviewXReportForCandidate({ interviewConfigId, candidateId });
   }
 
+  @Get("manager-analytics")
+  async managerAnalytics(@Headers("authorization") authorization?: string) {
+    const token = getBearerToken(authorization);
+    if (!token) throw new UnauthorizedException("Missing token");
+
+    const me = this.orgAuth.verifyToken(token);
+    const isManagerOrHr =
+      me?.accountType === "EMPLOYEE" &&
+      (me?.currentRole === "MANAGER" || me?.currentRole === "HR");
+    if (!isManagerOrHr) throw new UnauthorizedException("Only managers or HR can view analytics");
+
+    return this.service.getManagerAnalytics(me);
+  }
+
   @Get("blueprint-latest-credentials")
   async blueprintLatestCredentials(
     @Headers("authorization") authorization?: string,
