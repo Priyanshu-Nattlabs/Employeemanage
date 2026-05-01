@@ -260,6 +260,8 @@ function ManagerDashboardContent() {
             <div style={iconTile} title={user.fullName || user.email}>{initials}</div>
             <div style={{ minWidth: 0, overflow: "hidden" }}>
               <div style={breadcrumb}>
+                <a href={appPath("/dashboard/manager/hub")} style={{ color: "rgba(255,255,255,0.6)", textDecoration: "none", fontWeight: 700, fontSize: 12 }}>← Overview</a>
+                <span style={crumbSep}>›</span>
                 <span style={crumbCur}>Dashboard</span>
                 <span style={crumbSep}>›</span>
                 <span style={crumbCur}>{isHR ? "HR view" : "Manager view"}</span>

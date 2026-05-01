@@ -20,12 +20,14 @@ export default function VerifyOtpPage() {
   const [otp, setOtp] = useState("");
   const [email, setEmail] = useState("");
   const [nextUrl, setNextUrl] = useState<string>("/");
+  const [debugOtp, setDebugOtp] = useState("");
 
   useEffect(() => {
     if (typeof window === "undefined") return;
     const url = new URL(window.location.href);
     setEmail((url.searchParams.get("email") || "").trim());
     setNextUrl(url.searchParams.get("next") || "/");
+    setDebugOtp((url.searchParams.get("debugOtp") || "").trim());
   }, []);
 
   const inferredDomain = useMemo(() => domainFromEmail(email), [email]);
@@ -57,6 +59,7 @@ export default function VerifyOtpPage() {
     try {
       const r = await orgResendEmailOtp({ email });
       setInfo(r.message || "Check your inbox for a new code.");
+      setDebugOtp((r.debugOtp || "").trim());
     } catch (err: any) {
       setError(err?.message || "Failed to resend OTP");
     } finally {
@@ -70,6 +73,11 @@ export default function VerifyOtpPage() {
       <p style={{ margin: "8px 0 18px", color: "#475569", fontSize: 14, lineHeight: 1.6 }}>
         We sent a 6-digit OTP to <b>{email || "your email"}</b>. Enter it below to verify your account.
       </p>
+      {debugOtp ? (
+        <div style={{ marginBottom: 14, padding: "10px 12px", borderRadius: 10, background: "#fffbeb", border: "1px solid #fde68a", color: "#92400e", fontSize: 13 }}>
+          Development OTP: <b style={{ letterSpacing: 2 }}>{debugOtp}</b>
+        </div>
+      ) : null}
 
       <form onSubmit={onVerify} style={{ display: "grid", gap: 12 }}>
         <label style={{ display: "grid", gap: 6 }}>

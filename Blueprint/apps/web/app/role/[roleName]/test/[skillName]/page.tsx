@@ -144,6 +144,8 @@ export default function SkillTestPage() {
   const isCombinedKnownSkillsTest = skillName.toLowerCase() === "known-skills";
   const displayTestTitle = isCombinedKnownSkillsTest ? "Combined Known Skills Test" : skillName;
 
+  const [mounted, setMounted] = useState(false);
+  const [blocked, setBlocked] = useState<null | { role: string; loginHref: string; message: string }>(null);
   const [userId,     setUserId]     = useState("demo-student-1");
   const [test,       setTest]       = useState<TestType | null>(null);
   const [loading,    setLoading]    = useState(true);
@@ -173,11 +175,59 @@ export default function SkillTestPage() {
   const progress   = questionCount ? Math.round((answered / questionCount) * 100) : 0;
 
   useEffect(() => {
-    const uid = getOrgAuthFromStorage()?.user?.id || "demo-student-1";
+    setMounted(true);
+    const authUser = getOrgAuthFromStorage()?.user || null;
+    const currentRole = String(authUser?.currentRole || "");
+
+    // Only employees are allowed to attempt skill tests.
+    if (currentRole && currentRole !== "EMPLOYEE") {
+      const loginHref =
+        currentRole === "MANAGER" || currentRole === "HR"
+          ? "/auth/employee/login"
+          : "/auth/login";
+      setBlocked({
+        role: currentRole,
+        loginHref,
+        message: "Managers and HR can track progress, but cannot open or attempt tests on behalf of employees.",
+      });
+      setLoading(false);
+      return;
+    }
+
+    const uid = authUser?.id || "demo-student-1";
     setUserId(uid);
     void loadTest(uid, false);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [roleName, skillName]);
+
+  if (blocked) {
+    return (
+      <div style={{ maxWidth: 720, margin: "0 auto", padding: "18px 0 40px" }}>
+        <div style={card}>
+          <div style={{ fontSize: 28, marginBottom: 8 }}>🔒</div>
+          <h2 style={{ margin: "0 0 8px", fontSize: 20, color: "#0f172a" }}>Test is blocked for {blocked.role}</h2>
+          <p style={{ margin: "0 0 18px", color: "#475569", fontSize: 14, lineHeight: 1.5 }}>
+            {blocked.message}
+          </p>
+          <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+            <Link href={blocked.loginHref} style={{ textDecoration: "none" }}>
+              <button style={btn("white", "#2563eb")}>Login as employee</button>
+            </Link>
+            <button
+              type="button"
+              style={btn("#1e293b", "#f1f5f9", "#e2e8f0")}
+              onClick={() => router.back()}
+            >
+              ← Go back
+            </button>
+            <Link href="/" style={{ textDecoration: "none" }}>
+              <button style={btn("#0f172a", "#fff", "#e2e8f0")}>Home</button>
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   const safeJson = async (r: Response) => { try { return await r.json(); } catch { return null; } };
 

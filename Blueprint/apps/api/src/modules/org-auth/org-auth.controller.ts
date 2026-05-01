@@ -211,6 +211,25 @@ export class OrgAuthController {
     return this.service.getEmployeesPrepSummaryForManager(domain, department);
   }
 
+  /** Manager / HR view: aggregated hub analytics for the overview dashboard. */
+  @Get("manager-hub-analytics")
+  async managerHubAnalytics(@Headers("authorization") authorization?: string) {
+    const token = getBearerToken(authorization);
+    if (!token) throw new UnauthorizedException("Missing token");
+    const me = this.service.verifyToken(token);
+    const isManager = me?.accountType === "EMPLOYEE" && me?.currentRole === "MANAGER";
+    const isHR = me?.accountType === "EMPLOYEE" && me?.currentRole === "HR";
+    if (!isManager && !isHR) throw new UnauthorizedException("Only managers or HR can view hub analytics");
+
+    const domain = (me.companyDomain || "").trim().toLowerCase();
+    if (!domain) throw new UnauthorizedException("Missing companyDomain");
+
+    if (isHR) return this.service.getManagerHubAnalytics(domain);
+    const profile = await this.service.getProfileById(me?.sub);
+    const department = (profile as any)?.department || "";
+    return this.service.getManagerHubAnalytics(domain, department);
+  }
+
   // ───────────────────── Organization structure ─────────────────────
 
   /** Manager / HR: read the company's org structure (departments → roles map). */
