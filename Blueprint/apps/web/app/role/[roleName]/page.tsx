@@ -450,6 +450,7 @@ function RolePageContent() {
   // Only employees should be able to open/attempt tests. Managers/HR may view this page via links,
   // and can recommend roles, but should not see test actions.
   const canTakeTests = viewerRole === "EMPLOYEE" && !isRecommendMode;
+  const showTestsUi = !isRecommendMode;
 
   /* ── chart customization modal ── */
   const [showCustomize,      setShowCustomize]      = useState(false);
@@ -1101,7 +1102,9 @@ function RolePageContent() {
     ? (topicsCache[tooltip.topKey]?.[tooltip.month] ?? null)
     : null;
   const tooltipIsLoading = tooltip ? !!topicsLoading[tooltip.topKey] : false;
-  const showSkillSelectionOnly = !prep?.knownSkillsConfigured;
+  // In manager recommend flow we want ONLY the JD + recommend action.
+  // No tests, no preparation flow, no skill selection.
+  const showSkillSelectionOnly = !isRecommendMode && !prep?.knownSkillsConfigured;
   const waitForSkillComparison = Number(employeeLevel) > 1 && skillCompareLoading;
 
   if (showSkillSelectionOnly) {
@@ -1555,7 +1558,7 @@ function RolePageContent() {
         </div>
       )}
 
-      {(!prep?.knownSkillsConfigured) && waitForSkillComparison && (
+      {showTestsUi && (!prep?.knownSkillsConfigured) && waitForSkillComparison && (
         <div style={{ ...card, marginBottom: 16, borderLeft: "4px solid #3170A5" }}>
           <h3 style={{ margin: "0 0 6px", fontSize: 16, color: "#0F1724" }}>Step 2: Skills you already know</h3>
           <p style={{ margin: 0, fontSize: 13, color: "#64748b" }}>
@@ -1564,7 +1567,7 @@ function RolePageContent() {
         </div>
       )}
 
-      {(!prep?.knownSkillsConfigured) && allRoleSkillNames.length > 0 && !waitForSkillComparison && (
+      {showTestsUi && (!prep?.knownSkillsConfigured) && allRoleSkillNames.length > 0 && !waitForSkillComparison && (
         <div style={{ ...card, marginBottom: 16, borderLeft: "4px solid #3170A5" }}>
           <h3 style={{ margin: "0 0 6px", fontSize: 16, color: "#0F1724" }}>Step 2: Skills you already know</h3>
           <p style={{ margin: "0 0 10px", fontSize: 13, color: "#64748b" }}>
@@ -2180,7 +2183,7 @@ function RolePageContent() {
                         {/* actions */}
                         <td style={{ padding:"8px 10px", textAlign:"center", verticalAlign:"middle" }}>
                           <div style={{ display:"flex", flexDirection:"column", gap:4 }}>
-                            {prep?.isActive ? (
+                            {!showTestsUi ? null : prep?.isActive ? (
                               canTakeTests ? (
                                 <Link href={`/role/${enc(roleName)}/test/${enc(task.name)}`} style={{ textDecoration:"none" }}>
                                   <button
@@ -2324,7 +2327,7 @@ function RolePageContent() {
                           </div>
                         );
                       })()}
-                      {prep?.isActive ? (
+                      {!showTestsUi ? null : prep?.isActive ? (
                         canTakeTests ? (
                           <Link href={`/role/${enc(roleName)}/test/${enc(s.skillName)}`} style={{ textDecoration:"none" }} onClick={(e)=>e.stopPropagation()}>
                             <button style={{

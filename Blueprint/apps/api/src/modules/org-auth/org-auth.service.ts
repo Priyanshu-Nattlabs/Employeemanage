@@ -650,12 +650,13 @@ export class OrgAuthService {
     fullName: string;
     designation: string;
     department?: string;
+    industry?: string;
     companyName: string;
     companyDomain?: string;
     employeeId: string;
     currentRole: OrgCurrentRole;
     mobileNo: string;
-    reportingManagerEmail: string;
+    reportingManagerEmail?: string;
   }) {
     const email = normalizeEmail(input.email);
     const domainFromEmail = emailDomain(email);
@@ -666,17 +667,20 @@ export class OrgAuthService {
       throw new BadRequestException(`Email must use the company domain: ${companyDomain}`);
     }
 
-    const mgrEmail = normalizeEmail(input.reportingManagerEmail);
-    if (emailDomain(mgrEmail) !== companyDomain) {
+    const role = input.currentRole;
+    const mgrEmail = normalizeEmail(input.reportingManagerEmail || "");
+    if (mgrEmail && emailDomain(mgrEmail) !== companyDomain) {
       throw new BadRequestException("Reporting manager email must be in the same company domain");
     }
 
     // HR doesn't need a department. Everyone else (EMPLOYEE / MANAGER) does.
-    const isHR = input.currentRole === "HR";
+    const isHR = role === "HR";
     const department = (input.department || "").trim();
     if (!isHR && !department) {
       throw new BadRequestException("Department is required");
     }
+
+    const industry = String(input.industry || "").trim();
 
     const existing = await this.companyUserModel.findOne({ email }).lean();
     if (existing) throw new BadRequestException("An account with this email already exists");
@@ -688,13 +692,14 @@ export class OrgAuthService {
       fullName: input.fullName?.trim(),
       designation: input.designation?.trim(),
       department: isHR ? undefined : department,
+      industry: industry || undefined,
       companyName: input.companyName?.trim(),
       companyDomain,
       employeeId: input.employeeId?.trim(),
-      currentRole: input.currentRole,
+      currentRole: role,
       accountType: "EMPLOYEE" as OrgAccountType,
       mobileNo: input.mobileNo?.trim(),
-      reportingManagerEmail: mgrEmail,
+      reportingManagerEmail: mgrEmail || undefined,
       emailVerified: true,
     });
     const otpMeta = await this.setAndSendEmailOtp(created);

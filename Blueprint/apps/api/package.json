@@ -5,7 +5,8 @@
   "scripts": {
     "start:dev": "ts-node-dev --respawn --transpile-only src/main.ts",
     "import:old-blueprint": "ts-node-dev --transpile-only --exit-child src/scripts/import-old-blueprint.ts",
-    "seed:xlsx": "node src/scripts/seed-from-xlsx.mjs"
+    "seed:xlsx": "node src/scripts/seed-from-xlsx.mjs",
+    "seed:org-structure:xlsx": "node src/scripts/seed-org-structure-from-xlsx.mjs"
   },
   "dependencies": {
     "@nestjs/common": "^10.4.8",
