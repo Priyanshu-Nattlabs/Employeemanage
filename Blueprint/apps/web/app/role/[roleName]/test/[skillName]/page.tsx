@@ -144,6 +144,8 @@ export default function SkillTestPage() {
   const isCombinedKnownSkillsTest = skillName.toLowerCase() === "known-skills";
   const displayTestTitle = isCombinedKnownSkillsTest ? "Combined Known Skills Test" : skillName;
 
+  const [mounted, setMounted] = useState(false);
+  const [blocked, setBlocked] = useState<null | { role: string; loginHref: string; message: string }>(null);
   const [userId,     setUserId]     = useState("demo-student-1");
   const [test,       setTest]       = useState<TestType | null>(null);
   const [loading,    setLoading]    = useState(true);
@@ -173,11 +175,59 @@ export default function SkillTestPage() {
   const progress   = questionCount ? Math.round((answered / questionCount) * 100) : 0;
 
   useEffect(() => {
-    const uid = getOrgAuthFromStorage()?.user?.id || "demo-student-1";
+    setMounted(true);
+    const authUser = getOrgAuthFromStorage()?.user || null;
+    const currentRole = String(authUser?.currentRole || "");
+
+    // Only employees are allowed to attempt skill tests.
+    if (currentRole && currentRole !== "EMPLOYEE") {
+      const loginHref =
+        currentRole === "MANAGER" || currentRole === "HR"
+          ? "/auth/employee/login"
+          : "/auth/login";
+      setBlocked({
+        role: currentRole,
+        loginHref,
+        message: "Managers and HR can track progress, but cannot open or attempt tests on behalf of employees.",
+      });
+      setLoading(false);
+      return;
+    }
+
+    const uid = authUser?.id || "demo-student-1";
     setUserId(uid);
     void loadTest(uid, false);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [roleName, skillName]);
+
+  if (blocked) {
+    return (
+      <div style={{ maxWidth: 720, margin: "0 auto", padding: "18px 0 40px" }}>
+        <div style={card}>
+          <div style={{ fontSize: 28, marginBottom: 8 }}>🔒</div>
+          <h2 style={{ margin: "0 0 8px", fontSize: 20, color: "#0f172a" }}>Test is blocked for {blocked.role}</h2>
+          <p style={{ margin: "0 0 18px", color: "#475569", fontSize: 14, lineHeight: 1.5 }}>
+            {blocked.message}
+          </p>
+          <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+            <Link href={blocked.loginHref} style={{ textDecoration: "none" }}>
+              <button style={btn("white", "#2563eb")}>Login as employee</button>
+            </Link>
+            <button
+              type="button"
+              style={btn("#1e293b", "#f1f5f9", "#e2e8f0")}
+              onClick={() => router.back()}
+            >
+              ← Go back
+            </button>
+            <Link href="/" style={{ textDecoration: "none" }}>
+              <button style={btn("#0f172a", "#fff", "#e2e8f0")}>Home</button>
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   const safeJson = async (r: Response) => { try { return await r.json(); } catch { return null; } };
 
@@ -417,13 +467,18 @@ export default function SkillTestPage() {
   useEffect(() => {
     const prevHtmlOverflow = document.documentElement.style.overflow;
     const prevBodyOverflow = document.body.style.overflow;
-    document.documentElement.style.overflow = "hidden";
-    document.body.style.overflow = "hidden";
+    if (test?.status === "IN_PROGRESS") {
+      document.documentElement.style.overflow = "hidden";
+      document.body.style.overflow = "hidden";
+    } else {
+      document.documentElement.style.overflow = "";
+      document.body.style.overflow = "";
+    }
     return () => {
       document.documentElement.style.overflow = prevHtmlOverflow;
       document.body.style.overflow = prevBodyOverflow;
     };
-  }, []);
+  }, [test?.status]);
 
   useEffect(() => {
     if (!test || test.status !== "IN_PROGRESS" || !cameraReady) return;
@@ -502,7 +557,7 @@ export default function SkillTestPage() {
     const liUrl  = `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent("https://jobblueprint.app")}&summary=${encodeURIComponent(liText)}`;
 
     return (
-      <div style={{ width:"100%", maxWidth:580, margin:"0 auto", padding:"8px 0 32px" }}>
+      <div style={{ width:"100%", maxWidth:760, margin:"0 auto", padding:"12px 0 40px" }}>
         <style>{`@keyframes fadeUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}@keyframes pop{0%{transform:scale(.8);opacity:0}70%{transform:scale(1.05)}100%{transform:scale(1);opacity:1}}`}</style>
 
         {/* breadcrumb */}
@@ -535,22 +590,19 @@ export default function SkillTestPage() {
                 {copied ? "✓ Copied!" : "📋 Copy achievement text"}
               </button>
 
-              <div style={{ display:"flex", gap:10 }}>
-                <button style={{ ...btn("white","#6366f1"), flex:1, justifyContent:"center", borderRadius:12 }}
-                  onClick={() => router.push(`/role/${encodeURIComponent(roleName)}`)}>
-                  ← Back to Role
+              <div style={{ display:"flex", gap:10, flexWrap:"wrap" }}>
+                <button
+                  style={{ ...btn("white","#6366f1"), flex:1, justifyContent:"center", borderRadius:12, minWidth:220 }}
+                  onClick={() => router.replace(`/role/${encodeURIComponent(roleName)}`)}
+                >
+                  Go to Blueprint
                 </button>
                 <button
-                  style={{ ...btn("white","#0ea5e9"), flex:1, justifyContent:"center", borderRadius:12 }}
-                  onClick={() => router.push(`/role/${encodeURIComponent(roleName)}/report`)}
+                  style={{ ...btn("white","#0ea5e9"), flex:1, justifyContent:"center", borderRadius:12, minWidth:220 }}
+                  onClick={() => router.replace(`/role/${encodeURIComponent(roleName)}/report`)}
                 >
-                  📄 View Report
+                  Detailed Report
                 </button>
-                <Link href="/" style={{ textDecoration:"none", flex:1 }}>
-                  <button style={{ ...btn("#0f172a","#f8fafc","#e2e8f0"), width:"100%", justifyContent:"center", borderRadius:12 }}>
-                    🏠 Home
-                  </button>
-                </Link>
               </div>
             </div>
           </div>
@@ -558,29 +610,31 @@ export default function SkillTestPage() {
           /* ══ FAILED ══════════════════════════════════════════ */
           <div style={{ animation:"fadeUp .4s ease" }}>
             <div style={{
-              background: "linear-gradient(145deg,#1e293b,#0f172a)",
-              borderRadius: 24, overflow: "hidden",
-              boxShadow: "0 24px 64px rgba(0,0,0,.35)",
+              background: "linear-gradient(180deg,#ffffff 0%,#f8fafc 100%)",
+              borderRadius: 20,
+              overflow: "hidden",
+              boxShadow: "0 18px 36px rgba(15,23,42,.12)",
+              border: "1px solid #e2e8f0",
             }}>
-              <div style={{ height: 5, background: "linear-gradient(90deg,#ef4444,#b91c1c)" }} />
-              <div style={{ padding: "36px 32px", textAlign: "center" }}>
-                <div style={{ fontSize: 56, marginBottom: 12, animation:"pop .5s ease" }}>😔</div>
-                <h2 style={{ margin:"0 0 6px", color:"white", fontSize:26, fontWeight:900 }}>Not Passed</h2>
-                <p style={{ margin:"0 0 20px", color:"rgba(255,255,255,.55)", fontSize:14 }}>{displayTestTitle}</p>
+              <div style={{ height: 5, background: "linear-gradient(90deg,#ef4444,#f97316)" }} />
+              <div style={{ padding: "30px 26px", textAlign: "center" }}>
+                <div style={{ fontSize: 52, marginBottom: 10, animation:"pop .5s ease" }}>😔</div>
+                <h2 style={{ margin:"0 0 6px", color:"#0f172a", fontSize:30, fontWeight:900 }}>Not Passed</h2>
+                <p style={{ margin:"0 0 20px", color:"#64748b", fontSize:14, fontWeight:700 }}>{displayTestTitle}</p>
 
                 <div style={{ position:"relative", display:"inline-flex", alignItems:"center", justifyContent:"center", marginBottom:20 }}>
                   <ScoreRing pct={score} size={120} stroke={13} />
                   <div style={{ position:"absolute", textAlign:"center" }}>
-                    <div style={{ fontSize:28, fontWeight:900, color:"white" }}>{score}<span style={{ fontSize:14 }}>%</span></div>
-                    <div style={{ fontSize:10, color:"rgba(255,255,255,.4)", fontWeight:700, letterSpacing:".08em" }}>SCORE</div>
+                    <div style={{ fontSize:28, fontWeight:900, color:"#0f172a" }}>{score}<span style={{ fontSize:14 }}>%</span></div>
+                    <div style={{ fontSize:10, color:"#64748b", fontWeight:700, letterSpacing:".08em" }}>SCORE</div>
                   </div>
                 </div>
 
-                <div style={{ background:"rgba(239,68,68,.12)", border:"1px solid rgba(239,68,68,.25)", borderRadius:14, padding:"14px 20px", marginBottom:24 }}>
-                  <p style={{ margin:"0 0 4px", color:"#fca5a5", fontWeight:700, fontSize:14 }}>
+                <div style={{ background:"#fef2f2", border:"1px solid #fecaca", borderRadius:14, padding:"14px 20px", marginBottom:24 }}>
+                  <p style={{ margin:"0 0 4px", color:"#991b1b", fontWeight:800, fontSize:20 }}>
                     Need ≥ 80% to pass — you scored {score}%
                   </p>
-                  <p style={{ margin:0, color:"rgba(255,255,255,.45)", fontSize:12 }}>
+                  <p style={{ margin:0, color:"#7f1d1d", fontSize:13 }}>
                     Review the learning topics from the Gantt chart then retry.
                   </p>
                 </div>
@@ -592,17 +646,20 @@ export default function SkillTestPage() {
                   >
                     🔄 Retake Test
                   </button>
-                  <button
-                    style={{ ...btn("white","#0ea5e9"), justifyContent:"center", fontSize:14, padding:"12px 0", borderRadius:12 }}
-                    onClick={() => router.push(`/role/${encodeURIComponent(roleName)}/report`)}
-                  >
-                    📄 View Report
-                  </button>
-                  <button style={{ ...btn("white","rgba(255,255,255,.08)","rgba(255,255,255,.15)"), justifyContent:"center", fontSize:14, padding:"12px 0", borderRadius:12 }}
-                    onClick={() => router.push(`/role/${encodeURIComponent(roleName)}`)}
-                  >
-                    ← Study & Come Back
-                  </button>
+                  <div style={{ display:"flex", gap:10, flexWrap:"wrap" }}>
+                    <button
+                      style={{ ...btn("white","#6366f1"), flex:1, justifyContent:"center", borderRadius:12, minWidth:220 }}
+                      onClick={() => router.replace(`/role/${encodeURIComponent(roleName)}`)}
+                    >
+                      Go to Blueprint
+                    </button>
+                    <button
+                      style={{ ...btn("white","#0ea5e9"), flex:1, justifyContent:"center", borderRadius:12, minWidth:220 }}
+                      onClick={() => router.replace(`/role/${encodeURIComponent(roleName)}/report`)}
+                    >
+                      Detailed Report
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>

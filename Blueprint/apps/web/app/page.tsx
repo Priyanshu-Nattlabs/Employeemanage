@@ -94,6 +94,12 @@ export default function HomePage() {
   const [search, setSearch] = useState("");
   const [resuming, setResuming] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [activePreparations, setActivePreparations] = useState<
+    Array<{ roleName: string; preparationStartDate?: string; targetCompletionDate?: string }>
+  >([]);
+  const [testReportCards, setTestReportCards] = useState<
+    Array<{ roleName: string; tests: number; passed: number; failed: number; latestCompletedAt: string | null }>
+  >([]);
 
   useEffect(() => {
     const refreshAuth = () => {
@@ -121,6 +127,76 @@ export default function HomePage() {
     void load();
     return () => { cancelled = true; };
   }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    const loadReports = async () => {
+      const auth = getOrgAuthFromStorage();
+      const userId = auth?.user?.id;
+      if (!auth?.token || !userId) {
+        if (!cancelled) {
+          setTestReportCards([]);
+          setActivePreparations([]);
+        }
+        return;
+      }
+      try {
+        const ongoingRes = await fetch(`${getApiPrefix()}/api/role-preparation/ongoing?studentId=${encodeURIComponent(userId)}`);
+        const ongoing = await ongoingRes.json().catch(() => []);
+        if (!cancelled) {
+          const active = (Array.isArray(ongoing) ? ongoing : [])
+            .filter((x: any) => x?.roleName)
+            .map((x: any) => ({
+              roleName: String(x.roleName),
+              preparationStartDate: String(x?.preparationStartDate || ""),
+              targetCompletionDate: String(x?.targetCompletionDate || ""),
+            }));
+          setActivePreparations(active);
+        }
+        const roleNames = Array.from(
+          new Set(
+            (Array.isArray(ongoing) ? ongoing : [])
+              .map((x: any) => String(x?.roleName || "").trim())
+              .filter(Boolean)
+          )
+        ).slice(0, 6);
+        if (!roleNames.length) {
+          if (!cancelled) setTestReportCards([]);
+          return;
+        }
+        const summaries = await Promise.all(
+          roleNames.map(async (roleName) => {
+            const testsRes = await fetch(
+              `${getApiPrefix()}/api/skill-test/all-by-role?studentId=${encodeURIComponent(userId)}&roleName=${encodeURIComponent(roleName)}`
+            );
+            const tests = await testsRes.json().catch(() => []);
+            const latest = (Array.isArray(tests) ? tests : []).filter((t: any) => t?.isLatest);
+            const passed = latest.filter((t: any) => t?.passed).length;
+            const failed = latest.filter((t: any) => !t?.passed).length;
+            const latestCompletedAt =
+              latest
+                .map((t: any) => String(t?.completedAt || ""))
+                .filter(Boolean)
+                .sort()
+                .slice(-1)[0] || null;
+            return { roleName, tests: latest.length, passed, failed, latestCompletedAt };
+          })
+        );
+        if (!cancelled) {
+          setTestReportCards(summaries.filter((s) => s.tests > 0));
+        }
+      } catch {
+        if (!cancelled) {
+          setTestReportCards([]);
+          setActivePreparations([]);
+        }
+      }
+    };
+    void loadReports();
+    return () => {
+      cancelled = true;
+    };
+  }, [isAuthenticated]);
 
   const rankedRoleMatches = useMemo(
     () => rankRolesForSearch(roles, search, 12),
@@ -356,6 +432,117 @@ export default function HomePage() {
           </div>
         </div>
       </div>
+
+      {activePreparations.length > 0 && (
+        <div style={{ background: "#fff", padding: "16px 32px 6px" }}>
+          <div style={{ maxWidth: 1100, margin: "0 auto" }}>
+            <h2 style={{ margin: "0 0 10px", fontSize: 22, fontWeight: 800, color: "#1e1b4b" }}>Active Preparations</h2>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 12 }}>
+              {activePreparations.map((prep) => (
+                <div
+                  key={`${prep.roleName}-${prep.preparationStartDate || ""}`}
+                  style={{ background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 14, padding: 14 }}
+                >
+                  <div style={{ fontSize: 16, fontWeight: 900, color: "#0f172a" }}>{prep.roleName}</div>
+                  <div style={{ marginTop: 8, fontSize: 12, color: "#64748b" }}>
+                    Started: {prep.preparationStartDate ? new Date(prep.preparationStartDate).toLocaleDateString() : "—"}
+                  </div>
+                  <div style={{ marginTop: 3, fontSize: 12, color: "#64748b" }}>
+                    Target completion: {prep.targetCompletionDate ? new Date(prep.targetCompletionDate).toLocaleDateString() : "—"}
+                  </div>
+                  <div style={{ marginTop: 10 }}>
+                    <Link
+                      href={`/role/${encodeURIComponent(prep.roleName)}`}
+                      style={{
+                        textDecoration: "none",
+                        display: "inline-flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        padding: "8px 12px",
+                        borderRadius: 10,
+                        background: "#ede9fe",
+                        border: "1px solid #c4b5fd",
+                        color: "#5b21b6",
+                        fontSize: 13,
+                        fontWeight: 800,
+                      }}
+                    >
+                      Open Blueprint
+                    </Link>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {testReportCards.length > 0 && (
+        <div style={{ background: "#f8fafc", padding: "22px 32px 10px" }}>
+          <div style={{ maxWidth: 1100, margin: "0 auto" }}>
+            <h2 style={{ margin: "0 0 10px", fontSize: 22, fontWeight: 800, color: "#1e1b4b" }}>Your Test Reports</h2>
+            <p style={{ margin: "0 0 12px", fontSize: 13, color: "#64748b" }}>
+              Quick summary of latest skill-test results by role.
+            </p>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: 12, alignItems: "stretch" }}>
+              {testReportCards.map((card) => (
+                <div
+                  key={card.roleName}
+                  style={{
+                    background: "#fff",
+                    border: "1px solid #e2e8f0",
+                    borderRadius: 14,
+                    padding: 14,
+                    boxShadow: "0 4px 14px rgba(15,23,42,.06)",
+                    display: "flex",
+                    flexDirection: "column",
+                    minHeight: 158,
+                  }}
+                >
+                  <div style={{ fontSize: 16, fontWeight: 900, color: "#0f172a", marginBottom: 8 }}>{card.roleName}</div>
+                  <div style={{ marginTop: 2, display: "flex", gap: 8, flexWrap: "wrap", fontSize: 12 }}>
+                    <span style={{ background: "#ecfeff", color: "#155e75", border: "1px solid #a5f3fc", borderRadius: 999, padding: "3px 8px", fontWeight: 700 }}>
+                      Tests: {card.tests}
+                    </span>
+                    <span style={{ background: "#ecfdf5", color: "#166534", border: "1px solid #bbf7d0", borderRadius: 999, padding: "3px 8px", fontWeight: 700 }}>
+                      Passed: {card.passed}
+                    </span>
+                    <span style={{ background: "#fef2f2", color: "#991b1b", border: "1px solid #fecaca", borderRadius: 999, padding: "3px 8px", fontWeight: 700 }}>
+                      Failed: {card.failed}
+                    </span>
+                  </div>
+                  <div style={{ marginTop: 10, fontSize: 12, color: "#64748b" }}>
+                    {card.latestCompletedAt ? `Last updated: ${new Date(card.latestCompletedAt).toLocaleDateString()}` : "No recent update"}
+                  </div>
+                  <div style={{ marginTop: "auto", paddingTop: 10 }}>
+                    <Link
+                      href={`/role/${encodeURIComponent(card.roleName)}/report`}
+                      style={{
+                        textDecoration: "none",
+                        display: "inline-flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        padding: "8px 12px",
+                        borderRadius: 10,
+                        background: "#eff6ff",
+                        border: "1px solid #bfdbfe",
+                        color: "#1d4ed8",
+                        fontSize: 13,
+                        fontWeight: 800,
+                      }}
+                    >
+                      View Detailed Report
+                    </Link>
+                    <div style={{ marginTop: 8, fontSize: 11, color: "#64748b" }}>
+                      Includes skill-wise test summary for this role.
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ══ WHY CHOOSE JOB BLUEPRINT? ════════════════════════════════ */}
       <div style={{ background: "#f5f3ff", padding: "72px 32px" }}>

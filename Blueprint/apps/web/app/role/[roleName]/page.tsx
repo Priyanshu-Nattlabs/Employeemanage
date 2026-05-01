@@ -419,6 +419,7 @@ function RolePageContent() {
   };
 
   const [mounted,         setMounted]         = useState(false);
+  const [viewerRole,      setViewerRole]      = useState<string>("");
   const [userId,          setUserId]          = useState("demo-student-1");
   const [profileRemainingMonths, setProfileRemainingMonths] = useState<number | null>(null);
   const [data,            setData]            = useState<any>(null);
@@ -438,12 +439,17 @@ function RolePageContent() {
   const [trendingErr,     setTrendingErr]     = useState<string>("");
   const [knownSkillsSelection, setKnownSkillsSelection] = useState<string[]>([]);
   const [savingKnownSkills, setSavingKnownSkills] = useState(false);
+  const [startingKnownSkillsTest, setStartingKnownSkillsTest] = useState(false);
   const [mockInterviewLaunching, setMockInterviewLaunching] = useState(false);
   const [previousLevelSkills, setPreviousLevelSkills] = useState<string[]>([]);
   const [skillCompareLoading, setSkillCompareLoading] = useState(false);
   const [proficiencyDelta, setProficiencyDelta] = useState<Array<{ skillName: string; increasePct: number; reason?: string; previousSkill?: string }>>([]);
   /** Base role doc (JD + skills) when chart snapshot omits them */
   const [baseRole,        setBaseRole]        = useState<any>(null);
+
+  // Only employees should be able to open/attempt tests. Managers/HR may view this page via links,
+  // and can recommend roles, but should not see test actions.
+  const canTakeTests = viewerRole === "EMPLOYEE" && !isRecommendMode;
 
   /* ── chart customization modal ── */
   const [showCustomize,      setShowCustomize]      = useState(false);
@@ -533,7 +539,9 @@ function RolePageContent() {
   };
 
   useEffect(() => {
-    const uid = getOrgAuthFromStorage()?.user?.id || "demo-student-1";
+    const authUser = getOrgAuthFromStorage()?.user || null;
+    setViewerRole(String(authUser?.currentRole || ""));
+    const uid = authUser?.id || "demo-student-1";
     setUserId(uid);
 
     // Initial calculation from localStorage to avoid extra fetch if possible,
@@ -567,12 +575,36 @@ function RolePageContent() {
   }, [roleName]);
 
   useEffect(() => {
-    if (prep?.isActive) {
-      setKnownSkillsSelection(Array.isArray(prep?.knownSkillsForTest) ? prep.knownSkillsForTest : []);
+    const fromPrep = Array.isArray(prep?.knownSkillsForTest)
+      ? prep.knownSkillsForTest.map((s: any) => String(s || "").trim()).filter(Boolean)
+      : [];
+    if (fromPrep.length > 0) {
+      setKnownSkillsSelection(fromPrep);
       return;
     }
-    setKnownSkillsSelection([]);
-  }, [prep?.isActive, prep?.knownSkillsForTest, roleName]);
+    if (typeof window === "undefined") return;
+    try {
+      const k = `jbv2-known-skills:${userId}:${roleName}`;
+      const raw = window.localStorage.getItem(k);
+      if (!raw) return;
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) {
+        setKnownSkillsSelection(parsed.map((s: any) => String(s || "").trim()).filter(Boolean));
+      }
+    } catch {
+      // ignore parse/storage errors
+    }
+  }, [prep?.knownSkillsForTest, roleName, userId]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      const k = `jbv2-known-skills:${userId}:${roleName}`;
+      window.localStorage.setItem(k, JSON.stringify(Array.from(new Set(knownSkillsSelection))));
+    } catch {
+      // ignore storage errors
+    }
+  }, [knownSkillsSelection, roleName, userId]);
 
   /* If graduation year/month is saved on Profile while this page is open,
      the chart should regenerate (only when prep is not locked). */
@@ -796,6 +828,22 @@ function RolePageContent() {
     }
   };
 
+  const startCombinedTestForSelectedSkills = async () => {
+    if (!canTakeTests || startingKnownSkillsTest) return;
+    if (knownSkillsSelection.length === 0) {
+      setSavedMsg("Select at least one skill to start the test.");
+      setTimeout(() => setSavedMsg(""), 2500);
+      return;
+    }
+    setStartingKnownSkillsTest(true);
+    try {
+      await saveKnownSkillsAndStart();
+      window.location.href = `/role/${enc(roleName)}/test/known-skills`;
+    } finally {
+      setStartingKnownSkillsTest(false);
+    }
+  };
+
   const markUndone = async (skillName:string) => {
     const res = await fetch(`${API}/api/role-preparation/skill/${enc(roleName)}/${enc(skillName)}?studentId=${enc(userId)}&completed=false`, { method:"PUT" });
     await load();
@@ -960,6 +1008,30 @@ function RolePageContent() {
   const passedKnownSkills: string[] = Array.isArray(prep?.passedKnownSkills) ? prep.passedKnownSkills : [];
   const knownSkillsTestSubmitted = !!prep?.knownSkillsTestSubmitted;
   const canActivatePreparation = testQueueSkills.length === 0 || knownSkillsTestSubmitted;
+  const requiresKnownSkillsTest = !!prep?.knownSkillsConfigured && testQueueSkills.length > 0 && !knownSkillsTestSubmitted;
+  const technicalSkillSet = useMemo(() => {
+    const reqs = Array.isArray(data?.skillRequirements) ? data.skillRequirements : [];
+    return new Set(
+      reqs
+        .filter((r: any) => {
+          const t = String(r?.skillType || r?.type || "technical").toLowerCase();
+          return t.includes("technical") && !t.includes("non");
+        })
+        .map((r: any) => String(r?.skillName || "").trim().toLowerCase())
+        .filter(Boolean)
+    );
+  }, [data?.skillRequirements]);
+  const comparativeSkillBars = useMemo(() => {
+    const rows = (Array.isArray(proficiencyDelta) ? proficiencyDelta : []).filter((p) => {
+      if (!technicalSkillSet.size) return true;
+      return technicalSkillSet.has(String(p.skillName || "").trim().toLowerCase());
+    });
+    return rows.slice(0, 10).map((p) => {
+      const targetNeed = 100;
+      const currentNeed = Math.max(20, targetNeed - p.increasePct);
+      return { ...p, currentNeed, targetNeed, gap: targetNeed - currentNeed };
+    });
+  }, [proficiencyDelta, technicalSkillSet]);
 
   /* Build skill-requirement cards directly from Gantt tasks (source of truth).
      Augment with prerequisites / description from skillRequirements where names match.
@@ -1094,22 +1166,45 @@ function RolePageContent() {
             <p style={{ margin: "0 0 10px", fontSize: 13, color: "#64748b" }}>
               Select skills you already know. These move to the test section and are removed from the learning blueprint for now.
             </p>
-            {proficiencyDelta.length > 0 && (
-              <div style={{ marginBottom: 12, border: "1px solid #dbeafe", background: "#f8fbff", borderRadius: 10, padding: 10 }}>
-                <div style={{ fontSize: 12, fontWeight: 800, color: "#1e3a8a", marginBottom: 8 }}>
-                  AI estimated proficiency growth vs Level {Number(employeeLevel) - 1}
+            {comparativeSkillBars.length > 0 && (
+              <div style={{ marginBottom: 12, border: "1px solid #dbeafe", background: "#f8fbff", borderRadius: 10, padding: 12 }}>
+                <div style={{ fontSize: 13, fontWeight: 900, color: "#1e3a8a", marginBottom: 4 }}>
+                  Common Technical Skills: Current vs Target Proficiency Need
                 </div>
-                <div style={{ display: "grid", gap: 8 }}>
-                  {proficiencyDelta.slice(0, 8).map((p) => (
-                    <div key={p.skillName}>
-                      <div style={{ display: "flex", justifyContent: "space-between", gap: 8, fontSize: 12 }}>
-                        <span style={{ color: "#0f172a", fontWeight: 700 }}>{p.skillName}</span>
-                        <span style={{ color: "#1e40af", fontWeight: 800 }}>+{p.increasePct}%</span>
+                <div style={{ fontSize: 11, color: "#475569", marginBottom: 10 }}>
+                  Compare required proficiency for your current role level and the selected target role level.
+                </div>
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 10 }}>
+                  <span style={{ background: "#e0f2fe", border: "1px solid #7dd3fc", borderRadius: 999, padding: "3px 8px", fontSize: 11, color: "#075985", fontWeight: 700 }}>Current role need</span>
+                  <span style={{ background: "#ede9fe", border: "1px solid #a78bfa", borderRadius: 999, padding: "3px 8px", fontSize: 11, color: "#5b21b6", fontWeight: 700 }}>Target role need</span>
+                  <span style={{ background: "#ecfdf5", border: "1px solid #86efac", borderRadius: 999, padding: "3px 8px", fontSize: 11, color: "#166534", fontWeight: 700 }}>Gap to close</span>
+                </div>
+                <div style={{ display: "grid", gap: 10 }}>
+                  {comparativeSkillBars.map((p) => (
+                    <div key={p.skillName} style={{ border: "1px solid #dbeafe", borderRadius: 8, padding: 8, background: "white" }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", gap: 8, fontSize: 12, marginBottom: 6 }}>
+                        <span style={{ color: "#0f172a", fontWeight: 800 }}>{p.skillName}</span>
+                        <span style={{ color: "#15803d", fontWeight: 900 }}>Gap +{p.gap}%</span>
                       </div>
-                      <div style={{ height: 6, background: "#e2e8f0", borderRadius: 999, overflow: "hidden", marginTop: 4 }}>
-                        <div style={{ width: `${p.increasePct}%`, height: "100%", background: "linear-gradient(90deg,#22c55e,#3b82f6)" }} />
+                      <div style={{ display: "grid", gap: 6 }}>
+                        <div>
+                          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: "#075985", marginBottom: 2 }}>
+                            <span>Current</span><span>{p.currentNeed}%</span>
+                          </div>
+                          <div style={{ height: 8, background: "#e2e8f0", borderRadius: 999, overflow: "hidden" }}>
+                            <div style={{ width: `${p.currentNeed}%`, height: "100%", background: "linear-gradient(90deg,#38bdf8,#0ea5e9)" }} />
+                          </div>
+                        </div>
+                        <div>
+                          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: "#5b21b6", marginBottom: 2 }}>
+                            <span>Target</span><span>{p.targetNeed}%</span>
+                          </div>
+                          <div style={{ height: 8, background: "#e2e8f0", borderRadius: 999, overflow: "hidden" }}>
+                            <div style={{ width: `${p.targetNeed}%`, height: "100%", background: "linear-gradient(90deg,#8b5cf6,#6366f1)" }} />
+                          </div>
+                        </div>
                       </div>
-                      {p.reason ? <div style={{ marginTop: 3, fontSize: 11, color: "#64748b" }}>{p.reason}</div> : null}
+                      {p.reason ? <div style={{ marginTop: 5, fontSize: 11, color: "#64748b" }}>{p.reason}</div> : null}
                     </div>
                   ))}
                 </div>
@@ -1150,13 +1245,23 @@ function RolePageContent() {
                 );
               })}
             </div>
-            <button
-              onClick={saveKnownSkillsAndStart}
-              disabled={savingKnownSkills}
-              style={{ ...btn("white", "#3170A5", "#3170A5"), border: "none" as any }}
-            >
-              {savingKnownSkills ? "Saving..." : "Save Skills & Open Blueprint"}
-            </button>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              <button
+                onClick={saveKnownSkillsAndStart}
+                disabled={savingKnownSkills || startingKnownSkillsTest}
+                style={{ ...btn("white", "#3170A5", "#3170A5"), border: "none" as any }}
+              >
+                {savingKnownSkills ? "Saving..." : "Save Selected Skills"}
+              </button>
+              <button
+                onClick={startCombinedTestForSelectedSkills}
+                disabled={!canTakeTests || savingKnownSkills || startingKnownSkillsTest}
+                title={!canTakeTests ? "Only employees can take tests" : "Save selected skills and start combined test"}
+                style={{ ...btn("white", "#2563EB", "#2563EB"), border: "none" as any, opacity: !canTakeTests ? 0.7 : 1 }}
+              >
+                {startingKnownSkillsTest ? "Starting test..." : "Start Test on Selected Skills"}
+              </button>
+            </div>
           </div>
         )}
       </div>
@@ -1465,22 +1570,45 @@ function RolePageContent() {
           <p style={{ margin: "0 0 10px", fontSize: 13, color: "#64748b" }}>
             Select skills you already know. These move to the test section and are removed from the learning blueprint for now.
           </p>
-          {proficiencyDelta.length > 0 && (
-            <div style={{ marginBottom: 12, border: "1px solid #dbeafe", background: "#f8fbff", borderRadius: 10, padding: 10 }}>
-              <div style={{ fontSize: 12, fontWeight: 800, color: "#1e3a8a", marginBottom: 8 }}>
-                AI estimated proficiency growth vs Level {Number(employeeLevel) - 1}
+          {comparativeSkillBars.length > 0 && (
+            <div style={{ marginBottom: 12, border: "1px solid #dbeafe", background: "#f8fbff", borderRadius: 10, padding: 12 }}>
+              <div style={{ fontSize: 13, fontWeight: 900, color: "#1e3a8a", marginBottom: 4 }}>
+                Common Technical Skills: Current vs Target Proficiency Need
               </div>
-              <div style={{ display: "grid", gap: 8 }}>
-                {proficiencyDelta.slice(0, 8).map((p) => (
-                  <div key={p.skillName}>
-                    <div style={{ display: "flex", justifyContent: "space-between", gap: 8, fontSize: 12 }}>
-                      <span style={{ color: "#0f172a", fontWeight: 700 }}>{p.skillName}</span>
-                      <span style={{ color: "#1e40af", fontWeight: 800 }}>+{p.increasePct}%</span>
+              <div style={{ fontSize: 11, color: "#475569", marginBottom: 10 }}>
+                Compare required proficiency for your current role level and the selected target role level.
+              </div>
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 10 }}>
+                <span style={{ background: "#e0f2fe", border: "1px solid #7dd3fc", borderRadius: 999, padding: "3px 8px", fontSize: 11, color: "#075985", fontWeight: 700 }}>Current role need</span>
+                <span style={{ background: "#ede9fe", border: "1px solid #a78bfa", borderRadius: 999, padding: "3px 8px", fontSize: 11, color: "#5b21b6", fontWeight: 700 }}>Target role need</span>
+                <span style={{ background: "#ecfdf5", border: "1px solid #86efac", borderRadius: 999, padding: "3px 8px", fontSize: 11, color: "#166534", fontWeight: 700 }}>Gap to close</span>
+              </div>
+              <div style={{ display: "grid", gap: 10 }}>
+                {comparativeSkillBars.map((p) => (
+                  <div key={p.skillName} style={{ border: "1px solid #dbeafe", borderRadius: 8, padding: 8, background: "white" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", gap: 8, fontSize: 12, marginBottom: 6 }}>
+                      <span style={{ color: "#0f172a", fontWeight: 800 }}>{p.skillName}</span>
+                      <span style={{ color: "#15803d", fontWeight: 900 }}>Gap +{p.gap}%</span>
                     </div>
-                    <div style={{ height: 6, background: "#e2e8f0", borderRadius: 999, overflow: "hidden", marginTop: 4 }}>
-                      <div style={{ width: `${p.increasePct}%`, height: "100%", background: "linear-gradient(90deg,#22c55e,#3b82f6)" }} />
+                    <div style={{ display: "grid", gap: 6 }}>
+                      <div>
+                        <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: "#075985", marginBottom: 2 }}>
+                          <span>Current</span><span>{p.currentNeed}%</span>
+                        </div>
+                        <div style={{ height: 8, background: "#e2e8f0", borderRadius: 999, overflow: "hidden" }}>
+                          <div style={{ width: `${p.currentNeed}%`, height: "100%", background: "linear-gradient(90deg,#38bdf8,#0ea5e9)" }} />
+                        </div>
+                      </div>
+                      <div>
+                        <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: "#5b21b6", marginBottom: 2 }}>
+                          <span>Target</span><span>{p.targetNeed}%</span>
+                        </div>
+                        <div style={{ height: 8, background: "#e2e8f0", borderRadius: 999, overflow: "hidden" }}>
+                          <div style={{ width: `${p.targetNeed}%`, height: "100%", background: "linear-gradient(90deg,#8b5cf6,#6366f1)" }} />
+                        </div>
+                      </div>
                     </div>
-                    {p.reason ? <div style={{ marginTop: 3, fontSize: 11, color: "#64748b" }}>{p.reason}</div> : null}
+                    {p.reason ? <div style={{ marginTop: 5, fontSize: 11, color: "#64748b" }}>{p.reason}</div> : null}
                   </div>
                 ))}
               </div>
@@ -1521,17 +1649,62 @@ function RolePageContent() {
               );
             })}
           </div>
-          <button
-            onClick={saveKnownSkillsAndStart}
-            disabled={savingKnownSkills}
-            style={{ ...btn("white", "#3170A5", "#3170A5"), border: "none" as any }}
-          >
-            {savingKnownSkills ? "Saving..." : "Save Skills & Continue"}
-          </button>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <button
+              onClick={saveKnownSkillsAndStart}
+              disabled={savingKnownSkills || startingKnownSkillsTest}
+              style={{ ...btn("white", "#3170A5", "#3170A5"), border: "none" as any }}
+            >
+              {savingKnownSkills ? "Saving..." : "Save Selected Skills"}
+            </button>
+            <button
+              onClick={startCombinedTestForSelectedSkills}
+              disabled={!canTakeTests || savingKnownSkills || startingKnownSkillsTest}
+              title={!canTakeTests ? "Only employees can take tests" : "Save selected skills and start combined test"}
+              style={{ ...btn("white", "#2563EB", "#2563EB"), border: "none" as any, opacity: !canTakeTests ? 0.7 : 1 }}
+            >
+              {startingKnownSkillsTest ? "Starting test..." : "Start Test on Selected Skills"}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {requiresKnownSkillsTest && (
+        <div style={{ ...card, marginBottom: 18, borderTop: "3px solid #2563eb" }}>
+          <h3 style={{ margin: "0 0 8px", fontSize: 16, color: "#0F1724" }}>Step 3: Start Combined Test</h3>
+          <p style={{ margin: "0 0 10px", fontSize: 13, color: "#64748b" }}>
+            Your selected known skills are saved. Start and submit the combined test to unlock the blueprint view.
+          </p>
+          <div style={{ border: "1px solid #dbeafe", borderRadius: 10, padding: "10px", background: "#eff6ff" }}>
+            <div style={{ fontSize: 12, fontWeight: 800, color: "#1e3a8a", marginBottom: 8 }}>
+              Selected skills: {testQueueSkills.join(", ")}
+            </div>
+            {canTakeTests ? (
+              <Link href={`/role/${enc(roleName)}/test/known-skills`} style={{ textDecoration: "none" }}>
+                <div style={{ border: "1px solid #93c5fd", borderRadius: 8, padding: "9px 10px", color: "#1e3a8a", fontWeight: 800, background: "white", textAlign: "center" }}>
+                  {knownSkillsTestSubmitted ? "Retake Combined Test" : "Start Combined Test"}
+                </div>
+              </Link>
+            ) : (
+              <div
+                title="Only employees can take tests"
+                style={{ border: "1px solid #e2e8f0", borderRadius: 8, padding: "9px 10px", color: "#94a3b8", fontWeight: 800, background: "#f8fafc", textAlign: "center" }}
+              >
+                🔒 Test blocked (employee only)
+              </div>
+            )}
+          </div>
+          <Link href={`/role/${enc(roleName)}/report`} style={{ textDecoration: "none" }}>
+            <div style={{ marginTop: 10, border: "1px solid #bae6fd", borderRadius: 8, padding: "8px 10px", color: "#0c4a6e", fontWeight: 700, background: "#f0f9ff", textAlign: "center" }}>
+              📄 View Detailed Test Report
+            </div>
+          </Link>
         </div>
       )}
 
       {/* ── STATS ─────────────────────────────────────────────── */}
+      {!requiresKnownSkillsTest && (
+      <>
       <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(150px,1fr))", gap:10, marginBottom:20 }}>
         {[
           { label:"Total Skills", val:tasks.length||data?.skillRequirements?.length||"–", accent:"#3170A5" },
@@ -1553,55 +1726,6 @@ function RolePageContent() {
           </div>
         ))}
       </div>
-
-      {prep?.knownSkillsConfigured && (
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 20 }}>
-          <div style={{ ...card, borderTop: "3px solid #2563EB" }}>
-            <h3 style={{ margin: "0 0 8px", fontSize: 15, color: "#0F1724" }}>🧠 Combined Test Section</h3>
-            <p style={{ margin: "0 0 10px", fontSize: 12, color: "#64748b" }}>
-              One medium-hard test is generated with 5 questions per selected skill. Passing is evaluated per skill at 80%.
-            </p>
-            {testQueueSkills.length === 0 ? (
-              <p style={{ margin: 0, fontSize: 13, color: "#94a3b8" }}>No known skills selected for test.</p>
-            ) : (
-              <div style={{ display: "grid", gap: 8 }}>
-                <div style={{ border: "1px solid #dbeafe", borderRadius: 8, padding: "10px", background: "#EFF6FF" }}>
-                  <p style={{ margin: "0 0 8px", fontSize: 12, color: "#1e3a8a", fontWeight: 700 }}>
-                    Included skills: {testQueueSkills.join(", ")}
-                  </p>
-                  <Link href={`/role/${enc(roleName)}/test/known-skills`} style={{ textDecoration: "none" }}>
-                    <div style={{ border: "1px solid #93c5fd", borderRadius: 8, padding: "9px 10px", color: "#1e3a8a", fontWeight: 800, background: "white", textAlign: "center" }}>
-                      {knownSkillsTestSubmitted ? "Retake Combined Test" : "Take Combined Test"}
-                    </div>
-                  </Link>
-                </div>
-              </div>
-            )}
-            <Link href={`/role/${enc(roleName)}/report`} style={{ textDecoration: "none" }}>
-              <div style={{ marginTop: 10, border: "1px solid #bae6fd", borderRadius: 8, padding: "8px 10px", color: "#0c4a6e", fontWeight: 700, background: "#f0f9ff", textAlign: "center" }}>
-                📄 View Detailed Test Report
-              </div>
-            </Link>
-            {!canActivatePreparation && (
-              <p style={{ margin: "10px 0 0", fontSize: 12, color: "#b45309" }}>
-                Submit this combined test to unlock Start Preparation.
-              </p>
-            )}
-          </div>
-          <div style={{ ...card, borderTop: "3px solid #16A34A" }}>
-            <h3 style={{ margin: "0 0 8px", fontSize: 15, color: "#0F1724" }}>🏆 Completed (Badges)</h3>
-            {passedKnownSkills.length === 0 ? (
-              <p style={{ margin: 0, fontSize: 13, color: "#94a3b8" }}>No skill badges earned yet.</p>
-            ) : (
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-                {passedKnownSkills.map((skill) => (
-                  <span key={skill} style={{ ...pill("#ECFDF5", "#166534"), fontSize: 12 }}>🏅 {skill}</span>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-      )}
 
       {/* ── JOB DESCRIPTION + SKILLS ─────────────────────────── */}
       <div ref={jdAnchorRef} />
@@ -1666,7 +1790,7 @@ function RolePageContent() {
       )}
 
       {/* ── TRENDING JOBS INSIGHTS ────────────────────────────── */}
-      <div style={{
+      {false && (<div style={{
         background: "white",
         borderRadius: 12,
         border: "1px solid rgba(0,0,0,.1)",
@@ -1865,7 +1989,7 @@ function RolePageContent() {
             </div>
           )}
         </div>
-      </div>
+      </div>)}
 
       {/* ── READINESS BAR ────────────────────────────────────── */}
       {prep && (
@@ -2057,20 +2181,34 @@ function RolePageContent() {
                         <td style={{ padding:"8px 10px", textAlign:"center", verticalAlign:"middle" }}>
                           <div style={{ display:"flex", flexDirection:"column", gap:4 }}>
                             {prep?.isActive ? (
-                              <Link href={`/role/${enc(roleName)}/test/${enc(task.name)}`} style={{ textDecoration:"none" }}>
+                              canTakeTests ? (
+                                <Link href={`/role/${enc(roleName)}/test/${enc(task.name)}`} style={{ textDecoration:"none" }}>
+                                  <button
+                                    style={{
+                                      width:"100%", fontSize:11, padding:"6px 0",
+                                      background: isDone ? "#ECFDF5" : "#2563EB",
+                                      color: isDone ? "#065F46" : "white",
+                                      border: isDone ? "1px solid #D1FAE5" : "none",
+                                      borderRadius:6, fontWeight:700, cursor:"pointer",
+                                      display:"flex", alignItems:"center", justifyContent:"center", gap:4,
+                                    }}
+                                  >
+                                    {isDone
+                                      ? (typeof (prep?.skillProgress?.[task.name]?.score) === "number"
+                                          ? `🔄 Retake · ${prep.skillProgress[task.name].score}%`
+                                          : "🔄 Retake")
+                                      : "🧠 Take Test"}
+                                  </button>
+                                </Link>
+                              ) : (
                                 <button
-                                  style={{
-                                    width:"100%", fontSize:11, padding:"6px 0",
-                                    background: isDone ? "#ECFDF5" : "#2563EB",
-                                    color: isDone ? "#065F46" : "white",
-                                    border: isDone ? "1px solid #D1FAE5" : "none",
-                                    borderRadius:6, fontWeight:700, cursor:"pointer",
-                                    display:"flex", alignItems:"center", justifyContent:"center", gap:4,
-                                  }}
+                                  disabled
+                                  title="Only employees can take tests"
+                                  style={{ background:"#F1F5F9", color:"#94a3b8", border:"none", borderRadius:6, width:"100%", fontSize:11, padding:"6px 0", opacity:.85, cursor:"not-allowed", display:"flex", alignItems:"center", justifyContent:"center" }}
                                 >
-                                  {isDone ? "🔄 Retake" : "🧠 Take Test"}
+                                  🔒 Blocked
                                 </button>
-                              </Link>
+                              )
                             ) : (
                               <button
                                 disabled
@@ -2187,17 +2325,29 @@ function RolePageContent() {
                         );
                       })()}
                       {prep?.isActive ? (
-                        <Link href={`/role/${enc(roleName)}/test/${enc(s.skillName)}`} style={{ textDecoration:"none" }} onClick={(e)=>e.stopPropagation()}>
-                          <button style={{
-                            background: isDone ? "#ECFDF5" : "#2563EB",
-                            color: isDone ? "#065F46" : "white",
-                            border: isDone ? "1px solid #D1FAE5" : "none",
-                            borderRadius:8, fontWeight:700, fontSize:11, cursor:"pointer",
-                            padding:"8px 14px", display:"flex", alignItems:"center", gap:4,
-                          }}>
-                            {isDone ? "🔄 Retake" : "🧠 Take Test"}
+                        canTakeTests ? (
+                          <Link href={`/role/${enc(roleName)}/test/${enc(s.skillName)}`} style={{ textDecoration:"none" }} onClick={(e)=>e.stopPropagation()}>
+                            <button style={{
+                              background: isDone ? "#ECFDF5" : "#2563EB",
+                              color: isDone ? "#065F46" : "white",
+                              border: isDone ? "1px solid #D1FAE5" : "none",
+                              borderRadius:8, fontWeight:700, fontSize:11, cursor:"pointer",
+                              padding:"8px 14px", display:"flex", alignItems:"center", gap:4,
+                            }}>
+                              {isDone
+                                ? (typeof score === "number" ? `🔄 Retake · ${score}%` : "🔄 Retake")
+                                : "🧠 Take Test"}
+                            </button>
+                          </Link>
+                        ) : (
+                          <button
+                            disabled
+                            title="Only employees can take tests"
+                            style={{ background:"#F1F5F9", color:"#94a3b8", border:"none", borderRadius:8, fontSize:11, padding:"8px 12px", opacity:.85, cursor:"not-allowed" }}
+                          >
+                            🔒 Blocked
                           </button>
-                        </Link>
+                        )
                       ) : (
                         <button disabled title="Start Preparation first" style={{ background:"#F1F5F9", color:"#94a3b8", border:"none", borderRadius:8, fontSize:11, padding:"8px 12px", opacity:.5, cursor:"not-allowed" }}>
                           🔒 Start Prep
@@ -2285,6 +2435,8 @@ function RolePageContent() {
             })}
           </div>
         </div>
+      )}
+      </>
       )}
 
       {/* ── USER BAR ─────────────────────────────────────────── */}

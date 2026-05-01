@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { motion } from "framer-motion";
+import { InterviewXFooter } from "./InterviewXFooter";
 
 const sectionIn = {
   initial: { opacity: 0, y: 28 },
@@ -10,151 +11,253 @@ const sectionIn = {
   transition: { duration: 0.55 },
 };
 
-const features = [
-  { title: "AI Interviews", icon: "AI" },
-  { title: "Skill Labs", icon: "LB" },
-  { title: "Detailed Reports", icon: "RP" },
-  { title: "Comparison Insights", icon: "CP" },
-  { title: "Development Portal", icon: "DP" },
-  { title: "Manager Dashboard", icon: "MG" },
-];
-
-const steps = [
-  "Create role",
-  "Conduct AI interview + labs",
-  "Get detailed reports",
-  "Employee enters development portal",
-  "Track growth & promote",
-];
-
 export function PublicHomePage() {
   return (
     <div className="public-home">
       <style>{`
-        .public-home { position: relative; margin-left: calc(50% - 50vw); margin-right: calc(50% - 50vw); margin-top: -18px; width: 100vw; overflow-x: hidden; background: #ffffff; color: #0B3C8C; }
-        .public-bg { pointer-events: none; position: absolute; inset: 0; background: linear-gradient(180deg, #ddd6fe 0%, #cffafe 34%, #ffffff 76%); }
-        .hero-shell {
-          position: relative;
-          z-index: 1;
-          max-width: 1240px;
-          margin: 0 auto;
-          padding: 28px 20px 64px;
-          background:
-            radial-gradient(55% 60% at 12% 10%, rgba(91,33,182,.20), transparent 72%),
-            radial-gradient(45% 50% at 95% 18%, rgba(20,184,166,.18), transparent 70%),
-            linear-gradient(180deg, rgba(255,255,255,.35), rgba(255,255,255,.12));
+        :root {
+          --bg: #f6f8fc;
+          --surface: rgba(255,255,255,0.86);
+          --card: #ffffff;
+          --ink: #0b1220;
+          --muted: #475467;
+          --border: rgba(15, 23, 42, 0.10);
+          --border-strong: rgba(15, 23, 42, 0.14);
+          --shadow: 0 18px 45px rgba(15, 23, 42, 0.10);
+          --shadow-soft: 0 10px 26px rgba(15, 23, 42, 0.07);
+          /* SaarthiX palette cues (adapted to corporate) */
+          --brandA: #054a90;
+          --brandB: #3170a5;
+          --brandC: #4f46e5;
+          --brandMint: #00bfa6;
+
+          /* Footer theme (InterviewXFooter uses these vars) */
+          --ix-footer-bg: linear-gradient(180deg, #f5f9ff 0%, #eef5ff 45%, #eaf2ff 100%);
+          --ix-footer-text: var(--ink);
+          --ix-footer-muted: #667085;
+          --ix-footer-accent: var(--brandA);
+          --ix-footer-border: rgba(2, 6, 23, 0.06);
+          --ix-footer-card-bg: rgba(255, 255, 255, 0.92);
+          --ix-footer-card-border: rgba(2, 6, 23, 0.08);
+          --ix-footer-icon: rgba(15, 23, 42, 0.72);
+          --ix-footer-accent-border: rgba(5, 74, 144, 0.32);
+          --ix-footer-bar-bg: #0b1220;
+          --ix-footer-bar-text: rgba(226, 232, 240, 0.74);
+          --ix-footer-bar-text-hover: #e2e8f0;
         }
+
+        .public-home { position: relative; margin-left: calc(50% - 50vw); margin-right: calc(50% - 50vw); margin-top: -18px; width: 100vw; overflow-x: hidden; background: var(--bg); color: var(--ink); }
+        .public-bg {
+          pointer-events: none;
+          position: absolute;
+          inset: 0;
+          background:
+            radial-gradient(circle at 18% 24%, rgba(56, 189, 248, 0.18) 0%, transparent 48%),
+            radial-gradient(circle at 82% 18%, rgba(99, 102, 241, 0.14) 0%, transparent 46%),
+            radial-gradient(circle at 70% 82%, rgba(34, 197, 94, 0.10) 0%, transparent 50%),
+            linear-gradient(125deg, #dff1ff 0%, #e4e8ff 50%, #e8fff5 100%);
+        }
+
+        .hero-shell { position: relative; z-index: 1; max-width: 1240px; margin: 0 auto; padding: 56px 20px 42px; }
         .public-wrap { position: relative; z-index: 1; max-width: 1240px; margin: 0 auto; padding: 18px 20px 28px; }
-        .public-grid2 { display: grid; gap: 30px; grid-template-columns: 1fr; align-items: center; }
-        .public-badge { display: inline-flex; border: 1px solid rgba(31,95,191,.25); background: rgba(255,255,255,.7); border-radius: 999px; padding: 7px 14px; font-size: 11px; font-weight: 700; letter-spacing: .15em; color: #1F5FBF; }
-        .public-h1 { margin: 0; font-size: clamp(30px, 4.1vw, 52px); font-weight: 800; line-height: 1.1; letter-spacing: -.02em; color: #0B3C8C; max-width: 760px; }
-        .public-p { margin: 0; max-width: 680px; color: #1F5FBF; line-height: 1.85; font-size: 16px; }
-        .public-btns { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; }
-        .btn-primary { border-radius: 12px; padding: 12px 18px; background: linear-gradient(90deg, #1F5FBF, #00BFA6); color: #fff; font-weight: 800; font-size: 14px; text-decoration: none; border: none; box-shadow: 0 8px 20px rgba(31,95,191,.20); }
-        .btn-secondary { border-radius: 12px; padding: 12px 18px; background: #fff; color: #0B3C8C; font-weight: 800; font-size: 14px; text-decoration: none; border: 1px solid rgba(31,95,191,.25); }
-        .hero-points {
-          display: grid;
-          gap: 12px;
-        }
-        .hero-point {
-          border-left: 3px solid #00BFA6;
-          padding: 10px 0 10px 12px;
-          background: linear-gradient(90deg, rgba(79,163,255,.12), rgba(255,255,255,0));
-        }
-        .section { position: relative; z-index: 1; max-width: 1240px; margin: 0 auto; padding: 30px 20px 34px; }
-        .section-title { margin: 0; font-size: clamp(24px, 3.2vw, 34px); font-weight: 800; color: #0B3C8C; }
-        .dual-info-grid { margin-top: 14px; display: grid; gap: 16px; grid-template-columns: 1fr; width: 100%; }
-        .dual-info-card { border: 1px solid #4FA3FF55; border-radius: 12px; padding: 22px; background: linear-gradient(180deg, #ffffff 0%, #4FA3FF12 100%); box-shadow: 0 6px 18px rgba(11,60,140,.06); }
-        .triple-info-card { border: 1px solid #4FA3FF55; border-radius: 12px; padding: 22px; background: linear-gradient(180deg, #ffffff 0%, #4FA3FF12 100%); box-shadow: 0 6px 18px rgba(11,60,140,.06); }
-        .triple-info-grid { display: grid; gap: 16px; grid-template-columns: 1fr; }
-        .triple-info-col { border: 1px solid #4FA3FF33; border-radius: 10px; padding: 14px; background: #ffffff; }
-        .dual-info-title { margin: 0; font-size: 22px; font-weight: 800; color: #0B3C8C; }
-        .dual-info-subtitle { margin: 0; font-size: 12px; letter-spacing: .12em; text-transform: uppercase; font-weight: 700; color: #1F5FBF; }
-        .dual-info-list { margin: 10px 0 0; padding-left: 18px; color: #1F5FBF; font-size: 13px; line-height: 1.75; }
-        .info-card-btn {
+        .public-grid2 { display: grid; gap: 34px; grid-template-columns: 1fr; align-items: center; }
+        .public-badge {
           display: inline-flex;
-          align-items: center;
-          justify-content: center;
-          min-height: 42px;
-          padding: 10px 16px;
-          border-radius: 12px;
-          text-decoration: none;
-          font-size: 14px;
-          font-weight: 800;
-          color: #ffffff;
-          background: linear-gradient(90deg, #1F5FBF 0%, #00BFA6 100%);
-          box-shadow: 0 8px 18px rgba(31,95,191,.22);
-          border: 1px solid rgba(255,255,255,.45);
-          transition: transform .18s ease, box-shadow .18s ease, filter .18s ease;
+          border: 1px solid rgba(15,23,42,0.14);
+          background: rgba(255,255,255,.78);
+          border-radius: 999px;
+          padding: 7px 14px;
+          font-size: 11px;
+          font-weight: 900;
+          letter-spacing: .14em;
+          color: rgba(11,18,32,0.78);
+          text-transform: uppercase;
         }
-        .info-card-btn:hover {
-          transform: translateY(-1px);
-          box-shadow: 0 12px 22px rgba(31,95,191,.28);
-          filter: saturate(1.08);
-        }
-        .caps-grid { margin-top: 10px; display: grid; gap: 14px; grid-template-columns: 1fr; }
-        .caps-left { border: 1px solid #4FA3FF55; border-radius: 12px; padding: 18px; background: linear-gradient(180deg, #ffffff 0%, #6FE7D214 100%); }
-        .caps-items { margin-top: 10px; display: grid; gap: 8px; grid-template-columns: repeat(2, minmax(0,1fr)); }
-        .cap-item { border: 1px solid #6FE7D2; border-radius: 10px; padding: 9px 10px; font-size: 12px; color: #0B3C8C; background: #6FE7D21A; }
-        .cta {
-          margin: 24px auto 36px;
-          max-width: 980px;
-          border-radius: 16px;
-          border: 1px solid rgba(31,95,191,.22);
-          background:
-            radial-gradient(120% 140% at 0% 0%, rgba(111,231,210,.22), transparent 46%),
-            radial-gradient(110% 140% at 100% 100%, rgba(79,163,255,.24), transparent 44%),
-            linear-gradient(120deg, #eaf4ff 0%, #dff1ff 50%, #e9f9f6 100%);
-          color: #0B3C8C;
-          text-align: center;
-          padding: 46px 24px;
-          box-shadow: 0 10px 24px rgba(11, 60, 140, 0.10);
-        }
-        .cta-title {
+        .public-h1 {
           margin: 0;
-          font-size: clamp(30px, 3.7vw, 46px);
-          font-weight: 800;
-          letter-spacing: -0.02em;
-          color: #0B3C8C;
-          line-height: 1.12;
+          font-size: clamp(34px, 4.2vw, 58px);
+          font-weight: 900;
+          line-height: 1.05;
+          letter-spacing: -0.03em;
+          color: var(--ink);
+          max-width: 760px;
         }
-        .cta-btn-primary {
+        .public-p { margin: 0; max-width: 680px; color: rgba(71,84,103,0.92); line-height: 1.85; font-size: 16px; }
+        .public-btns { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 18px; }
+
+        .btn-primary,
+        .btn-secondary,
+        .btn-ghost {
+          border-radius: 14px;
+          padding: 12px 16px;
+          font-weight: 900;
+          font-size: 14px;
+          text-decoration: none;
           display: inline-flex;
           align-items: center;
           justify-content: center;
-          min-height: 42px;
-          padding: 10px 18px;
-          border-radius: 12px;
-          border: 1px solid rgba(31,95,191,.20);
-          background: linear-gradient(90deg, #1F5FBF 0%, #00BFA6 100%);
+          gap: 8px;
+          transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease, background .18s ease, color .18s ease;
+        }
+        .btn-primary {
+          border: none;
+          background: linear-gradient(90deg, var(--brandC), var(--brandA) 55%, var(--brandMint));
           color: #fff;
-          font-size: 14px;
-          font-weight: 800;
-          text-decoration: none;
-          box-shadow: 0 8px 18px rgba(31,95,191,.22);
+          box-shadow: 0 14px 30px rgba(31,95,191,.18);
         }
-        .cta-btn-secondary {
-          display: inline-flex;
-          align-items: center;
-          justify-content: center;
-          min-height: 42px;
-          padding: 10px 18px;
-          border-radius: 12px;
-          border: 1px solid rgba(31,95,191,.25);
-          background: rgba(255,255,255,.9);
-          color: #1F5FBF;
-          font-size: 14px;
-          font-weight: 800;
-          text-decoration: none;
+        .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 18px 45px rgba(31,95,191,.22); }
+        .btn-secondary {
+          background: rgba(255,255,255,0.85);
+          color: var(--ink);
+          border: 1px solid rgba(15,23,42,0.14);
+          box-shadow: 0 10px 22px rgba(15,23,42,0.06);
         }
-        .footer { border-top: 1px solid #4FA3FF66; background: #ffffff; padding: 28px 20px; }
-        .footer-grid { max-width: 1240px; margin: 0 auto; display: grid; gap: 20px; grid-template-columns: 1fr; }
+        .btn-secondary:hover { transform: translateY(-1px); border-color: rgba(15,23,42,0.22); }
+        .btn-ghost {
+          background: transparent;
+          color: rgba(11,18,32,0.78);
+          border: 1px dashed rgba(15,23,42,0.22);
+        }
+        .btn-ghost:hover { transform: translateY(-1px); border-color: rgba(15,23,42,0.35); color: var(--ink); }
+
+        .hero-visual {
+          position: relative;
+          border-radius: 22px;
+          border: 1px solid rgba(15,23,42,0.10);
+          background: rgba(255,255,255,0.70);
+          backdrop-filter: blur(10px);
+          box-shadow: var(--shadow);
+          padding: 16px;
+          overflow: hidden;
+        }
+        .hero-visual::before {
+          content: "";
+          position: absolute;
+          inset: -30%;
+          background:
+            radial-gradient(circle at 18% 24%, rgba(56, 189, 248, 0.22) 0%, transparent 46%),
+            radial-gradient(circle at 82% 18%, rgba(99, 102, 241, 0.16) 0%, transparent 44%),
+            radial-gradient(circle at 70% 82%, rgba(34, 197, 94, 0.12) 0%, transparent 46%);
+          filter: blur(24px);
+          opacity: 0.85;
+          pointer-events: none;
+          animation: heroAmbient 14s ease-in-out infinite alternate;
+        }
+        @keyframes heroAmbient {
+          0% { transform: translate3d(-1.5%, 1.2%, 0) scale(1); opacity: 0.70; }
+          100% { transform: translate3d(1.5%, -1.2%, 0) scale(1.04); opacity: 0.92; }
+        }
+        .hero-visual::after {
+          content: "";
+          position: absolute;
+          inset: 0;
+          pointer-events: none;
+          opacity: 0.08;
+          mix-blend-mode: overlay;
+          background-image:
+            repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.06) 0 1px, transparent 1px 3px),
+            repeating-linear-gradient(90deg, rgba(0, 0, 0, 0.04) 0 1px, transparent 1px 3px);
+          mask-image: radial-gradient(circle at 30% 35%, rgba(0, 0, 0, 0.9), transparent 70%);
+        }
+
+        .hero-lines {
+          position: absolute;
+          inset: 0;
+          z-index: 1;
+          width: 100%;
+          height: 100%;
+          opacity: 0.85;
+          pointer-events: none;
+        }
+        .hero-line {
+          fill: none;
+          stroke: rgba(164, 190, 226, 0.56);
+          stroke-width: 2.4;
+          stroke-linecap: round;
+          stroke-dasharray: 9 12;
+          filter: drop-shadow(0 0 5px rgba(255, 255, 255, 0.55))
+            drop-shadow(0 0 12px rgba(141, 180, 255, 0.35));
+          animation: heroLineFlow 7.5s linear infinite;
+        }
+        .hero-line.b { animation-duration: 8.2s; animation-direction: reverse; }
+        .hero-line.c { animation-duration: 9s; }
+        @keyframes heroLineFlow {
+          0% { stroke-dashoffset: 0; opacity: 0.55; }
+          50% { opacity: 1; }
+          100% { stroke-dashoffset: 86; opacity: 0.55; }
+        }
+
+        .hero-sparkles { position: absolute; inset: 0; z-index: 2; pointer-events: none; }
+        .hero-sparkle {
+          position: absolute;
+          display: block;
+          clip-path: polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%);
+          background: radial-gradient(circle, rgba(255, 255, 255, 0.98) 0%, rgba(221, 235, 255, 0.92) 50%, rgba(150, 190, 255, 0.35) 100%);
+          filter: drop-shadow(0 0 5px rgba(255, 255, 255, 0.85))
+            drop-shadow(0 0 10px rgba(166, 202, 255, 0.65))
+            drop-shadow(0 0 18px rgba(125, 174, 255, 0.35));
+          transform-origin: center;
+          opacity: 0.65;
+          animation: heroSparkleMove 3.2s ease-in-out infinite;
+        }
+        @keyframes heroSparkleMove {
+          0%, 100% { opacity: 0.55; transform: translate(0,0) scale(0.88) rotate(0deg); }
+          50% { opacity: 0.95; transform: translate(var(--drift, 0px, -7px)) scale(1.18) rotate(12deg); }
+        }
+        .hero-shotRow { position: relative; display: block; }
+        .hero-shot {
+          width: 100%;
+          height: auto;
+          display: block;
+          border-radius: 16px;
+          border: 1px solid rgba(15,23,42,0.10);
+          box-shadow: 0 16px 36px rgba(15,23,42,0.16);
+        }
+        .hero-microGrid { margin-top: 14px; display: grid; gap: 10px; grid-template-columns: 1fr; }
+        .hero-microCard {
+          border-radius: 14px;
+          background: rgba(255,255,255,0.82);
+          border: 1px solid rgba(15,23,42,0.10);
+          padding: 12px 12px;
+          box-shadow: 0 10px 22px rgba(15,23,42,0.07);
+        }
+        .hero-microEyebrow { font-size: 11px; font-weight: 900; letter-spacing: .14em; text-transform: uppercase; color: rgba(71,84,103,0.85); }
+        .hero-microTitle { margin-top: 6px; font-size: 14px; font-weight: 900; color: var(--ink); line-height: 1.35; }
+
+        .section { position: relative; z-index: 1; max-width: 1240px; margin: 0 auto; padding: 54px 20px; }
+        .section-title { margin: 0; font-size: clamp(24px, 3.2vw, 36px); font-weight: 900; color: var(--ink); letter-spacing: -0.02em; }
+        .modules-grid { display: grid; gap: 14px; grid-template-columns: 1fr; margin-top: 14px; }
+        .module-card { border: 1px solid rgba(15,23,42,0.10); background: rgba(255,255,255,0.86); backdrop-filter: blur(10px); border-radius: 18px; padding: 18px; box-shadow: var(--shadow-soft); transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease; }
+        .module-card:hover { transform: translateY(-2px); border-color: rgba(15,23,42,0.18); box-shadow: 0 18px 46px rgba(15,23,42,0.12); }
+        .module-head { display: flex; gap: 12px; align-items: flex-start; justify-content: space-between; }
+        .module-icon { width: 42px; height: 42px; border-radius: 14px; display: grid; place-items: center; font-weight: 1000; color: var(--ink); background: linear-gradient(135deg, rgba(79,70,229,.16), rgba(0,191,166,.14)); border: 1px solid rgba(15,23,42,0.12); }
+        .module-title { margin: 0; font-size: 16px; font-weight: 900; color: var(--ink); letter-spacing: -0.01em; }
+        .module-desc { margin: 8px 0 0; color: rgba(71,84,103,0.92); font-size: 13px; line-height: 1.75; }
+        .module-tags { margin-top: 12px; display: flex; flex-wrap: wrap; gap: 8px; }
+        .tag { font-size: 11px; font-weight: 900; color: rgba(11,18,32,0.86); background: rgba(0,191,166,.12); border: 1px solid rgba(0,191,166,.28); padding: 4px 9px; border-radius: 999px; }
+        .tag.alt { background: rgba(79,70,229,.10); border-color: rgba(79,70,229,.22); }
+        .module-cta { margin-top: 14px; display: flex; flex-wrap: wrap; gap: 10px; }
+        .module-link { display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 10px 14px; border-radius: 14px; font-size: 13px; font-weight: 900; text-decoration: none; border: 1px solid rgba(15,23,42,0.14); background: rgba(255,255,255,0.90); color: var(--ink); box-shadow: 0 10px 22px rgba(15,23,42,0.06); }
+        .module-link.primary { border: none; background: linear-gradient(90deg, var(--brandC), var(--brandA) 55%, var(--brandMint)); color: #fff; box-shadow: 0 14px 30px rgba(31,95,191,.16); }
+        .module-link:hover { filter: brightness(0.99); }
+        .enterprise-grid { display: grid; gap: 14px; grid-template-columns: 1fr; margin-top: 14px; }
+        .enterprise-card { border-radius: 18px; border: 1px solid rgba(15,23,42,0.10); background: rgba(255,255,255,0.86); backdrop-filter: blur(10px); padding: 18px; box-shadow: var(--shadow-soft); }
+        .enterprise-h { margin: 0; font-size: 12px; font-weight: 1000; color: rgba(71,84,103,0.85); letter-spacing: .14em; text-transform: uppercase; }
+        .enterprise-ul { margin: 10px 0 0; padding-left: 18px; color: rgba(71,84,103,0.92); font-size: 13px; line-height: 1.75; }
+
         @media (min-width: 980px) {
           .public-grid2 { grid-template-columns: 1.05fr .95fr; align-items: center; }
-          .dual-info-grid { grid-template-columns: 1fr; }
-          .triple-info-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-          .caps-grid { grid-template-columns: 1fr; }
-          .footer-grid { grid-template-columns: 2fr repeat(4,1fr); }
+          .modules-grid { grid-template-columns: repeat(2, minmax(0,1fr)); }
+          .enterprise-grid { grid-template-columns: repeat(3, minmax(0,1fr)); }
+          .hero-microGrid { grid-template-columns: repeat(3, minmax(0,1fr)); }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+          .btn-primary, .btn-secondary, .btn-ghost, .module-card { transition: none; }
+          .btn-primary:hover, .btn-secondary:hover, .btn-ghost:hover, .module-card:hover { transform: none; }
+          .hero-visual::before { animation: none; }
+          .hero-line { animation: none; }
+          .hero-sparkle { animation: none; }
         }
       `}</style>
       <div className="public-bg" />
@@ -164,147 +267,211 @@ export function PublicHomePage() {
           <motion.div {...sectionIn}>
             <span className="public-badge">WORKFORCE INTELLIGENCE PLATFORM</span>
             <div style={{ marginTop: 20, display: "grid", gap: 14 }}>
-              <h1 className="public-h1">If talent is your edge, this is your system.</h1>
+              <h1 className="public-h1">If talent is your edge, this is your operating system.</h1>
               <p className="public-p">
-                TalentOS helps companies hire better and grow talent faster using AI-driven interviews, real-world
-                simulations, and personalized career pathways.
+                A connected platform for <b>role blueprinting</b>, <b>AI interviews</b>, <b>interview preparation</b>, and <b>manager monitoring</b> — so hiring and development are driven by consistent evidence.
               </p>
             </div>
             <div className="public-btns">
-              <Link href="/auth/employee/register" className="btn-primary">Get Started</Link>
-              <Link href="/auth/manager/login" className="btn-secondary">Book Demo</Link>
+              <Link href="/auth/manager/login" className="btn-primary">Request Demo <span aria-hidden>→</span></Link>
+              <Link href="/auth/employee/register" className="btn-secondary">Get Started</Link>
+              <Link href="/role/" className="btn-ghost">Browse Blueprints</Link>
             </div>
           </motion.div>
 
-          <motion.div {...sectionIn} transition={{ duration: 0.7 }} className="hero-points">
-            <div className="hero-point">
-              <div style={{ fontSize: 12, color: "#1F5FBF", fontWeight: 700, textTransform: "uppercase", letterSpacing: ".08em" }}>Interview Intelligence</div>
-              <div style={{ marginTop: 5, fontSize: 18, color: "#0B3C8C", fontWeight: 800 }}>AI-led interviews that mirror real role expectations</div>
-            </div>
-            <div className="hero-point">
-              <div style={{ fontSize: 12, color: "#1F5FBF", fontWeight: 700, textTransform: "uppercase", letterSpacing: ".08em" }}>Development Clarity</div>
-              <div style={{ marginTop: 5, fontSize: 18, color: "#0B3C8C", fontWeight: 800 }}>Skill-gap visibility with guided role-based growth</div>
-            </div>
-            <div className="hero-point">
-              <div style={{ fontSize: 12, color: "#1F5FBF", fontWeight: 700, textTransform: "uppercase", letterSpacing: ".08em" }}>Leadership View</div>
-              <div style={{ marginTop: 5, fontSize: 18, color: "#0B3C8C", fontWeight: 800 }}>Promotion readiness insights for confident decisions</div>
-            </div>
-          </motion.div>
-        </div>
-      </section>
-
-      <section className="section">
-        <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "end", flexWrap: "wrap" }}>
-          <h2 className="section-title">Built for both employees and employers</h2>
-          <p style={{ margin: 0, color: "#1F5FBF", fontSize: 13 }}>Grow individual careers and track organizational readiness together.</p>
-        </div>
-        <div className="dual-info-grid">
-          <motion.div {...sectionIn} className="triple-info-card">
-            <div className="triple-info-grid">
-              <div className="triple-info-col">
-                <p className="dual-info-subtitle">For Employees</p>
-                <h3 className="dual-info-title" style={{ fontSize: 20 }}>Your development roadmap, personalized</h3>
-                <p style={{ margin: "10px 0 0", color: "#1F5FBF", fontSize: 14, lineHeight: 1.7 }}>
-                  Set your target role and follow a clear development path.
-                </p>
-                <ul className="dual-info-list">
-                  <li>Map current skills vs target role</li>
-                  <li>Track milestones and readiness progress</li>
-                </ul>
-                <div style={{ marginTop: 18, paddingBottom: 8 }}>
-                  <Link href="/auth/employee/login" className="info-card-btn">Employee Login</Link>
-                </div>
+          <motion.div {...sectionIn} transition={{ duration: 0.7 }}>
+            <div className="hero-visual" aria-label="Product preview">
+              <svg className="hero-lines" viewBox="0 0 1600 720" preserveAspectRatio="none" aria-hidden>
+                <path className="hero-line a" d="M-40 500 C 210 380, 360 590, 640 470 C 860 380, 1140 560, 1660 410" />
+                <path className="hero-line b" d="M-30 620 C 220 520, 460 650, 760 560 C 980 490, 1240 640, 1660 530" />
+                <path className="hero-line c" d="M200 120 C 500 200, 760 80, 1060 170 C 1260 230, 1430 140, 1660 210" />
+              </svg>
+              <div className="hero-sparkles" aria-hidden>
+                {[
+                  { left: "38%", top: "16%", size: 18, delay: "0.2s", drift: "1px, -8px" },
+                  { left: "56%", top: "78%", size: 22, delay: "1s", drift: "-2px, -9px" },
+                  { left: "70%", top: "62%", size: 20, delay: "1.7s", drift: "2px, -7px" },
+                  { left: "84%", top: "26%", size: 24, delay: "0.6s", drift: "-1px, -10px" },
+                  { left: "92%", top: "44%", size: 18, delay: "2.1s", drift: "1px, -6px" },
+                ].map((s, idx) => (
+                  <span
+                    key={idx}
+                    className="hero-sparkle"
+                    style={{
+                      left: s.left,
+                      top: s.top,
+                      width: `${s.size}px`,
+                      height: `${s.size}px`,
+                      animationDelay: s.delay,
+                      ["--drift" as any]: s.drift,
+                    }}
+                  />
+                ))}
+              </div>
+              <div className="hero-shotRow">
+                <img
+                  className="hero-shot"
+                  src="/ui-images/corporate-career-ladder.png"
+                  alt="Career progression from entry level through executive, aligned with role development and readiness"
+                  loading="eager"
+                />
               </div>
 
-              <div className="triple-info-col">
-                <p className="dual-info-subtitle">For Employers</p>
-                <h3 className="dual-info-title" style={{ fontSize: 20 }}>Monitor growth and readiness across teams</h3>
-                <p style={{ margin: "10px 0 0", color: "#1F5FBF", fontSize: 14, lineHeight: 1.7 }}>
-                  View team growth and promotion readiness from one dashboard.
-                </p>
-                <ul className="dual-info-list">
-                  <li>Monitor progress by role and department</li>
-                  <li>Identify promotion-ready talent quickly</li>
-                </ul>
-                <div style={{ marginTop: 18, paddingBottom: 8 }}>
-                  <Link href="/auth/manager/login" className="info-card-btn">Manager / HR Login</Link>
-                </div>
-              </div>
-
-              <div className="triple-info-col">
-                <p className="dual-info-subtitle">Interview</p>
-                <h3 className="dual-info-title" style={{ fontSize: 20 }}>AI interview readiness and evaluation</h3>
-                <p style={{ margin: "10px 0 0", color: "#1F5FBF", fontSize: 14, lineHeight: 1.7 }}>
-                  Practice mock interviews and get role-readiness feedback.
-                </p>
-                <ul className="dual-info-list">
-                  <li>Run technical and HR interview simulations</li>
-                  <li>Get feedback on role fit and communication</li>
-                </ul>
-                <div style={{ marginTop: 18, paddingBottom: 8 }}>
-                  <Link href="/auth/employee/login" className="info-card-btn">Start Interview Prep</Link>
-                </div>
+              <div className="hero-microGrid" aria-label="Key outcomes">
+                {[
+                  { e: "Blueprint", t: "Standardize role expectations across teams." },
+                  { e: "Evaluate", t: "AI interviews + reports you can defend." },
+                  { e: "Monitor", t: "Progress, readiness, and trends in one view." },
+                ].map((x) => (
+                  <div key={x.e} className="hero-microCard">
+                    <div className="hero-microEyebrow">{x.e}</div>
+                    <div className="hero-microTitle">{x.t}</div>
+                  </div>
+                ))}
               </div>
             </div>
           </motion.div>
         </div>
       </section>
 
-      <motion.section {...sectionIn} className="section">
+      <section className="section" aria-labelledby="modules-heading">
         <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "end", flexWrap: "wrap" }}>
-          <h2 className="section-title">Simple workflow</h2>
-          <p style={{ margin: 0, color: "#1F5FBF", fontSize: 13 }}>Hire → Develop → Promote in one connected flow.</p>
+          <h2 id="modules-heading" className="section-title">Four connected modules, one talent system</h2>
+          <p style={{ margin: 0, color: "#1F5FBF", fontSize: 13 }}>Blueprint → Evaluate → Prepare → Monitor — all aligned to roles.</p>
         </div>
-        <div className="caps-grid">
-          <div className="caps-left">
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <h3 style={{ margin: 0, fontSize: 14, color: "#0B3C8C" }}>Core Capabilities</h3>
-              <span style={{ fontSize: 11, color: "#1F5FBF" }}>6 modules</span>
-            </div>
-            <div className="caps-items">
-              {features.map((item) => (
-                <div key={item.title} className="cap-item">
-                  <span style={{ color: "#1F5FBF", fontWeight: 700 }}>{item.icon}</span> {item.title}
+
+        <div className="modules-grid">
+          <motion.div {...sectionIn} className="module-card">
+            <div className="module-head">
+              <div style={{ display: "flex", gap: 12, minWidth: 0 }}>
+                <div className="module-icon" aria-hidden>BP</div>
+                <div style={{ minWidth: 0 }}>
+                  <h3 className="module-title">Blueprint (Role Pathways)</h3>
+                  <p className="module-desc">
+                    Define target roles, required skills, and a guided roadmap. Employees get clarity; managers get consistency.
+                  </p>
                 </div>
-              ))}
+              </div>
             </div>
+            <div className="module-tags" aria-label="Blueprint highlights">
+              <span className="tag">Skill gaps</span>
+              <span className="tag alt">Roadmaps</span>
+              <span className="tag">Assessments</span>
+            </div>
+            <div className="module-cta">
+              <Link href="/role/" className="module-link primary">Explore Blueprints <span aria-hidden>→</span></Link>
+              <Link href="/target-role" className="module-link">Start a plan <span aria-hidden>→</span></Link>
+            </div>
+          </motion.div>
+
+          <motion.div {...sectionIn} className="module-card">
+            <div className="module-head">
+              <div style={{ display: "flex", gap: 12, minWidth: 0 }}>
+                <div className="module-icon" aria-hidden>AI</div>
+                <div style={{ minWidth: 0 }}>
+                  <h3 className="module-title">AI Interviews (InterviewX)</h3>
+                  <p className="module-desc">
+                    Schedule role-aligned AI interviews, generate reports, and review proctoring summaries for credibility.
+                  </p>
+                </div>
+              </div>
+            </div>
+            <div className="module-tags" aria-label="AI Interview highlights">
+              <span className="tag alt">Reports</span>
+              <span className="tag">Rubrics</span>
+              <span className="tag alt">Proctoring</span>
+            </div>
+            <div className="module-cta">
+              <Link href="/auth/manager/login" className="module-link primary">Manager / HR access <span aria-hidden>→</span></Link>
+              <Link href="/dashboard/manager/schedule-interviews" className="module-link">Open schedule hub <span aria-hidden>→</span></Link>
+            </div>
+          </motion.div>
+
+          <motion.div {...sectionIn} className="module-card">
+            <div className="module-head">
+              <div style={{ display: "flex", gap: 12, minWidth: 0 }}>
+                <div className="module-icon" aria-hidden>IP</div>
+                <div style={{ minWidth: 0 }}>
+                  <h3 className="module-title">Interview Preparation</h3>
+                  <p className="module-desc">
+                    Technical + HR practice, structured feedback, and mentor interview requests — so candidates improve faster.
+                  </p>
+                </div>
+              </div>
+            </div>
+            <div className="module-tags" aria-label="Interview prep highlights">
+              <span className="tag">Technical</span>
+              <span className="tag alt">HR round</span>
+              <span className="tag">Mentors</span>
+            </div>
+            <div className="module-cta">
+              <Link href="/auth/employee/login" className="module-link primary">Employee login <span aria-hidden>→</span></Link>
+              <Link href="/auth/employee/register" className="module-link">Create account <span aria-hidden>→</span></Link>
+            </div>
+          </motion.div>
+
+          <motion.div {...sectionIn} className="module-card">
+            <div className="module-head">
+              <div style={{ display: "flex", gap: 12, minWidth: 0 }}>
+                <div className="module-icon" aria-hidden>MN</div>
+                <div style={{ minWidth: 0 }}>
+                  <h3 className="module-title">Monitoring & Analytics</h3>
+                  <p className="module-desc">
+                    A manager dashboard for activity, progress distribution, team comparisons, and employee tracking by role.
+                  </p>
+                </div>
+              </div>
+            </div>
+            <div className="module-tags" aria-label="Monitoring highlights">
+              <span className="tag alt">Activity feed</span>
+              <span className="tag">KPI view</span>
+              <span className="tag alt">Tracking</span>
+            </div>
+            <div className="module-cta">
+              <Link href="/auth/manager/login" className="module-link primary">Open dashboard <span aria-hidden>→</span></Link>
+              <Link href="/dashboard/manager" className="module-link">Manager view <span aria-hidden>→</span></Link>
+            </div>
+          </motion.div>
+        </div>
+      </section>
+
+      <motion.section {...sectionIn} className="section" aria-labelledby="enterprise-heading">
+        <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "end", flexWrap: "wrap" }}>
+          <h2 id="enterprise-heading" className="section-title">Enterprise-ready by design</h2>
+          <p style={{ margin: 0, color: "#1F5FBF", fontSize: 13 }}>Practical governance, clear audit trails, and role-based access.</p>
+        </div>
+        <div className="enterprise-grid">
+          <div className="enterprise-card">
+            <p className="enterprise-h">Security</p>
+            <ul className="enterprise-ul">
+              <li>Role-based access for employees, managers, HR, and admins</li>
+              <li>Reports and scores stored per candidate and interview</li>
+              <li>Proctoring summary surfaced in interview reports (when enabled)</li>
+            </ul>
+          </div>
+          <div className="enterprise-card">
+            <p className="enterprise-h">Operations</p>
+            <ul className="enterprise-ul">
+              <li>Manager dashboard with activity feed and engagement views</li>
+              <li>Bulk invite employees via Excel for faster onboarding</li>
+              <li>Consistent role blueprints to standardize expectations</li>
+            </ul>
+          </div>
+          <div className="enterprise-card">
+            <p className="enterprise-h">Decisioning</p>
+            <ul className="enterprise-ul">
+              <li>Promotion readiness based on assessments + progress</li>
+              <li>Compare team progress distribution across roles</li>
+              <li>Track employee preparation analytics by role</li>
+            </ul>
           </div>
         </div>
       </motion.section>
 
-      <motion.section {...sectionIn} className="section">
-        <div className="cta">
-          <h2 className="cta-title">Build your future workforce today</h2>
-          <div className="public-btns" style={{ justifyContent: "center", marginTop: 18 }}>
-            <Link href="/auth/employee/register" className="cta-btn-primary">
-              Get Started
-            </Link>
-            <Link href="/auth/manager/login" className="cta-btn-secondary">
-              Request Demo
-            </Link>
-          </div>
-        </div>
-      </motion.section>
-
-      <footer className="footer">
-        <div className="footer-grid">
-          <div>
-            <p style={{ margin: 0, fontSize: 20, fontWeight: 800 }}>TalentOS</p>
-            <p style={{ margin: "8px 0 0", fontSize: 13, color: "#1F5FBF", lineHeight: 1.7 }}>
-              Workforce Intelligence Platform for hiring, evaluating, and developing talent with AI.
-            </p>
-            <p style={{ margin: "10px 0 0", fontSize: 13, color: "#1F5FBF" }}>Headquarters: Bengaluru, India</p>
-          </div>
-          <div><p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: "#0B3C8C" }}>Product</p><p style={{ margin: "8px 0 0", fontSize: 13, color: "#1F5FBF", lineHeight: 1.8 }}>AI Interview Engine<br />Skill Labs & Simulations<br />Manager Analytics</p></div>
-          <div><p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: "#0B3C8C" }}>Company</p><p style={{ margin: "8px 0 0", fontSize: 13, color: "#1F5FBF", lineHeight: 1.8 }}>About TalentOS<br />Careers (8 open roles)<br />Partners Program</p></div>
-          <div><p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: "#0B3C8C" }}>Contact</p><p style={{ margin: "8px 0 0", fontSize: 13, color: "#1F5FBF", lineHeight: 1.8 }}>hello@talentos.ai<br />+1 (000) 123-4567<br />Mon - Fri, 9:00 AM - 6:00 PM</p></div>
-          <div><p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: "#0B3C8C" }}>Legal</p><p style={{ margin: "8px 0 0", fontSize: 13, color: "#1F5FBF", lineHeight: 1.8 }}>Privacy Policy<br />Terms of Service<br />Security & Compliance</p></div>
-        </div>
-        <div style={{ maxWidth: 1240, margin: "16px auto 0", borderTop: "1px solid #4FA3FF55", paddingTop: 12, display: "flex", gap: 8, justifyContent: "space-between", flexWrap: "wrap", color: "#1F5FBF", fontSize: 12 }}>
-          <p style={{ margin: 0 }}>© {new Date().getFullYear()} TalentOS. All rights reserved.</p>
-          <p style={{ margin: 0 }}>Built for modern HR, L&D, and people managers.</p>
-        </div>
-      </footer>
+      {/* Footer must be the final full-bleed section */}
+      <div style={{ marginTop: 22, position: "relative", zIndex: 1 }}>
+        <InterviewXFooter />
+      </div>
     </div>
   );
 }

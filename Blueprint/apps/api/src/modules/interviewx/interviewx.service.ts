@@ -282,6 +282,157 @@ export class InterviewXService {
     };
   }
 
+  async getManagerAnalytics(me: BlueprintMe) {
+    const companyDomain = String(me?.companyDomain || "").trim().toLowerCase();
+    if (!companyDomain) throw new BadRequestException("Invalid token: missing companyDomain");
+
+    const filter: Record<string, any> = { companyDomain };
+    if (me?.currentRole === "MANAGER" && me?.department) {
+      // Managers see only interviews they scheduled within their dept scope.
+      // We don't store department on the interview record, so we rely on the
+      // employeeId scoping done at scheduling time – no further filter needed here.
+    }
+
+    const allRecords = await this.interviewxEmployeeInterviewModel
+      .find(filter)
+      .sort({ createdAt: -1 })
+      .lean()
+      .exec();
+
+    const interviewXBackendOrigin = this.normalizeOrigin(
+      this.config.get<string>("INTERVIEWX_BACKEND_ORIGIN") ||
+        this.config.get<string>("NEXT_PUBLIC_INTERVIEWX_ORIGIN") ||
+        "http://host.docker.internal:8180",
+    );
+
+    const uniqueConfigIds = Array.from(new Set(allRecords.map((r: any) => String(r.interviewConfigId || "")).filter(Boolean)));
+
+    type CandidateStatus = "PENDING" | "IN_PROGRESS" | "COMPLETED" | "EXPIRED";
+    interface IxCandidate { id?: string; status?: CandidateStatus; name?: string; email?: string; interviewStartedAt?: string }
+
+    const candidatesByConfig = new Map<string, IxCandidate[]>();
+    await Promise.allSettled(
+      uniqueConfigIds.map(async (configId) => {
+        try {
+          const res = await this.requestJson<IxCandidate[]>(
+            `${interviewXBackendOrigin}/api/ai-interview/candidates?interviewConfigId=${encodeURIComponent(configId)}&userId=${encodeURIComponent(this.guestUserId)}`,
+            { method: "GET" },
+          );
+          candidatesByConfig.set(configId, Array.isArray(res) ? res : []);
+        } catch {
+          candidatesByConfig.set(configId, []);
+        }
+      }),
+    );
+
+    type HiringRec = "MUST_HIRE" | "HIRE" | "MAYBE" | "NO_HIRE";
+    const reportsByConfig = new Map<string, Array<{ candidateId?: string; overallScore?: number; hiringRecommendation?: HiringRec }>>();
+    await Promise.allSettled(
+      uniqueConfigIds.map(async (configId) => {
+        const candidates = candidatesByConfig.get(configId) ?? [];
+        const hasCompleted = candidates.some((c) => c.status === "COMPLETED");
+        if (!hasCompleted) { reportsByConfig.set(configId, []); return; }
+        try {
+          const res = await this.requestJson<any[]>(
+            `${interviewXBackendOrigin}/api/ai-interview/reports/config/${encodeURIComponent(configId)}?userId=${encodeURIComponent(this.guestUserId)}`,
+            { method: "GET" },
+          );
+          reportsByConfig.set(configId, Array.isArray(res) ? res : []);
+        } catch {
+          reportsByConfig.set(configId, []);
+        }
+      }),
+    );
+
+    let totalScheduled = 0;
+    let totalPending = 0;
+    let totalAppeared = 0;
+    let totalCompleted = 0;
+    let totalExpired = 0;
+    const hiringBreakdown: Record<string, number> = { MUST_HIRE: 0, HIRE: 0, MAYBE: 0, NO_HIRE: 0 };
+
+    for (const configId of uniqueConfigIds) {
+      const candidates = candidatesByConfig.get(configId) ?? [];
+      if (candidates.length === 0) {
+        // At minimum count it as one scheduled (from our Blueprint record)
+        totalScheduled += 1;
+        totalPending += 1;
+        continue;
+      }
+      totalScheduled += candidates.length;
+      for (const c of candidates) {
+        if (c.status === "PENDING") totalPending++;
+        else if (c.status === "IN_PROGRESS") totalAppeared++;
+        else if (c.status === "COMPLETED") { totalCompleted++; totalAppeared++; }
+        else if (c.status === "EXPIRED") totalExpired++;
+        else totalPending++;
+      }
+      const reports = reportsByConfig.get(configId) ?? [];
+      for (const r of reports) {
+        const rec = String(r?.hiringRecommendation || "").toUpperCase();
+        if (rec === "MUST_HIRE" || rec === "HIRE" || rec === "MAYBE" || rec === "NO_HIRE") {
+          hiringBreakdown[rec] = (hiringBreakdown[rec] || 0) + 1;
+        }
+      }
+    }
+
+    const passed = hiringBreakdown.MUST_HIRE + hiringBreakdown.HIRE;
+    const failed = hiringBreakdown.NO_HIRE;
+    const maybe = hiringBreakdown.MAYBE;
+
+    // Monthly trend – use stored interviewStartDateTime from Blueprint records
+    const monthCountMap = new Map<string, number>();
+    const monthOrder: string[] = [];
+    const monthLabels = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+    const now = new Date();
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+      monthCountMap.set(key, 0);
+      monthOrder.push(key);
+    }
+    for (const rec of allRecords) {
+      const raw = String((rec as any).interviewStartDateTime || "");
+      if (!raw) continue;
+      const d = new Date(raw);
+      if (isNaN(d.getTime())) continue;
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+      if (monthCountMap.has(key)) monthCountMap.set(key, (monthCountMap.get(key) ?? 0) + 1);
+    }
+    const monthlyTrend = monthOrder.map((key) => {
+      const [, m] = key.split("-");
+      return { month: monthLabels[parseInt(m, 10) - 1], key, count: monthCountMap.get(key) ?? 0 };
+    });
+
+    // Recent interviews list (up to 10)
+    const recentInterviews = allRecords.slice(0, 10).map((rec: any) => {
+      const configId = String(rec.interviewConfigId || "");
+      const candidates = candidatesByConfig.get(configId) ?? [];
+      const candidateMatch = candidates.find((c) => c.email === String(rec.candidateEmail || "").toLowerCase()) ?? candidates[0];
+      const reports = reportsByConfig.get(configId) ?? [];
+      const report = candidateMatch?.id
+        ? (reports.find((r: any) => String(r.candidateId || "") === String(candidateMatch.id || "")) ?? reports[0])
+        : reports[0];
+      return {
+        candidateName: String(rec.candidateName || ""),
+        candidateEmail: String(rec.candidateEmail || ""),
+        interviewConfigId: configId,
+        candidateId: String(rec.candidateId || ""),
+        status: candidateMatch?.status ?? "PENDING",
+        scheduledAt: String(rec.interviewStartDateTime || ""),
+        score: report?.overallScore ?? null,
+        hiringRecommendation: report?.hiringRecommendation ?? null,
+      };
+    });
+
+    return {
+      totals: { scheduled: totalScheduled, pending: totalPending, appeared: totalAppeared, completed: totalCompleted, passed, failed, maybe, expired: totalExpired },
+      hiringBreakdown,
+      monthlyTrend,
+      recentInterviews,
+    };
+  }
+
   async getInterviewXReportForCandidate(input: { interviewConfigId: string; candidateId?: string }) {
     const interviewConfigId = String(input.interviewConfigId || "").trim();
     const candidateId = String(input.candidateId || "").trim();

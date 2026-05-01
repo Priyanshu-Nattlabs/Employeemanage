@@ -77,9 +77,14 @@ export default function ManagerRegisterPage() {
         reportingManagerEmail,
         companyDomain: inferredDomain
       });
+      if ("verificationRequired" in r && r.verificationRequired) {
+        const debugOtpQuery = r.debugOtp ? `&debugOtp=${encodeURIComponent(r.debugOtp)}` : "";
+        window.location.href = `/auth/verify-otp?email=${encodeURIComponent(r.email)}&next=${encodeURIComponent("/dashboard/manager/hub")}${debugOtpQuery}`;
+        return;
+      }
       if (!("token" in r) || !r.token || !r.user) throw new Error("Registration succeeded but login payload missing.");
       setOrgAuthInStorage(r.token, r.user);
-      window.location.href = "/dashboard/manager";
+      window.location.href = "/dashboard/manager/hub";
     } catch (err: any) {
       setError(err?.message || "Registration failed");
     } finally {

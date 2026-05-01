@@ -165,36 +165,46 @@ export default function TargetRolePage() {
           blueprint from this role.
         </p>
 
-        <label style={dateField}>
-          <span style={dateLabel}>In how much span are you going to complete this role? (months)</span>
-          <input
-            type="number"
-            min={1}
-            max={60}
-            value={targetDurationMonths}
-            onChange={(e) => setTargetDurationMonths(e.target.value)}
-            style={dateInput}
-            placeholder="e.g. 6"
-          />
-        </label>
+        <div style={formGrid}>
+          <section style={fieldCard}>
+            <h2 style={fieldHeading}>Timeline</h2>
+            <label style={dateField}>
+              <span style={dateLabel}>In how much span are you going to complete this role? (months)</span>
+              <input
+                type="number"
+                min={1}
+                max={60}
+                value={targetDurationMonths}
+                onChange={(e) => setTargetDurationMonths(e.target.value)}
+                style={dateInput}
+                placeholder="e.g. 6"
+              />
+            </label>
+          </section>
 
-        <input
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search roles..."
-          style={input}
-          disabled={loading}
-        />
+          <section style={fieldCard}>
+            <h2 style={fieldHeading}>Search role</h2>
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Type role name"
+              style={input}
+              disabled={loading}
+            />
+          </section>
 
-        <label style={dateField}>
-          <span style={dateLabel}>Level (optional)</span>
-          <select value={selectedLevel} onChange={(e) => setSelectedLevel(e.target.value)} style={dateInput}>
-            <option value="">Any level</option>
-            <option value="1">1</option>
-            <option value="2">2</option>
-            <option value="3">3</option>
-          </select>
-        </label>
+          <section style={fieldCard}>
+            <h2 style={fieldHeading}>Level (optional)</h2>
+            <label style={dateField}>
+              <select value={selectedLevel} onChange={(e) => setSelectedLevel(e.target.value)} style={dateInput}>
+                <option value="">Any level</option>
+                <option value="1">1</option>
+                <option value="2">2</option>
+                <option value="3">3</option>
+              </select>
+            </label>
+          </section>
+        </div>
 
         {error ? <div style={err}>{error}</div> : null}
 
@@ -239,13 +249,29 @@ const card: React.CSSProperties = {
 };
 const h1: React.CSSProperties = { margin: "0 0 8px", color: "#0f172a", fontWeight: 900, fontSize: 26 };
 const sub: React.CSSProperties = { margin: "0 0 14px", color: "#475569", lineHeight: 1.6, fontSize: 14 };
+const formGrid: React.CSSProperties = {
+  display: "grid",
+  gap: 12,
+  marginBottom: 12,
+};
+const fieldCard: React.CSSProperties = {
+  border: "1px solid #e2e8f0",
+  borderRadius: 10,
+  padding: 12,
+  background: "#f8fafc",
+};
+const fieldHeading: React.CSSProperties = {
+  margin: "0 0 8px",
+  fontSize: 15,
+  color: "#0f172a",
+  fontWeight: 800,
+};
 const input: React.CSSProperties = {
   width: "100%",
   borderRadius: 10,
   border: "1px solid #cbd5e1",
   minHeight: 42,
   padding: "8px 12px",
-  marginBottom: 12,
   fontSize: 14,
 };
 const list: React.CSSProperties = {
