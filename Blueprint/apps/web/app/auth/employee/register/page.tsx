@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
+import { appPath } from "@/lib/apiBase";
 import { orgRegisterEmployee, setOrgAuthInStorage, type OrgCurrentRole } from "@/lib/orgAuth";
 
 const DEPARTMENT_OPTIONS = [
@@ -74,14 +75,14 @@ export default function EmployeeRegisterPage() {
         companyDomain: inferredDomain
       });
       if ("verificationRequired" in r && r.verificationRequired) {
-        const nextPath = currentRole === "MANAGER" ? "/dashboard/manager/hub" : "/target-role";
+        const nextPath = currentRole === "MANAGER" ? appPath("/dashboard/manager/hub") : appPath("/employee/");
         const debugOtpQuery = r.debugOtp ? `&debugOtp=${encodeURIComponent(r.debugOtp)}` : "";
-        window.location.href = `/auth/verify-otp?email=${encodeURIComponent(r.email)}&next=${encodeURIComponent(nextPath)}${debugOtpQuery}`;
+        window.location.href = `${appPath("/auth/verify-otp")}?email=${encodeURIComponent(r.email)}&next=${encodeURIComponent(nextPath)}${debugOtpQuery}`;
         return;
       }
       if (!("token" in r) || !r.token || !r.user) throw new Error("Registration succeeded but login payload missing.");
       setOrgAuthInStorage(r.token, r.user);
-      window.location.href = currentRole === "MANAGER" ? "/dashboard/manager/hub" : "/target-role";
+      window.location.href = currentRole === "MANAGER" ? appPath("/dashboard/manager/hub") : appPath("/employee/");
     } catch (err: any) {
       setError(err?.message || "Registration failed");
     } finally {

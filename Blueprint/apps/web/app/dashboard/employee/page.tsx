@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { appPath } from "@/lib/apiBase";
 import { clearOrgAuthInStorage, getOrgAuthFromStorage } from "@/lib/orgAuth";
 
 export default function EmployeeDashboardPage() {
@@ -13,13 +14,12 @@ export default function EmployeeDashboardPage() {
   }, []);
 
   useEffect(() => {
-    if (!token) window.location.href = "/auth/login";
+    if (!token) window.location.href = appPath("/auth/employee/login");
   }, [token]);
 
   useEffect(() => {
-    // Employees should land on the main page (home). Keep manager/admin dashboards separate.
-    if (token && user?.accountType === "EMPLOYEE" && user?.currentRole !== "MANAGER") {
-      window.location.href = "/";
+    if (token && user?.accountType === "EMPLOYEE" && user?.currentRole === "EMPLOYEE") {
+      window.location.href = appPath("/employee/");
     }
   }, [token, user]);
 
@@ -33,7 +33,7 @@ export default function EmployeeDashboardPage() {
             <h1 style={h1}>Employee dashboard</h1>
             <div style={sub}>Welcome, <b>{user.fullName}</b> ({user.email})</div>
           </div>
-          <button onClick={() => { clearOrgAuthInStorage(); window.location.href = "/"; }} style={btnOutline}>Logout</button>
+          <button onClick={() => { clearOrgAuthInStorage(); window.location.href = appPath("/"); }} style={btnOutline}>Logout</button>
         </div>
 
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginTop: 18 }}>

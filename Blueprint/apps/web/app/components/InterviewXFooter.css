@@ -35,7 +35,7 @@
 }
 
 .ix-site-footer__col--brand {
-  max-width: 22rem;
+  max-width: min(36rem, 100%);
 }
 
 .ix-site-footer__logo-row {
@@ -46,9 +46,11 @@
 }
 
 .ix-site-footer__logo-img {
-  height: 40px;
+  height: 80px;
   width: auto;
+  max-width: min(534px, 100%);
   object-fit: contain;
+  object-position: left center;
   display: block;
 }
 
