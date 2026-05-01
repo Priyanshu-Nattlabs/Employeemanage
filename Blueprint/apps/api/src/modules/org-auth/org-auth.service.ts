@@ -695,7 +695,7 @@ export class OrgAuthService {
       accountType: "EMPLOYEE" as OrgAccountType,
       mobileNo: input.mobileNo?.trim(),
       reportingManagerEmail: mgrEmail,
-      emailVerified: false,
+      emailVerified: true,
     });
     const otpMeta = await this.setAndSendEmailOtp(created);
     return { verificationRequired: true as const, email: created.email, debugOtp: otpMeta.debugOtp };
@@ -723,7 +723,7 @@ export class OrgAuthService {
       companyDomain,
       currentRole: "EMPLOYEE",
       accountType: "ADMIN" as OrgAccountType,
-      emailVerified: false,
+      emailVerified: true,
     });
     const otpMeta = await this.setAndSendEmailOtp(created);
     return { verificationRequired: true as const, email: created.email, debugOtp: otpMeta.debugOtp };

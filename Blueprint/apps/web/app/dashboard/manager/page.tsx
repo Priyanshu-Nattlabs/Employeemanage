@@ -567,6 +567,23 @@ function ManagerDashboardContent() {
               <option value="NAME">Sort: name (A → Z)</option>
               <option value="RECENT_TEST">Sort: recent test</option>
             </select>
+            <Link
+              href={appPath("/dashboard/manager/employees")}
+              style={{
+                ...btnOutline,
+                display: "inline-flex",
+                alignItems: "center",
+                justifyContent: "center",
+                textDecoration: "none",
+                gap: 8,
+                minHeight: 40,
+                width: "100%",
+                boxSizing: "border-box",
+              }}
+              title="Open full employee dashboard"
+            >
+              View all
+            </Link>
           </div>
         </div>
 
