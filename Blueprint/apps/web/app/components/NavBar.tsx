@@ -128,7 +128,7 @@ export function NavBar() {
           margin: "0 auto",
           display: "flex",
           alignItems: "center",
-          height: 64,
+          height: 76,
           padding: "0 clamp(12px, 3vw, 24px)",
           gap: 16,
           boxSizing: "border-box",
@@ -137,9 +137,21 @@ export function NavBar() {
       >
         <Link
           href="/"
-          style={{ display: "flex", alignItems: "center", textDecoration: "none", color: "#0f172a", gap: 8 }}
+          style={{ display: "flex", alignItems: "center", textDecoration: "none", color: "#0f172a", gap: 10, minWidth: 0 }}
         >
-          <div style={{ fontWeight: 900, fontSize: 16, letterSpacing: "-0.02em" }}>Employee Development</div>
+          <img
+            src="/brand/corporate-development.png"
+            alt="Corporate Development"
+            width={360}
+            height={54}
+            style={{
+              height: 54,
+              width: "auto",
+              maxWidth: "min(460px, 68vw)",
+              objectFit: "contain",
+              display: "block",
+            }}
+          />
         </Link>
 
         <div style={{ flex: 1, minWidth: 0 }} />
