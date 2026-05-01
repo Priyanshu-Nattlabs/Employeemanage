@@ -11,7 +11,9 @@ const API = getApiPrefix();
 type Q = { questionNumber: number; questionText: string; options: string[]; correctAnswer?: string; skillName?: string };
 type TestType = {
   _id?: string; id?: string; status: string;
+  testType?: string;
   score?: number; passed?: boolean;
+  skillBreakdown?: Record<string, { correct: number; total: number; score: number; passed: boolean }>;
   questions: Q[];
   answers: Record<string, string>;
 };
@@ -553,6 +555,21 @@ export default function SkillTestPage() {
     const passed = (test.score ?? 0) >= 80;
     const score  = test.score ?? 0;
     const today  = new Date().toLocaleDateString("en-US", { year:"numeric", month:"long", day:"numeric" });
+    const isKnownSkillsResult = test.testType === "KNOWN_SKILLS";
+    const skillRows = isKnownSkillsResult
+      ? Object.entries((test as any).skillBreakdown || {}).map(([skill, rowAny]) => {
+          const row: any = rowAny || {};
+          return {
+            skill,
+            total: Number(row.total || 0),
+            correct: Number(row.correct || 0),
+            score: Number(row.score || 0),
+            passed: !!row.passed,
+          };
+        })
+      : [];
+    const skillPassedCount = skillRows.filter((r) => r.passed).length;
+    const allSkillsPassed = isKnownSkillsResult ? skillRows.length > 0 && skillRows.every((r) => r.passed) : passed;
     const liText = `🏆 I just passed the "${displayTestTitle}" skill assessment for ${roleName} on JobBlueprint with a score of ${score}%! Career roadmaps and skill tracking. #CareerDevelopment #JobBlueprint`;
     const liUrl  = `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent("https://jobblueprint.app")}&summary=${encodeURIComponent(liText)}`;
 
@@ -630,13 +647,64 @@ export default function SkillTestPage() {
                   </div>
                 </div>
 
+                {isKnownSkillsResult && skillRows.length > 0 && (
+                  <div style={{ margin: "0 auto 18px", maxWidth: 560, textAlign: "left", border: "1px solid #e2e8f0", borderRadius: 12, background: "white", padding: 12 }}>
+                    <div style={{ fontSize: 13, fontWeight: 900, color: "#0f172a", marginBottom: 8 }}>
+                      Skill-wise result (pass is 80% per skill)
+                    </div>
+                    <div style={{ display: "grid", gap: 8 }}>
+                      {skillRows.map((r) => (
+                        <div key={r.skill} style={{ border: "1px solid #e2e8f0", borderRadius: 10, padding: "8px 10px", background: "#f8fafc" }}>
+                          <div style={{ display: "flex", justifyContent: "space-between", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+                            <span style={{ fontSize: 13, fontWeight: 800, color: "#0f172a" }}>{r.skill}</span>
+                            <span
+                              style={{
+                                fontSize: 11,
+                                fontWeight: 900,
+                                borderRadius: 999,
+                                padding: "3px 8px",
+                                border: r.passed ? "1px solid #bbf7d0" : "1px solid #fecaca",
+                                background: r.passed ? "#ecfdf5" : "#fef2f2",
+                                color: r.passed ? "#166534" : "#991b1b",
+                              }}
+                            >
+                              {r.passed ? "PASSED" : "FAILED"} · {r.score}%
+                            </span>
+                          </div>
+                          <div style={{ marginTop: 4, fontSize: 12, color: "#64748b" }}>
+                            Correct: {r.correct}/{r.total}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                    <div style={{ marginTop: 8, fontSize: 12, color: "#475569", fontWeight: 700 }}>
+                      Skills passed: {skillPassedCount}/{skillRows.length}
+                    </div>
+                  </div>
+                )}
+
                 <div style={{ background:"#fef2f2", border:"1px solid #fecaca", borderRadius:14, padding:"14px 20px", marginBottom:24 }}>
-                  <p style={{ margin:"0 0 4px", color:"#991b1b", fontWeight:800, fontSize:20 }}>
-                    Need ≥ 80% to pass — you scored {score}%
-                  </p>
-                  <p style={{ margin:0, color:"#7f1d1d", fontSize:13 }}>
-                    Review the learning topics from the Gantt chart then retry.
-                  </p>
+                  {isKnownSkillsResult ? (
+                    <>
+                      <p style={{ margin:"0 0 4px", color:"#991b1b", fontWeight:800, fontSize:20 }}>
+                        Each selected skill requires at least 80% to pass
+                      </p>
+                      <p style={{ margin:0, color:"#7f1d1d", fontSize:13 }}>
+                        {allSkillsPassed
+                          ? "Great work — all selected skills are cleared."
+                          : "Review the failed skills and retry. Passed skills remain visible in skill-wise breakdown above."}
+                      </p>
+                    </>
+                  ) : (
+                    <>
+                      <p style={{ margin:"0 0 4px", color:"#991b1b", fontWeight:800, fontSize:20 }}>
+                        Need ≥ 80% to pass — you scored {score}%
+                      </p>
+                      <p style={{ margin:0, color:"#7f1d1d", fontSize:13 }}>
+                        Review the learning topics from the Gantt chart then retry.
+                      </p>
+                    </>
+                  )}
                 </div>
 
                 <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
