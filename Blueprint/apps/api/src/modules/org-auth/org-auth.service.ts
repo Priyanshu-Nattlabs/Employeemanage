@@ -27,7 +27,7 @@ const JWT_EXPIRES_IN = process.env.ORG_AUTH_JWT_EXPIRES_IN || "7d";
 const OTP_SECRET = process.env.ORG_EMAIL_OTP_SECRET || process.env.OTP_SECRET || "dev-only-change-me";
 const OTP_TTL_MINUTES = Number(process.env.ORG_EMAIL_OTP_TTL_MINUTES || "10");
 const OTP_RESEND_COOLDOWN_SECONDS = Number(process.env.ORG_EMAIL_OTP_RESEND_COOLDOWN_SECONDS || "30");
-const OTP_DEBUG = String(process.env.ORG_EMAIL_OTP_DEBUG || "").trim() === "true";
+const OTP_DEBUG = String(process.env.ORG_EMAIL_OTP_DEBUG || "true").trim().toLowerCase() !== "false";
 
 function normalizeEmail(email: string): string {
   return (email || "").trim().toLowerCase();
@@ -239,7 +239,8 @@ export class OrgAuthService {
     user.emailOtpExpiresAt = new Date(Date.now() + OTP_TTL_MINUTES * 60_000);
     user.emailOtpLastSentAt = new Date();
     await user.save();
-    return await this.sendOtpEmail(user.email, otp, this.mailPortalBrandingForUser(user));
+    await this.sendOtpEmail(user.email, otp, this.mailPortalBrandingForUser(user));
+    return { debugOtp: OTP_DEBUG ? otp : undefined };
   }
 
   private async sendPasswordResetOtpEmail(
@@ -696,7 +697,8 @@ export class OrgAuthService {
       reportingManagerEmail: mgrEmail,
       emailVerified: true,
     });
-    return this.authPayload(created);
+    const otpMeta = await this.setAndSendEmailOtp(created);
+    return { verificationRequired: true as const, email: created.email, debugOtp: otpMeta.debugOtp };
   }
 
   async registerAdmin(input: { email: string; password: string; fullName: string; companyName: string; companyDomain?: string }) {
@@ -723,7 +725,8 @@ export class OrgAuthService {
       accountType: "ADMIN" as OrgAccountType,
       emailVerified: true,
     });
-    return this.authPayload(created);
+    const otpMeta = await this.setAndSendEmailOtp(created);
+    return { verificationRequired: true as const, email: created.email, debugOtp: otpMeta.debugOtp };
   }
 
   async login(emailRaw: string, password: string) {
@@ -750,8 +753,8 @@ export class OrgAuthService {
     if (last && Date.now() - last < OTP_RESEND_COOLDOWN_SECONDS * 1000) {
       throw new BadRequestException(`Please wait ${OTP_RESEND_COOLDOWN_SECONDS} seconds before requesting another code.`);
     }
-    await this.setAndSendEmailOtp(user);
-    return { ok: true, message: "We sent a new verification code to your email." };
+    const otpMeta = await this.setAndSendEmailOtp(user);
+    return { ok: true, message: "We sent a new verification code to your email.", debugOtp: otpMeta.debugOtp };
   }
 
   async verifyEmailOtp(emailRaw: string, otpRaw: string) {
@@ -1196,6 +1199,102 @@ export class OrgAuthService {
       const avgPct = ongoing.length ? Math.round(ongoing.reduce((s, x) => s + (x.pct || 0), 0) / ongoing.length) : 0;
       return { employee: e, ongoing, avgPct, latestTest: latestTestByStudent.get(id) ?? null };
     });
+  }
+
+  async getManagerHubAnalytics(companyDomain: string, department?: string) {
+    const summary = await this.getEmployeesPrepSummaryForManager(companyDomain, department);
+    const rows = Array.isArray(summary) ? summary : [];
+
+    const totalEmployees = rows.length;
+    const activelyPreparing = rows.filter((r: any) => Array.isArray(r.ongoing) && r.ongoing.length > 0).length;
+
+    const activePct = rows
+      .filter((r: any) => Array.isArray(r.ongoing) && r.ongoing.length > 0)
+      .map((r: any) => r.avgPct ?? 0);
+    const avgProgressPct = activePct.length ? Math.round(activePct.reduce((s: number, v: number) => s + v, 0) / activePct.length) : 0;
+
+    const testsAll = rows.filter((r: any) => r.latestTest != null);
+    const testsPassed = testsAll.filter((r: any) => r.latestTest?.passed === true).length;
+    const skillTestPassRate = testsAll.length ? Math.round((testsPassed / testsAll.length) * 100) : 0;
+
+    // Role distribution
+    const roleCountMap = new Map<string, number>();
+    for (const r of rows) {
+      const ongoing = Array.isArray((r as any).ongoing) ? (r as any).ongoing : [];
+      for (const o of ongoing) {
+        const role = String(o?.roleName || "").trim();
+        if (role) roleCountMap.set(role, (roleCountMap.get(role) ?? 0) + 1);
+      }
+    }
+    const roleDistribution = Array.from(roleCountMap.entries())
+      .map(([role, count]) => ({ role, count }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 6);
+
+    // Top performers (active prep, highest avg pct)
+    const topPerformers = rows
+      .filter((r: any) => Array.isArray(r.ongoing) && r.ongoing.length > 0 && (r.avgPct ?? 0) > 0)
+      .sort((a: any, b: any) => (b.avgPct ?? 0) - (a.avgPct ?? 0))
+      .slice(0, 3)
+      .map((r: any) => ({
+        id: String(r.employee?._id || r.employee?.id || ""),
+        name: String(r.employee?.fullName || r.employee?.email || ""),
+        email: String(r.employee?.email || ""),
+        avgPct: r.avgPct ?? 0,
+        role: String(r.ongoing?.[0]?.roleName || ""),
+      }));
+
+    // Needs attention (active prep, lowest avg pct)
+    const needsAttention = rows
+      .filter((r: any) => Array.isArray(r.ongoing) && r.ongoing.length > 0)
+      .sort((a: any, b: any) => (a.avgPct ?? 0) - (b.avgPct ?? 0))
+      .slice(0, 3)
+      .map((r: any) => ({
+        id: String(r.employee?._id || r.employee?.id || ""),
+        name: String(r.employee?.fullName || r.employee?.email || ""),
+        email: String(r.employee?.email || ""),
+        avgPct: r.avgPct ?? 0,
+        role: String(r.ongoing?.[0]?.roleName || ""),
+      }));
+
+    // Progress bands
+    const progressBands = { "0-25": 0, "25-50": 0, "50-75": 0, "75-100": 0 };
+    for (const r of rows) {
+      if (!Array.isArray((r as any).ongoing) || (r as any).ongoing.length === 0) continue;
+      const p = (r as any).avgPct ?? 0;
+      if (p < 25) progressBands["0-25"]++;
+      else if (p < 50) progressBands["25-50"]++;
+      else if (p < 75) progressBands["50-75"]++;
+      else progressBands["75-100"]++;
+    }
+
+    // Live activity — employees currently in active prep, sorted by most recently started
+    const recentActivity = rows
+      .filter((r: any) => Array.isArray(r.ongoing) && r.ongoing.length > 0)
+      .sort((a: any, b: any) => {
+        const aDate = a.ongoing?.[0]?.startedAt ? new Date(a.ongoing[0].startedAt).getTime() : 0;
+        const bDate = b.ongoing?.[0]?.startedAt ? new Date(b.ongoing[0].startedAt).getTime() : 0;
+        return bDate - aDate;
+      })
+      .slice(0, 8)
+      .map((r: any) => ({
+        id: String(r.employee?._id || r.employee?.id || ""),
+        name: String(r.employee?.fullName || r.employee?.email || ""),
+        email: String(r.employee?.email || ""),
+        avgPct: r.avgPct ?? 0,
+        roles: (r.ongoing as any[]).map((o: any) => ({ roleName: String(o?.roleName || ""), pct: typeof o?.pct === "number" ? Math.round(o.pct) : 0 })),
+        latestTestPassed: r.latestTest?.passed === true ? true : r.latestTest ? false : null,
+        latestTestScore: r.latestTest && typeof r.latestTest.score === "number" ? r.latestTest.score : null,
+      }));
+
+    return {
+      totals: { employees: totalEmployees, activelyPreparing, avgProgressPct, skillTestPassRate },
+      roleDistribution,
+      topPerformers,
+      needsAttention,
+      progressBands,
+      recentActivity,
+    };
   }
 
   // ────────────────────────────────────────────────────────────────────────────

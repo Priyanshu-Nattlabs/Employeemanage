@@ -22,7 +22,7 @@ export default function LoginPage() {
       const r = await orgLogin({ email, password });
       setOrgAuthInStorage(r.token, r.user);
       if (r.user.accountType === "ADMIN") window.location.href = "/dashboard/admin";
-      else window.location.href = r.user.currentRole === "MANAGER" ? "/dashboard/manager" : "/";
+      else window.location.href = r.user.currentRole === "MANAGER" || r.user.currentRole === "HR" ? "/dashboard/manager/hub" : "/";
     } catch (err: any) {
       setError(err?.message || "Login failed");
     } finally {
