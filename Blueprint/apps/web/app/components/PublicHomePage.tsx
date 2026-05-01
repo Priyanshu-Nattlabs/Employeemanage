@@ -63,7 +63,7 @@ export function PublicHomePage() {
         }
         .section { position: relative; z-index: 1; max-width: 1240px; margin: 0 auto; padding: 30px 20px 34px; }
         .section-title { margin: 0; font-size: clamp(24px, 3.2vw, 34px); font-weight: 800; color: #0B3C8C; }
-        .dual-info-grid { margin-top: 14px; display: grid; gap: 16px; grid-template-columns: 1fr; }
+        .dual-info-grid { margin-top: 14px; display: grid; gap: 16px; grid-template-columns: 1fr; width: 100%; }
         .dual-info-card { border: 1px solid #4FA3FF55; border-radius: 12px; padding: 22px; background: linear-gradient(180deg, #ffffff 0%, #4FA3FF12 100%); box-shadow: 0 6px 18px rgba(11,60,140,.06); }
         .triple-info-card { border: 1px solid #4FA3FF55; border-radius: 12px; padding: 22px; background: linear-gradient(180deg, #ffffff 0%, #4FA3FF12 100%); box-shadow: 0 6px 18px rgba(11,60,140,.06); }
         .triple-info-grid { display: grid; gap: 16px; grid-template-columns: 1fr; }
@@ -71,16 +71,87 @@ export function PublicHomePage() {
         .dual-info-title { margin: 0; font-size: 22px; font-weight: 800; color: #0B3C8C; }
         .dual-info-subtitle { margin: 0; font-size: 12px; letter-spacing: .12em; text-transform: uppercase; font-weight: 700; color: #1F5FBF; }
         .dual-info-list { margin: 10px 0 0; padding-left: 18px; color: #1F5FBF; font-size: 13px; line-height: 1.75; }
+        .info-card-btn {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          min-height: 42px;
+          padding: 10px 16px;
+          border-radius: 12px;
+          text-decoration: none;
+          font-size: 14px;
+          font-weight: 800;
+          color: #ffffff;
+          background: linear-gradient(90deg, #1F5FBF 0%, #00BFA6 100%);
+          box-shadow: 0 8px 18px rgba(31,95,191,.22);
+          border: 1px solid rgba(255,255,255,.45);
+          transition: transform .18s ease, box-shadow .18s ease, filter .18s ease;
+        }
+        .info-card-btn:hover {
+          transform: translateY(-1px);
+          box-shadow: 0 12px 22px rgba(31,95,191,.28);
+          filter: saturate(1.08);
+        }
         .caps-grid { margin-top: 10px; display: grid; gap: 14px; grid-template-columns: 1fr; }
         .caps-left { border: 1px solid #4FA3FF55; border-radius: 12px; padding: 18px; background: linear-gradient(180deg, #ffffff 0%, #6FE7D214 100%); }
         .caps-items { margin-top: 10px; display: grid; gap: 8px; grid-template-columns: repeat(2, minmax(0,1fr)); }
         .cap-item { border: 1px solid #6FE7D2; border-radius: 10px; padding: 9px 10px; font-size: 12px; color: #0B3C8C; background: #6FE7D21A; }
-        .cta { margin: 16px auto 34px; max-width: 980px; border-radius: 12px; border: 1px solid #4FA3FF88; background: linear-gradient(90deg, #0B3C8C 0%, #1F5FBF 55%, #4FA3FF 100%); color: #fff; text-align: center; padding: 34px 20px; box-shadow: 0 10px 26px rgba(11, 60, 140, 0.20); }
+        .cta {
+          margin: 24px auto 36px;
+          max-width: 980px;
+          border-radius: 16px;
+          border: 1px solid rgba(31,95,191,.22);
+          background:
+            radial-gradient(120% 140% at 0% 0%, rgba(111,231,210,.22), transparent 46%),
+            radial-gradient(110% 140% at 100% 100%, rgba(79,163,255,.24), transparent 44%),
+            linear-gradient(120deg, #eaf4ff 0%, #dff1ff 50%, #e9f9f6 100%);
+          color: #0B3C8C;
+          text-align: center;
+          padding: 46px 24px;
+          box-shadow: 0 10px 24px rgba(11, 60, 140, 0.10);
+        }
+        .cta-title {
+          margin: 0;
+          font-size: clamp(30px, 3.7vw, 46px);
+          font-weight: 800;
+          letter-spacing: -0.02em;
+          color: #0B3C8C;
+          line-height: 1.12;
+        }
+        .cta-btn-primary {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          min-height: 42px;
+          padding: 10px 18px;
+          border-radius: 12px;
+          border: 1px solid rgba(31,95,191,.20);
+          background: linear-gradient(90deg, #1F5FBF 0%, #00BFA6 100%);
+          color: #fff;
+          font-size: 14px;
+          font-weight: 800;
+          text-decoration: none;
+          box-shadow: 0 8px 18px rgba(31,95,191,.22);
+        }
+        .cta-btn-secondary {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          min-height: 42px;
+          padding: 10px 18px;
+          border-radius: 12px;
+          border: 1px solid rgba(31,95,191,.25);
+          background: rgba(255,255,255,.9);
+          color: #1F5FBF;
+          font-size: 14px;
+          font-weight: 800;
+          text-decoration: none;
+        }
         .footer { border-top: 1px solid #4FA3FF66; background: #ffffff; padding: 28px 20px; }
         .footer-grid { max-width: 1240px; margin: 0 auto; display: grid; gap: 20px; grid-template-columns: 1fr; }
         @media (min-width: 980px) {
           .public-grid2 { grid-template-columns: 1.05fr .95fr; align-items: center; }
-          .dual-info-grid { grid-template-columns: repeat(2, minmax(0,1fr)); }
+          .dual-info-grid { grid-template-columns: 1fr; }
           .triple-info-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
           .caps-grid { grid-template-columns: 1fr; }
           .footer-grid { grid-template-columns: 2fr repeat(4,1fr); }
@@ -134,15 +205,14 @@ export function PublicHomePage() {
                 <p className="dual-info-subtitle">For Employees</p>
                 <h3 className="dual-info-title" style={{ fontSize: 20 }}>Your development roadmap, personalized</h3>
                 <p style={{ margin: "10px 0 0", color: "#1F5FBF", fontSize: 14, lineHeight: 1.7 }}>
-                  Set a target role, identify skill gaps, and follow a clear path that helps you prepare for your next opportunity.
+                  Set your target role and follow a clear development path.
                 </p>
                 <ul className="dual-info-list">
-                  <li>Choose your target role and map current skills</li>
-                  <li>Take guided assessments and focused practice tests</li>
-                  <li>Track progress with clear milestones and readiness signals</li>
+                  <li>Map current skills vs target role</li>
+                  <li>Track milestones and readiness progress</li>
                 </ul>
-                <div style={{ marginTop: 14 }}>
-                  <Link href="/auth/employee/login" className="btn-primary">Employee Login</Link>
+                <div style={{ marginTop: 18, paddingBottom: 8 }}>
+                  <Link href="/auth/employee/login" className="info-card-btn">Employee Login</Link>
                 </div>
               </div>
 
@@ -150,15 +220,14 @@ export function PublicHomePage() {
                 <p className="dual-info-subtitle">For Employers</p>
                 <h3 className="dual-info-title" style={{ fontSize: 20 }}>Monitor growth and readiness across teams</h3>
                 <p style={{ margin: "10px 0 0", color: "#1F5FBF", fontSize: 14, lineHeight: 1.7 }}>
-                  Get visibility into employee skill progression, test outcomes, and promotion readiness with a single manager view.
+                  View team growth and promotion readiness from one dashboard.
                 </p>
                 <ul className="dual-info-list">
-                  <li>Monitor progress by role, department, and employee</li>
-                  <li>Review development trends and assessment outcomes</li>
-                  <li>Identify promotion-ready talent with confidence</li>
+                  <li>Monitor progress by role and department</li>
+                  <li>Identify promotion-ready talent quickly</li>
                 </ul>
-                <div style={{ marginTop: 14 }}>
-                  <Link href="/auth/manager/login" className="btn-primary">Manager / HR Login</Link>
+                <div style={{ marginTop: 18, paddingBottom: 8 }}>
+                  <Link href="/auth/manager/login" className="info-card-btn">Manager / HR Login</Link>
                 </div>
               </div>
 
@@ -166,15 +235,14 @@ export function PublicHomePage() {
                 <p className="dual-info-subtitle">Interview</p>
                 <h3 className="dual-info-title" style={{ fontSize: 20 }}>AI interview readiness and evaluation</h3>
                 <p style={{ margin: "10px 0 0", color: "#1F5FBF", fontSize: 14, lineHeight: 1.7 }}>
-                  Practice role-based mock interviews and evaluate readiness with structured reports on strengths and gaps.
+                  Practice mock interviews and get role-readiness feedback.
                 </p>
                 <ul className="dual-info-list">
-                  <li>Launch technical and HR-focused interview simulations</li>
-                  <li>Get detailed feedback on communication and role fit</li>
-                  <li>Use insights to improve before real interviews</li>
+                  <li>Run technical and HR interview simulations</li>
+                  <li>Get feedback on role fit and communication</li>
                 </ul>
-                <div style={{ marginTop: 14 }}>
-                  <Link href="/auth/employee/login" className="btn-primary">Start Interview Prep</Link>
+                <div style={{ marginTop: 18, paddingBottom: 8 }}>
+                  <Link href="/auth/employee/login" className="info-card-btn">Start Interview Prep</Link>
                 </div>
               </div>
             </div>
@@ -206,12 +274,12 @@ export function PublicHomePage() {
 
       <motion.section {...sectionIn} className="section">
         <div className="cta">
-          <h2 style={{ margin: 0, fontSize: "clamp(28px, 3.8vw, 42px)", fontWeight: 800 }}>Build your future workforce today</h2>
+          <h2 className="cta-title">Build your future workforce today</h2>
           <div className="public-btns" style={{ justifyContent: "center", marginTop: 18 }}>
-            <Link href="/auth/employee/register" className="btn-secondary" style={{ background: "#fff", color: "#0B3C8C", borderColor: "#6FE7D2" }}>
+            <Link href="/auth/employee/register" className="cta-btn-primary">
               Get Started
             </Link>
-            <Link href="/auth/manager/login" className="btn-secondary" style={{ background: "transparent", color: "#fff", borderColor: "#6FE7D2" }}>
+            <Link href="/auth/manager/login" className="cta-btn-secondary">
               Request Demo
             </Link>
           </div>
