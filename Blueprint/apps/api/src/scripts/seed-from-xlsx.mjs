@@ -175,7 +175,8 @@ function parseRolesFromNewJdSheet(wb) {
     const name = String(r[iRole] || "").trim();
     if (!name) continue;
     const levelRaw = iLevel !== undefined ? String(r[iLevel] ?? "").trim() : "";
-    const level = levelRaw ? String(levelRaw) : undefined;
+    // Normalize empty/blank level to empty string so unique index key stays stable.
+    const level = levelRaw ? String(levelRaw) : "";
     const desc = String(r[iDesc] || "").trim();
     const tech = split(iTech !== undefined ? r[iTech] : "");
     const soft = split(iSoft !== undefined ? r[iSoft] : "");
