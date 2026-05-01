@@ -1,0 +1,78 @@
+/* Enterprise header — compact height, blue-tinted shell */
+.jb-nav {
+  position: sticky;
+  top: 0;
+  z-index: 80;
+  background: linear-gradient(180deg, #f8faff 0%, #ffffff 52%);
+  border-bottom: 1px solid rgba(5, 74, 144, 0.14);
+  box-shadow: 0 2px 16px -6px rgba(15, 23, 42, 0.08);
+}
+
+.jb-nav__inner {
+  width: 100%;
+  max-width: 1280px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 12px;
+  min-height: 56px;
+  padding: 6px clamp(10px, 2.5vw, 20px) 8px;
+  box-sizing: border-box;
+  min-width: 0;
+}
+
+.jb-nav__brand {
+  display: flex;
+  align-items: center;
+  text-decoration: none;
+  color: #0f172a;
+  gap: 8px;
+  min-width: 0;
+  flex-shrink: 1;
+}
+
+.jb-nav__logo {
+  display: block;
+  width: auto;
+  height: 40px;
+  max-width: min(380px, calc(100vw - 148px));
+  object-fit: contain;
+  object-position: left center;
+}
+
+@media (min-width: 640px) {
+  .jb-nav__inner {
+    min-height: 62px;
+    padding-top: 8px;
+    padding-bottom: 8px;
+  }
+  .jb-nav__logo {
+    height: 46px;
+    max-width: min(440px, calc(100vw - 190px));
+  }
+}
+
+@media (min-width: 1024px) {
+  .jb-nav__inner {
+    min-height: 68px;
+    padding-top: 8px;
+    padding-bottom: 10px;
+  }
+  .jb-nav__logo {
+    height: 52px;
+    max-width: min(520px, calc(100vw - 220px));
+  }
+}
+
+@media (max-width: 420px) {
+  .jb-nav__inner {
+    min-height: 50px;
+    padding-top: 6px;
+    padding-bottom: 6px;
+  }
+  .jb-nav__logo {
+    height: 34px;
+    max-width: calc(100vw - 124px);
+  }
+}

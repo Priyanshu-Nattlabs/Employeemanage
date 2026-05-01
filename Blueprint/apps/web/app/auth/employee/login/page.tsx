@@ -23,7 +23,7 @@ export default function EmployeeLoginPage() {
         window.location.href = appPath("/auth/employee/complete-profile");
         return;
       }
-      window.location.href = appPath("/");
+      window.location.href = appPath("/employee/");
     } catch (err: any) {
       setError(err?.message || "Login failed");
     } finally {

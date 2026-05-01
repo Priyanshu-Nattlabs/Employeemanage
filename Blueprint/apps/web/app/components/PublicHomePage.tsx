@@ -213,16 +213,6 @@ export function PublicHomePage() {
           border: 1px solid rgba(15,23,42,0.10);
           box-shadow: 0 16px 36px rgba(15,23,42,0.16);
         }
-        .hero-microGrid { margin-top: 14px; display: grid; gap: 10px; grid-template-columns: 1fr; }
-        .hero-microCard {
-          border-radius: 14px;
-          background: rgba(255,255,255,0.82);
-          border: 1px solid rgba(15,23,42,0.10);
-          padding: 12px 12px;
-          box-shadow: 0 10px 22px rgba(15,23,42,0.07);
-        }
-        .hero-microEyebrow { font-size: 11px; font-weight: 900; letter-spacing: .14em; text-transform: uppercase; color: rgba(71,84,103,0.85); }
-        .hero-microTitle { margin-top: 6px; font-size: 14px; font-weight: 900; color: var(--ink); line-height: 1.35; }
 
         .section { position: relative; z-index: 1; max-width: 1240px; margin: 0 auto; padding: 54px 20px; }
         .section-title { margin: 0; font-size: clamp(24px, 3.2vw, 36px); font-weight: 900; color: var(--ink); letter-spacing: -0.02em; }
@@ -249,7 +239,6 @@ export function PublicHomePage() {
           .public-grid2 { grid-template-columns: 1.05fr .95fr; align-items: center; }
           .modules-grid { grid-template-columns: repeat(2, minmax(0,1fr)); }
           .enterprise-grid { grid-template-columns: repeat(3, minmax(0,1fr)); }
-          .hero-microGrid { grid-template-columns: repeat(3, minmax(0,1fr)); }
         }
 
         @media (prefers-reduced-motion: reduce) {
@@ -280,7 +269,7 @@ export function PublicHomePage() {
           </motion.div>
 
           <motion.div {...sectionIn} transition={{ duration: 0.7 }}>
-            <div className="hero-visual" aria-label="Product preview">
+            <div className="hero-visual" aria-label="Career progression illustration">
               <svg className="hero-lines" viewBox="0 0 1600 720" preserveAspectRatio="none" aria-hidden>
                 <path className="hero-line a" d="M-40 500 C 210 380, 360 590, 640 470 C 860 380, 1140 560, 1660 410" />
                 <path className="hero-line b" d="M-30 620 C 220 520, 460 650, 760 560 C 980 490, 1240 640, 1660 530" />
@@ -315,19 +304,6 @@ export function PublicHomePage() {
                   alt="Career progression from entry level through executive, aligned with role development and readiness"
                   loading="eager"
                 />
-              </div>
-
-              <div className="hero-microGrid" aria-label="Key outcomes">
-                {[
-                  { e: "Blueprint", t: "Standardize role expectations across teams." },
-                  { e: "Evaluate", t: "AI interviews + reports you can defend." },
-                  { e: "Monitor", t: "Progress, readiness, and trends in one view." },
-                ].map((x) => (
-                  <div key={x.e} className="hero-microCard">
-                    <div className="hero-microEyebrow">{x.e}</div>
-                    <div className="hero-microTitle">{x.t}</div>
-                  </div>
-                ))}
               </div>
             </div>
           </motion.div>

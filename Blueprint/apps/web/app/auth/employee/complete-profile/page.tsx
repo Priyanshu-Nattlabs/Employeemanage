@@ -35,7 +35,7 @@ export default function CompleteInviteProfilePage() {
         const needs = Boolean(raw.needsProfileCompletion);
         const mustPw = Boolean(raw.mustChangePassword);
         if (!needs && !mustPw) {
-          window.location.href = appPath("/");
+          window.location.href = appPath("/employee/");
           return;
         }
         setOrgAuthInStorage(token, {
@@ -89,7 +89,7 @@ export default function CompleteInviteProfilePage() {
         employeeId: employeeId.trim() || undefined,
       });
       setOrgAuthInStorage(r.token, r.user);
-      window.location.href = appPath("/");
+      window.location.href = appPath("/employee/");
     } catch (err: any) {
       setError(err?.message || "Could not save your profile");
     } finally {
