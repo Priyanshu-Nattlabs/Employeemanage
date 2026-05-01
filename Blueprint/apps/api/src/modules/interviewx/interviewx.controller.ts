@@ -84,7 +84,7 @@ export class InterviewXController {
     const candidateId = String(body?.candidateId || "").trim();
     if (!interviewConfigId) throw new BadRequestException("Missing interviewConfigId");
 
-    return this.service.getInterviewXReportForCandidate({ interviewConfigId, candidateId });
+    return this.service.getInterviewXReportForCandidate({ me, interviewConfigId, candidateId });
   }
 
   @Get("manager-analytics")

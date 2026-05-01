@@ -220,8 +220,6 @@ function SplitButton({ label, icon, bg, options }: { label: string; icon: string
             <a
               key={i}
               href={opt.href}
-              target={opt.external ? "_blank" : undefined}
-              rel={opt.external ? "noopener noreferrer" : undefined}
               onClick={() => setOpen(false)}
               style={{
                 display: "flex", alignItems: "center", gap: 12, padding: "12px 16px", textDecoration: "none",
@@ -309,11 +307,11 @@ export default function ManagerHubPage() {
 
   const scheduleOptions: DropdownOption[] = [
     { label: "Internal Employees", sub: "Schedule AI interview for your team", icon: "👨‍💼", href: appPath("/dashboard/manager/interviews"), color: "#6366f1" },
-    { label: "External Candidates", sub: "Open InterviewX hiring platform", icon: "🌐", href: ixDashboardUrl, external: true, color: "#0ea5e9" },
+    { label: "External Candidates", sub: "Open InterviewX manager dashboard", icon: "🌐", href: ixDashboardUrl, color: "#0ea5e9" },
   ];
   const viewInterviewsOptions: DropdownOption[] = [
     { label: "Internal Interviews", sub: "View scheduled employee interviews", icon: "📋", href: appPath("/dashboard/manager/interviews"), color: "#6366f1" },
-    { label: "External Interviews", sub: "View & manage on InterviewX", icon: "🔗", href: ixDashboardUrl, external: true, color: "#0ea5e9" },
+    { label: "External Interviews", sub: "Open InterviewX manager dashboard", icon: "🔗", href: ixDashboardUrl, color: "#0ea5e9" },
   ];
 
   return (
@@ -379,7 +377,7 @@ export default function ManagerHubPage() {
           <div style={{ display: "flex", gap: 10, marginTop: 20, flexWrap: "wrap", alignItems: "center" }}>
             <a href={appPath("/dashboard/manager")} style={solidBtn("#6366f1")}>👨‍💼 View Employees</a>
             <SplitButton label="Schedule Interview" icon="📅" bg="#0ea5e9" options={scheduleOptions} />
-            <a href={ixDashboardUrl} target="_blank" rel="noopener noreferrer" style={solidBtn("#8b5cf6")}>🔗 InterviewX Dashboard ↗</a>
+            <a href={ixDashboardUrl} style={solidBtn("#8b5cf6")}>🔗 InterviewX Dashboard</a>
           </div>
         </div>
       </div>
@@ -482,9 +480,9 @@ export default function ManagerHubPage() {
                   <div style={{ fontSize: 14, fontWeight: 800, color: "#4c1d95" }}>View Interview Dashboard on InterviewX</div>
                   <div style={{ fontSize: 12, color: "#6d28d9", marginTop: 2 }}>Manage external candidates, reports & AI assessments</div>
                 </div>
-                <a href={ixDashboardUrl} target="_blank" rel="noopener noreferrer"
+                <a href={ixDashboardUrl}
                   style={{ background: "#7c3aed", color: "#fff", borderRadius: 10, padding: "8px 16px", fontSize: 13, fontWeight: 800, textDecoration: "none", whiteSpace: "nowrap", display: "inline-flex", alignItems: "center", gap: 6 }}>
-                  Open InterviewX ↗
+                  Open InterviewX
                 </a>
               </div>
             </>

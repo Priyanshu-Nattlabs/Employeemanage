@@ -118,18 +118,9 @@ export function buildInterviewXAiInterviewUrl(
 
 export function buildInterviewXIndustryOpenUrl(): string {
   const base = interviewXBase();
-  const interviewId =
-    typeof process !== "undefined" && process.env.NEXT_PUBLIC_INTERVIEWX_INTERVIEW_ID
-      ? clean(process.env.NEXT_PUBLIC_INTERVIEWX_INTERVIEW_ID)
-      : "";
-
-  if (interviewId) {
-    return `${base}/industry/ai-interview/${encodeURIComponent(interviewId)}/candidates`;
-  }
-
-  const u = new URL(`${base}/industry/ai-interview`);
-  u.searchParams.set("type", "interview");
-  return u.toString();
+  // Always open the InterviewX manager landing/dashboard page so all
+  // manager entry points in Blueprint are consistent.
+  return `${base}/industry/ai-interview/dashboard`;
 }
 
 export function buildInterviewXCandidatesUrl(interviewConfigId: string): string {
