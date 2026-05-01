@@ -262,9 +262,7 @@ export function PublicHomePage() {
               </p>
             </div>
             <div className="public-btns">
-              <Link href="/auth/manager/login" className="btn-primary">Request Demo <span aria-hidden>→</span></Link>
               <Link href="/auth/employee/register" className="btn-secondary">Get Started</Link>
-              <Link href="/role/" className="btn-ghost">Browse Blueprints</Link>
             </div>
           </motion.div>
 
