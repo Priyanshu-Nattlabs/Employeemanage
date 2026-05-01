@@ -198,6 +198,15 @@ export class InterviewXEmployeeInterview {
   // Stored as local datetime strings `YYYY-MM-DDTHH:mm:ss` (no timezone suffix)
   @Prop() interviewStartDateTime?: string;
   @Prop() interviewEndDateTime?: string;
+
+  // Persisted lifecycle + latest report snapshot from InterviewX syncs.
+  @Prop() lastKnownCandidateStatus?: string;
+  @Prop() interviewAppearedAt?: string;
+  @Prop() interviewCompletedAt?: string;
+  @Prop() latestOverallScore?: number;
+  @Prop() latestHiringRecommendation?: string;
+  @Prop() latestReportGeneratedAt?: string;
+  @Prop({ type: Object }) latestReportSnapshot?: Record<string, unknown>;
 }
 
 export type BlueprintDocument = HydratedDocument<Blueprint>;

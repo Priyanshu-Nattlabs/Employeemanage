@@ -27,6 +27,16 @@ type InterviewXBlueprintCredentials = {
   interviewEndDateTime?: string; // ISO
 };
 
+type CandidateStatus = "PENDING" | "IN_PROGRESS" | "COMPLETED" | "EXPIRED";
+type HiringRec = "MUST_HIRE" | "HIRE" | "MAYBE" | "NO_HIRE";
+interface IxCandidate {
+  id?: string;
+  status?: CandidateStatus;
+  name?: string;
+  email?: string;
+  interviewStartedAt?: string;
+}
+
 @Injectable()
 export class InterviewXService {
   constructor(
@@ -89,6 +99,56 @@ export class InterviewXService {
     const min = pad(d.getMinutes());
     const sec = pad(d.getSeconds());
     return `${yyyy}-${mm}-${dd}T${hh}:${min}:${sec}`;
+  }
+
+  private async syncInterviewRecordSnapshot(input: {
+    companyDomain: string;
+    interviewConfigId: string;
+    candidateId?: string;
+    candidate?: IxCandidate | null;
+    report?: any | null;
+  }) {
+    const companyDomain = String(input.companyDomain || "").trim().toLowerCase();
+    const interviewConfigId = String(input.interviewConfigId || "").trim();
+    if (!companyDomain || !interviewConfigId) return;
+    const candidateId = String(input.candidateId || input.candidate?.id || "").trim();
+    const candidate = input.candidate || null;
+    const report = input.report || null;
+    const status = String(candidate?.status || "").trim() || undefined;
+    const startedAt = String(candidate?.interviewStartedAt || "").trim() || undefined;
+    const completedAt =
+      status === "COMPLETED" && report?.generatedAt
+        ? String(report.generatedAt)
+        : status === "COMPLETED" && startedAt
+          ? startedAt
+          : undefined;
+
+    const latestReportSnapshot = report
+      ? {
+          id: report?.id || report?._id || undefined,
+          candidateId: report?.candidateId || undefined,
+          overallReview: report?.overallReview ?? null,
+          strengths: Array.isArray(report?.strengths) ? report.strengths : [],
+          weaknesses: Array.isArray(report?.weaknesses) ? report.weaknesses : [],
+          recommendationReason: report?.recommendationReason ?? null,
+        }
+      : undefined;
+
+    const query: Record<string, any> = { companyDomain, interviewConfigId };
+    if (candidateId) query.candidateId = candidateId;
+    await this.interviewxEmployeeInterviewModel
+      .updateMany(query, {
+        $set: {
+          ...(status ? { lastKnownCandidateStatus: status } : {}),
+          ...(startedAt ? { interviewAppearedAt: startedAt } : {}),
+          ...(completedAt ? { interviewCompletedAt: completedAt } : {}),
+          ...(typeof report?.overallScore === "number" ? { latestOverallScore: report.overallScore } : {}),
+          ...(report?.hiringRecommendation ? { latestHiringRecommendation: String(report.hiringRecommendation) } : {}),
+          ...(report?.generatedAt ? { latestReportGeneratedAt: String(report.generatedAt) } : {}),
+          ...(latestReportSnapshot ? { latestReportSnapshot } : {}),
+        },
+      })
+      .exec();
   }
 
   /**
@@ -307,9 +367,6 @@ export class InterviewXService {
 
     const uniqueConfigIds = Array.from(new Set(allRecords.map((r: any) => String(r.interviewConfigId || "")).filter(Boolean)));
 
-    type CandidateStatus = "PENDING" | "IN_PROGRESS" | "COMPLETED" | "EXPIRED";
-    interface IxCandidate { id?: string; status?: CandidateStatus; name?: string; email?: string; interviewStartedAt?: string }
-
     const candidatesByConfig = new Map<string, IxCandidate[]>();
     await Promise.allSettled(
       uniqueConfigIds.map(async (configId) => {
@@ -325,7 +382,6 @@ export class InterviewXService {
       }),
     );
 
-    type HiringRec = "MUST_HIRE" | "HIRE" | "MAYBE" | "NO_HIRE";
     const reportsByConfig = new Map<string, Array<{ candidateId?: string; overallScore?: number; hiringRecommendation?: HiringRec }>>();
     await Promise.allSettled(
       uniqueConfigIds.map(async (configId) => {
@@ -373,6 +429,21 @@ export class InterviewXService {
         if (rec === "MUST_HIRE" || rec === "HIRE" || rec === "MAYBE" || rec === "NO_HIRE") {
           hiringBreakdown[rec] = (hiringBreakdown[rec] || 0) + 1;
         }
+      }
+
+      // Persist latest conducted status/report summary for audit/history.
+      for (const c of candidates) {
+        const rep =
+          c.id && reports.length
+            ? (reports.find((r: any) => String(r?.candidateId || "") === String(c.id || "")) ?? null)
+            : reports[0] ?? null;
+        await this.syncInterviewRecordSnapshot({
+          companyDomain,
+          interviewConfigId: configId,
+          candidateId: c.id,
+          candidate: c,
+          report: rep,
+        });
       }
     }
 
@@ -433,7 +504,9 @@ export class InterviewXService {
     };
   }
 
-  async getInterviewXReportForCandidate(input: { interviewConfigId: string; candidateId?: string }) {
+  async getInterviewXReportForCandidate(input: { me: BlueprintMe; interviewConfigId: string; candidateId?: string }) {
+    const companyDomain = String(input.me?.companyDomain || "").trim().toLowerCase();
+    if (!companyDomain) throw new BadRequestException("Invalid token: missing companyDomain");
     const interviewConfigId = String(input.interviewConfigId || "").trim();
     const candidateId = String(input.candidateId || "").trim();
     if (!interviewConfigId) throw new BadRequestException("Missing interviewConfigId");
@@ -462,6 +535,31 @@ export class InterviewXService {
       list[0];
 
     if (!matched) return { ready: false, message: "Report not found" };
+
+    let matchedCandidate: IxCandidate | null = null;
+    try {
+      const candidates = await this.requestJson<IxCandidate[]>(
+        `${interviewXBackendOrigin}/api/ai-interview/candidates?interviewConfigId=${encodeURIComponent(interviewConfigId)}&userId=${encodeURIComponent(this.guestUserId)}`,
+        { method: "GET", headers: {} },
+      );
+      const candidateList = Array.isArray(candidates) ? candidates : [];
+      matchedCandidate =
+        (candidateId
+          ? candidateList.find((c) => String(c?.id || "").trim() === candidateId)
+          : undefined) ||
+        candidateList[0] ||
+        null;
+    } catch {
+      matchedCandidate = null;
+    }
+
+    await this.syncInterviewRecordSnapshot({
+      companyDomain,
+      interviewConfigId,
+      candidateId: String(matched?.candidateId || candidateId || "").trim() || undefined,
+      candidate: matchedCandidate,
+      report: matched,
+    });
 
     const detailed = {
       id: String(matched.id || matched._id || ""),
