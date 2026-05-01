@@ -128,7 +128,7 @@ export function NavBar() {
           margin: "0 auto",
           display: "flex",
           alignItems: "center",
-          height: 76,
+          height: 104,
           padding: "0 clamp(12px, 3vw, 24px)",
           gap: 16,
           boxSizing: "border-box",
@@ -142,13 +142,14 @@ export function NavBar() {
           <img
             src="/brand/corporate-development.png"
             alt="Corporate Development"
-            width={360}
-            height={54}
+            width={534}
+            height={80}
             style={{
-              height: 54,
+              height: 80,
               width: "auto",
-              maxWidth: "min(460px, 68vw)",
+              maxWidth: "min(640px, 82vw)",
               objectFit: "contain",
+              objectPosition: "left center",
               display: "block",
             }}
           />
