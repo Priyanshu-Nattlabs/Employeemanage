@@ -2,6 +2,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState, type CSSProperties } from "react";
+import { publicAssetUrl } from "@/lib/apiBase";
 import {
   clearOrgAuthInStorage,
   getOrgAuthFromStorage,
@@ -9,6 +10,8 @@ import {
   orgUpdateRecommendationStatus,
   type RoleRecommendation,
 } from "@/lib/orgAuth";
+
+import "./NavBar.css";
 
 const NOTIF_POLL_MS = 30_000;
 
@@ -109,49 +112,21 @@ export function NavBar() {
   const dashboardHref = isAdmin ? "/dashboard/admin" : isManagerOrHR ? "/dashboard/manager" : "/";
   const profileHref = isAdmin ? "/profile/admin" : "/profile/employee";
   const profileLabel = isAdmin ? "Admin Profile" : "Employee Profile";
+  /** Individual contributors land on the employee hub; others keep home. */
+  const brandHref = isLoggedIn && isEmployee ? "/employee/" : "/";
 
   return (
-    <header
-      style={{
-        position: "sticky",
-        top: 0,
-        zIndex: 80,
-        background: "#fff",
-        borderBottom: "1px solid #e5e7eb",
-        boxShadow: "none",
-      }}
-    >
-      <div
-        style={{
-          width: "100%",
-          maxWidth: 1280,
-          margin: "0 auto",
-          display: "flex",
-          alignItems: "center",
-          height: 104,
-          padding: "0 clamp(12px, 3vw, 24px)",
-          gap: 16,
-          boxSizing: "border-box",
-          minWidth: 0,
-        }}
-      >
-        <Link
-          href="/"
-          style={{ display: "flex", alignItems: "center", textDecoration: "none", color: "#0f172a", gap: 10, minWidth: 0 }}
-        >
+    <header className="jb-nav">
+      <div className="jb-nav__inner">
+        <Link href={brandHref} className="jb-nav__brand" aria-label="Corporate Development — go to employee home">
           <img
-            src="/brand/corporate-development.png"
+            src={publicAssetUrl("/brand/corporate-development.png")}
             alt="Corporate Development"
             width={534}
             height={80}
-            style={{
-              height: 80,
-              width: "auto",
-              maxWidth: "min(640px, 82vw)",
-              objectFit: "contain",
-              objectPosition: "left center",
-              display: "block",
-            }}
+            className="jb-nav__logo"
+            decoding="async"
+            fetchPriority="high"
           />
         </Link>
 
@@ -285,7 +260,7 @@ export function NavBar() {
 
 const portalLoginStyle: CSSProperties = {
   textDecoration: "none",
-  border: "1px solid #cbd5e1",
+  border: "1px solid rgba(5, 74, 144, 0.22)",
   color: "#0f172a",
   borderRadius: 10,
   padding: "8px 12px",
@@ -335,7 +310,7 @@ const authMenuItem: CSSProperties = {
 
 const portalDashStyle: CSSProperties = {
   textDecoration: "none",
-  border: "1px solid #cbd5e1",
+  border: "1px solid rgba(5, 74, 144, 0.22)",
   color: "#0f172a",
   borderRadius: 10,
   padding: "8px 12px",
@@ -368,7 +343,7 @@ const bellStyle: CSSProperties = {
   height: 38,
   borderRadius: 999,
   background: "#fff",
-  border: "1px solid #cbd5e1",
+  border: "1px solid rgba(5, 74, 144, 0.2)",
   cursor: "pointer",
   padding: 0,
 };

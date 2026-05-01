@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
+import { BadRequestException, Injectable, NotFoundException, UnauthorizedException } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { InjectModel } from "@nestjs/mongoose";
 import type { Model } from "mongoose";
@@ -618,6 +618,52 @@ export class InterviewXService {
       },
       detailedReport: detailed,
     };
+  }
+
+  /**
+   * Employee hub: sanitized InterviewX prep sessions + reports for the org JWT email.
+   * InterviewX must allow the call via {@code BLUEPRINT_INTERVIEWX_TRACKING_KEY} (same value on both sides).
+   */
+  async getMeInterviewPrepTracking(me: {
+    email?: string;
+    accountType?: string;
+    currentRole?: string;
+  }): Promise<{
+    trackingEnabled: boolean;
+    sessions: Array<Record<string, unknown>>;
+    reports: Array<Record<string, unknown>>;
+  }> {
+    if (me?.accountType !== "EMPLOYEE" || me?.currentRole !== "EMPLOYEE") {
+      throw new UnauthorizedException("Only employees can view interview preparation tracking");
+    }
+    const email = String(me?.email || "").trim().toLowerCase();
+    if (!email) throw new BadRequestException("Missing email in token");
+
+    const key = String(this.config.get<string>("BLUEPRINT_INTERVIEWX_TRACKING_KEY") || "").trim();
+    if (!key) {
+      return { trackingEnabled: false, sessions: [], reports: [] };
+    }
+
+    const interviewXBackendOrigin = this.normalizeOrigin(
+      this.config.get<string>("INTERVIEWX_BACKEND_ORIGIN") ||
+        this.config.get<string>("NEXT_PUBLIC_INTERVIEWX_ORIGIN") ||
+        "http://host.docker.internal:8180",
+    );
+
+    const url = `${interviewXBackendOrigin}/api/interview-preparation/internal/blueprint-tracking?email=${encodeURIComponent(email)}`;
+    try {
+      const data = await this.requestJson<any>(url, {
+        method: "GET",
+        headers: { "X-Blueprint-Tracking-Key": key },
+      });
+      return {
+        trackingEnabled: Boolean(data?.trackingEnabled),
+        sessions: Array.isArray(data?.sessions) ? data.sessions : [],
+        reports: Array.isArray(data?.reports) ? data.reports : [],
+      };
+    } catch {
+      return { trackingEnabled: true, sessions: [], reports: [] };
+    }
   }
 }
 

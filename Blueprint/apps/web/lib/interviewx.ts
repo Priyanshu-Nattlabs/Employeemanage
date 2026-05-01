@@ -129,3 +129,14 @@ export function buildInterviewXCandidatesUrl(interviewConfigId: string): string 
   if (!id) return `${base}/industry/ai-interview`;
   return `${base}/industry/ai-interview/${encodeURIComponent(id)}/candidates`;
 }
+
+/** Student InterviewX app: preparation hub (technical / HR / labs). Set `NEXT_PUBLIC_INTERVIEWX_ORIGIN` in production. */
+export function buildInterviewXStudentPrepHomeUrl(opts?: { email?: string; name?: string }): string {
+  const base = interviewXBase();
+  const u = new URL(`${base}/students/interview-preparation`);
+  const email = clean(opts?.email);
+  const name = clean(opts?.name);
+  if (email) u.searchParams.set("email", email);
+  if (name) u.searchParams.set("name", name);
+  return u.toString();
+}

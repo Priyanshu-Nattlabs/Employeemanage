@@ -120,5 +120,15 @@ export class InterviewXController {
 
     return this.service.getLatestCredentialsForEmployee({ me, employeeId });
   }
+
+  /** Employee workspace: InterviewX prep history for the signed-in employee (org JWT). */
+  @Get("me/interview-prep-tracking")
+  async meInterviewPrepTracking(@Headers("authorization") authorization?: string) {
+    const token = getBearerToken(authorization);
+    if (!token) throw new UnauthorizedException("Missing token");
+
+    const me = this.orgAuth.verifyToken(token);
+    return this.service.getMeInterviewPrepTracking(me);
+  }
 }
 

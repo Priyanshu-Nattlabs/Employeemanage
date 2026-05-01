@@ -23,8 +23,7 @@ export default function EmployeeLoginPage() {
         window.location.href = appPath("/auth/employee/complete-profile");
         return;
       }
-      // If a manager logs in via the Employee login, they should see the same preparation flow as employees.
-      window.location.href = appPath("/target-role");
+      window.location.href = appPath("/employee/");
     } catch (err: any) {
       setError(err?.message || "Login failed");
     } finally {
