@@ -1,6 +1,8 @@
 import { Module } from "@nestjs/common";
 import { MongooseModule } from "@nestjs/mongoose";
 import {
+  Blueprint,
+  BlueprintSchema,
   CompanyOrgStructure,
   CompanyOrgStructureSchema,
   CompanyUser,
@@ -23,6 +25,7 @@ import { OrgAuthService } from "./org-auth.service";
       { name: SkillTest.name, schema: SkillTestSchema },
       { name: CompanyOrgStructure.name, schema: CompanyOrgStructureSchema },
       { name: RoleRecommendation.name, schema: RoleRecommendationSchema },
+      { name: Blueprint.name, schema: BlueprintSchema },
     ]),
   ],
   controllers: [OrgAuthController],

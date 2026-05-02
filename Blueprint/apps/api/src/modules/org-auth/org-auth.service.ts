@@ -7,6 +7,8 @@ import crypto from "crypto";
 import nodemailer from "nodemailer";
 import * as XLSX from "xlsx";
 import {
+  Blueprint,
+  type BlueprintDocument,
   CompanyOrgStructure,
   type CompanyOrgStructureDocument,
   CompanyUser,
@@ -57,7 +59,7 @@ function normalizeDepartmentKey(raw: string): string {
 function domainBucketForRoleName(roleName: string): string {
   const n = " " + String(roleName || "").toLowerCase() + " ";
   const has = (list: string[]) => list.some((k) => n.includes(k));
-  if (has(["developer", "engineer", "programmer", "software", "web", "mobile", "devops", "cloud", "data", "ml ", "ai ", "security", "network", "it ", "system", "database", "frontend", "backend", "fullstack"])) return "Technology";
+  if (has(["developer", "engineer", "programmer", "software", "web", "mobile", "devops", "cloud", "data", "ml ", "ai ", "security", "network", "it ", "system", "database", "frontend", "backend", "fullstack"])) return "IT";
   if (has(["manager", "director", "head", "lead", "chief", "officer", "president", "vp ", "cto", "ceo", "cfo", "coo", "executive"])) return "Management";
   if (has(["design", "ux", "ui ", "graphic", "creative", "visual", "artist", "animator", "illustrat"])) return "Design & Creative";
   if (has(["finance", "account", "audit", "tax", "invest", "banking", "actuari", "financial analyst", "cfo"])) return "Finance & Accounting";
@@ -75,7 +77,7 @@ function isKnownDomainDepartment(rawDept: string): boolean {
   const d = String(rawDept || "").trim();
   if (!d) return false;
   return [
-    "Technology",
+    "IT",
     "Management",
     "Design & Creative",
     "Finance & Accounting",
@@ -133,7 +135,30 @@ export class OrgAuthService {
     @InjectModel(SkillTest.name) private readonly testModel: Model<SkillTestDocument>,
     @InjectModel(CompanyOrgStructure.name) private readonly orgStructureModel: Model<CompanyOrgStructureDocument>,
     @InjectModel(RoleRecommendation.name) private readonly recommendationModel: Model<RoleRecommendationDocument>,
+    @InjectModel(Blueprint.name) private readonly blueprintModel: Model<BlueprintDocument>,
   ) {}
+
+  async listDesignationOptions(q?: string): Promise<string[]> {
+    const needle = String(q || "").trim().toLowerCase();
+    const docs = await this.blueprintModel
+      .find({ type: { $regex: "^role$", $options: "i" } })
+      .select("name")
+      .lean();
+
+    const out: string[] = [];
+    const seen = new Set<string>();
+    for (const d of docs as any[]) {
+      const name = String(d?.name || "").trim();
+      if (!name) continue;
+      if (needle && !name.toLowerCase().includes(needle)) continue;
+      const key = name.toLowerCase();
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out.push(name);
+    }
+    out.sort((a, b) => a.localeCompare(b));
+    return out;
+  }
 
   private otpHash(email: string, otp: string): string {
     const h = crypto.createHash("sha256");
@@ -650,12 +675,13 @@ export class OrgAuthService {
     fullName: string;
     designation: string;
     department?: string;
+    industry?: string;
     companyName: string;
     companyDomain?: string;
     employeeId: string;
     currentRole: OrgCurrentRole;
     mobileNo: string;
-    reportingManagerEmail: string;
+    reportingManagerEmail?: string;
   }) {
     const email = normalizeEmail(input.email);
     const domainFromEmail = emailDomain(email);
@@ -666,17 +692,20 @@ export class OrgAuthService {
       throw new BadRequestException(`Email must use the company domain: ${companyDomain}`);
     }
 
-    const mgrEmail = normalizeEmail(input.reportingManagerEmail);
-    if (emailDomain(mgrEmail) !== companyDomain) {
+    const role = input.currentRole;
+    const mgrEmail = normalizeEmail(input.reportingManagerEmail || "");
+    if (mgrEmail && emailDomain(mgrEmail) !== companyDomain) {
       throw new BadRequestException("Reporting manager email must be in the same company domain");
     }
 
     // HR doesn't need a department. Everyone else (EMPLOYEE / MANAGER) does.
-    const isHR = input.currentRole === "HR";
+    const isHR = role === "HR";
     const department = (input.department || "").trim();
     if (!isHR && !department) {
       throw new BadRequestException("Department is required");
     }
+
+    const industry = String(input.industry || "").trim();
 
     const existing = await this.companyUserModel.findOne({ email }).lean();
     if (existing) throw new BadRequestException("An account with this email already exists");
@@ -688,13 +717,14 @@ export class OrgAuthService {
       fullName: input.fullName?.trim(),
       designation: input.designation?.trim(),
       department: isHR ? undefined : department,
+      industry: industry || undefined,
       companyName: input.companyName?.trim(),
       companyDomain,
       employeeId: input.employeeId?.trim(),
-      currentRole: input.currentRole,
+      currentRole: role,
       accountType: "EMPLOYEE" as OrgAccountType,
       mobileNo: input.mobileNo?.trim(),
-      reportingManagerEmail: mgrEmail,
+      reportingManagerEmail: mgrEmail || undefined,
       emailVerified: true,
     });
     const otpMeta = await this.setAndSendEmailOtp(created);
@@ -849,11 +879,10 @@ export class OrgAuthService {
    * Employees visible to Manager/HR dashboards: org accounts with `currentRole: EMPLOYEE`
    * (employee portal signups and invited line employees)—not peers with Manager/HR roles.
    *
-   * @param department - If **omitted** (HR callers), lists all line employees for the domain.
-   *                     If **passed** (always for managers—even `""`), require a non-empty department
-   *                     to scope results; managers with no department get an empty roster (never whole-domain leakage).
+   * @param department - Legacy scoping (kept for compatibility): if passed and non-empty, filters by department.
+   * @param managerEmail - Preferred scoping: if passed and non-empty, filters by reportingManagerEmail (case-insensitive exact).
    */
-  async getEmployeesForManager(companyDomain: string, department?: string) {
+  async getEmployeesForManager(companyDomain: string, department?: string, managerEmail?: string) {
     const domain = normalizeDomain(companyDomain);
     const filter: any = {
       companyDomain: domain,
@@ -861,7 +890,10 @@ export class OrgAuthService {
       currentRole: "EMPLOYEE",
     };
 
-    if (department !== undefined) {
+    const mgr = String(managerEmail || "").trim().toLowerCase();
+    if (mgr) {
+      filter.reportingManagerEmail = new RegExp(`^${mgr.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`, "i");
+    } else if (department !== undefined) {
       const dept = String(department || "").trim();
       if (!dept) {
         return [];
@@ -974,8 +1006,8 @@ export class OrgAuthService {
     });
   }
 
-  async getEmployeesActivityForManager(companyDomain: string, department?: string) {
-    const employees = await this.getEmployeesForManager(companyDomain, department);
+  async getEmployeesActivityForManager(companyDomain: string, department?: string, managerEmail?: string) {
+    const employees = await this.getEmployeesForManager(companyDomain, department, managerEmail);
     const ids = employees.map((e: any) => String(e._id || e.id || "")).filter(Boolean);
     const empById = new Map<string, any>();
     for (const e of employees as any[]) empById.set(String(e._id || e.id || ""), e);
@@ -1161,8 +1193,8 @@ export class OrgAuthService {
     };
   }
 
-  async getEmployeesPrepSummaryForManager(companyDomain: string, department?: string) {
-    const employees = await this.getEmployeesForManager(companyDomain, department);
+  async getEmployeesPrepSummaryForManager(companyDomain: string, department?: string, managerEmail?: string) {
+    const employees = await this.getEmployeesForManager(companyDomain, department, managerEmail);
     const ids = employees.map((e: any) => String(e._id || e.id || "")).filter(Boolean);
     if (!ids.length) return [];
 
@@ -1201,8 +1233,8 @@ export class OrgAuthService {
     });
   }
 
-  async getManagerHubAnalytics(companyDomain: string, department?: string) {
-    const summary = await this.getEmployeesPrepSummaryForManager(companyDomain, department);
+  async getManagerHubAnalytics(companyDomain: string, department?: string, managerEmail?: string) {
+    const summary = await this.getEmployeesPrepSummaryForManager(companyDomain, department, managerEmail);
     const rows = Array.isArray(summary) ? summary : [];
 
     const totalEmployees = rows.length;
