@@ -514,6 +514,20 @@ function RolePageContent() {
     setLoading(true); setTooltip(null); setTopicsCache({});
     const u = uid ?? userId;
     try {
+      if (isRecommendMode) {
+        const [mR, roleR] = await Promise.all([
+          fetch(`${API}/api/blueprint/role/${enc(roleName)}/mappings`),
+          fetch(`${API}/api/blueprint/role/${enc(roleName)}${levelQuery}`),
+        ]);
+        const mappingsData = await mR.json().catch(() => null);
+        const roleJson = await roleR.json().catch(() => null);
+        setPrep(null);
+        setData(null);
+        setMappings(mappingsData);
+        setBaseRole(roleJson && typeof roleJson === "object" && !Array.isArray(roleJson) ? roleJson : null);
+        return;
+      }
+
       const [pR, mR, roleR] = await Promise.all([
         fetch(`${API}/api/role-preparation/${enc(roleName)}?studentId=${enc(u)}`),
         fetch(`${API}/api/blueprint/role/${enc(roleName)}/mappings`),
@@ -612,7 +626,7 @@ function RolePageContent() {
       await load(uid);
     })();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [roleName, roleFlowSig]);
+  }, [roleName, roleFlowSig, isRecommendMode]);
 
   useEffect(() => {
     const fromPrep = Array.isArray(prep?.knownSkillsForTest)
@@ -722,6 +736,11 @@ function RolePageContent() {
 
   /* fetch contextual JD + skills whenever context changes */
   useEffect(() => {
+    if (isRecommendMode) {
+      setContextualData(null);
+      setCtxLoading(false);
+      return;
+    }
     if (!ctxIndustry && !ctxEducation && !ctxSpecialization) { setContextualData(null); return; }
     setCtxLoading(true);
     const q = new URLSearchParams();
@@ -732,7 +751,7 @@ function RolePageContent() {
     fetch(`${API}/api/blueprint/role/${enc(roleName)}/contextual?${q.toString()}`, { method: "POST" })
       .then(r => r.json()).catch(() => null)
       .then(d => { setContextualData(d); setCtxLoading(false); });
-  }, [roleName, ctxIndustry, ctxEducation, ctxSpecialization, employeeLevel]);
+  }, [roleName, ctxIndustry, ctxEducation, ctxSpecialization, employeeLevel, isRecommendMode]);
 
   useEffect(() => {
     const currentLevel = Number(employeeLevel);
@@ -1088,7 +1107,8 @@ function RolePageContent() {
   const passedKnownSkills: string[] = Array.isArray(prep?.passedKnownSkills) ? prep.passedKnownSkills : [];
   const knownSkillsTestSubmitted = !!prep?.knownSkillsTestSubmitted;
   const canActivatePreparation = testQueueSkills.length === 0 || knownSkillsTestSubmitted;
-  const requiresKnownSkillsTest = !!prep?.knownSkillsConfigured && testQueueSkills.length > 0 && !knownSkillsTestSubmitted;
+  const requiresKnownSkillsTest =
+    !isRecommendMode && !!prep?.knownSkillsConfigured && testQueueSkills.length > 0 && !knownSkillsTestSubmitted;
   const technicalSkillSet = useMemo(() => {
     const reqs = Array.isArray(data?.skillRequirements) ? data.skillRequirements : [];
     return new Set(
@@ -1604,7 +1624,7 @@ function RolePageContent() {
       </div>
 
       {/* ── CONTEXTUAL BANNER ─────────────────────────────── */}
-      {(ctxIndustry || ctxEducation || ctxSpecialization) && (
+      {(ctxIndustry || ctxEducation || ctxSpecialization) && !isRecommendMode && (
         <div style={{ background:"linear-gradient(90deg,#EFF6FF,#F0F9FF)", border:"1px solid #BAE6FD", borderRadius:10, padding:"12px 18px", marginBottom:16, display:"flex", justifyContent:"space-between", alignItems:"center", flexWrap:"wrap", gap:10 }}>
           <div style={{ display:"flex", alignItems:"center", gap:10 }}>
             <span style={{ fontSize:20 }}>{ctxLoading ? "⏳" : "🤖"}</span>
@@ -1789,6 +1809,7 @@ function RolePageContent() {
       {/* ── STATS ─────────────────────────────────────────────── */}
       {!requiresKnownSkillsTest && (
       <>
+      {!isRecommendMode && (
       <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(150px,1fr))", gap:10, marginBottom:20 }}>
         {[
           { label:"Total Skills", val:tasks.length||data?.skillRequirements?.length||"–", accent:"#3170A5" },
@@ -1810,6 +1831,7 @@ function RolePageContent() {
           </div>
         ))}
       </div>
+      )}
 
       {/* ── JOB DESCRIPTION + SKILLS ─────────────────────────── */}
       <div ref={jdAnchorRef} />
@@ -2076,7 +2098,7 @@ function RolePageContent() {
       </div>)}
 
       {/* ── READINESS BAR ────────────────────────────────────── */}
-      {prep && (
+      {prep && !isRecommendMode && (
         <div style={{ ...card, marginBottom:20 }}>
           <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:10 }}>
             <span style={{ fontWeight:800, color:"#0F1724", fontSize:14 }}>Role Readiness</span>
@@ -2090,6 +2112,7 @@ function RolePageContent() {
       )}
 
       {/* ══ GANTT ══════════════════════════════════════════════ */}
+      {!isRecommendMode && (
       <div style={{ background:"white", borderRadius:12, border:"1px solid rgba(0,0,0,.1)", marginBottom:20, padding:0, overflow:"hidden", boxShadow:"0 2px 8px rgba(0,0,0,.06)" }}>
 
         {/* header */}
@@ -2335,9 +2358,10 @@ function RolePageContent() {
           </div>
         )}
       </div>
+      )}
 
       {/* ── WARNINGS ─────────────────────────────────────────── */}
-      {(data?.plan?.warnings||[]).length > 0 && (
+      {!isRecommendMode && (data?.plan?.warnings||[]).length > 0 && (
         <div style={{ background:"#FFFBEB", borderRadius:10, border:"1px solid #FDE68A", padding:"16px 20px", marginBottom:20 }}>
           <h3 style={{ margin:"0 0 10px", color:"#854D0E", fontSize:14, fontWeight:800 }}>⚠ Scheduling Warnings</h3>
           <ul style={{ margin:0, paddingLeft:18 }}>
@@ -2347,7 +2371,7 @@ function RolePageContent() {
       )}
 
       {/* ── SKILL REQUIREMENT CARDS ──────────────────────────── */}
-      {chartSkillReqs.length > 0 && (
+      {!isRecommendMode && chartSkillReqs.length > 0 && (
         <div style={{ marginBottom:24 }}>
           <h2 style={{ marginBottom:14, fontSize:17, fontWeight:900, color:"#0F1724" }}>🎯 Skill Requirements</h2>
           <div style={{ display:"grid", gap:8 }}>
@@ -2692,6 +2716,7 @@ function RolePageContent() {
       )}
 
       {/* ── Mock Interview (InterviewX) ─────────────────────── */}
+      {!isRecommendMode && (
       <div
         style={{
           ...card,
@@ -2732,6 +2757,7 @@ function RolePageContent() {
           🎤 Mock Interview
         </a>
       </div>
+      )}
     </div>
   );
 }

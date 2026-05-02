@@ -1645,7 +1645,8 @@ export class OrgAuthService {
    * - **Manager:** roles from every org-structure row whose **department** segment matches the
    *   manager's `department` (any industry prefix). Plus legacy single-name buckets (e.g. `AI`).
    * - **HR:** roles from rows matching the **employee's** industry + department segments.
-   * Manager path ignores `managerIndustry` for listing (industry may differ across mapped rows).
+   * Manager path: when both `managerIndustry` and `managerDepartment` are set, roles are limited to
+   * org rows matching that industry + department; otherwise department-only (any industry prefix).
    */
   async listRecommendableRolesForEmployee(input: {
     companyDomain: string;
@@ -1687,21 +1688,39 @@ export class OrgAuthService {
 
     if (input.managerRole === "MANAGER") {
       const mgrDept = String(input.managerDepartment || "").trim();
-      const collected = collectOrgMappedRolesForDepartmentAnyIndustry(all, mgrDept);
-      roles = collected.roles;
-      const names = collected.matchedSectionNames;
-      if (!roles.length && mgrDept) {
-        const targetKey = normalizeDepartmentKey(mgrDept);
-        const match = all.find((d) => normalizeDepartmentKey(String(d.name || "")) === targetKey);
-        roles = ((match?.roles || []) as string[]).map((r) => String(r || "").trim()).filter(Boolean);
-        if (match?.name) {
-          departmentLabel = String(match.name);
+      const mgrInd = String(input.managerIndustry || "").trim();
+      if (mgrInd && mgrDept) {
+        const collected = collectOrgMappedRolesForIndustryAndDepartment(all, mgrInd, mgrDept);
+        roles = collected.roles;
+        const names = collected.matchedSectionNames;
+        if (!roles.length && mgrDept) {
+          const targetKey = normalizeDepartmentKey(mgrDept);
+          const match = all.find((d) => normalizeDepartmentKey(String(d.name || "")) === targetKey);
+          roles = ((match?.roles || []) as string[]).map((r) => String(r || "").trim()).filter(Boolean);
+          if (match?.name) departmentLabel = String(match.name);
+        } else if (names.length) {
+          departmentLabel =
+            names.slice(0, 2).join(" · ") + (names.length > 2 ? ` (+${names.length - 2} more)` : "");
+        } else {
+          departmentLabel = mgrDept || null;
         }
-      } else if (names.length) {
-        departmentLabel =
-          names.slice(0, 2).join(" · ") + (names.length > 2 ? ` (+${names.length - 2} more)` : "");
       } else {
-        departmentLabel = mgrDept || null;
+        const collected = collectOrgMappedRolesForDepartmentAnyIndustry(all, mgrDept);
+        roles = collected.roles;
+        const names = collected.matchedSectionNames;
+        if (!roles.length && mgrDept) {
+          const targetKey = normalizeDepartmentKey(mgrDept);
+          const match = all.find((d) => normalizeDepartmentKey(String(d.name || "")) === targetKey);
+          roles = ((match?.roles || []) as string[]).map((r) => String(r || "").trim()).filter(Boolean);
+          if (match?.name) {
+            departmentLabel = String(match.name);
+          }
+        } else if (names.length) {
+          departmentLabel =
+            names.slice(0, 2).join(" · ") + (names.length > 2 ? ` (+${names.length - 2} more)` : "");
+        } else {
+          departmentLabel = mgrDept || null;
+        }
       }
     } else {
       const empIndustry = String((employee as any).industry || "").trim();
@@ -1790,7 +1809,12 @@ export class OrgAuthService {
       let mappedRoles: string[] = [];
       if (input.manager.role === "MANAGER") {
         const mgrDept = String(input.manager.department || "").trim();
-        mappedRoles = collectOrgMappedRolesForDepartmentAnyIndustry(all, mgrDept).roles;
+        const mgrInd = String(input.manager.industry || "").trim();
+        if (mgrInd && mgrDept) {
+          mappedRoles = collectOrgMappedRolesForIndustryAndDepartment(all, mgrInd, mgrDept).roles;
+        } else {
+          mappedRoles = collectOrgMappedRolesForDepartmentAnyIndustry(all, mgrDept).roles;
+        }
         if (!mappedRoles.length && mgrDept) {
           const match = all.find(
             (d: any) => normalizeDepartmentKey(String(d.name || "")) === normalizeDepartmentKey(mgrDept),
