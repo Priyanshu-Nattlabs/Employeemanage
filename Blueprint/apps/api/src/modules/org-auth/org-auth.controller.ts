@@ -142,7 +142,8 @@ export class OrgAuthController {
     if (!domain) throw new UnauthorizedException("Missing companyDomain");
 
     if (isHR) return this.service.getEmployeesForManager(domain);
-    return this.service.getEmployeesForManager(domain, undefined, me?.email);
+    const scope = await this.service.getManagerScopeFieldsByUserId(String(me?.sub || ""));
+    return this.service.getEmployeesForManager(domain, scope.department, scope.email, scope.industry);
   }
 
   /** Admin view: list employees for admin's company name + domain. */
@@ -190,7 +191,8 @@ export class OrgAuthController {
     if (!domain) throw new UnauthorizedException("Missing companyDomain");
 
     if (isHR) return this.service.getEmployeesActivityForManager(domain);
-    return this.service.getEmployeesActivityForManager(domain, undefined, me?.email);
+    const scope = await this.service.getManagerScopeFieldsByUserId(String(me?.sub || ""));
+    return this.service.getEmployeesActivityForManager(domain, scope.department, scope.email, scope.industry);
   }
 
   /** Manager / HR view: employees + preparation/test summary. Manager is scoped to their department. */
@@ -208,7 +210,8 @@ export class OrgAuthController {
     if (!domain) throw new UnauthorizedException("Missing companyDomain");
 
     if (isHR) return this.service.getEmployeesPrepSummaryForManager(domain);
-    return this.service.getEmployeesPrepSummaryForManager(domain, undefined, me?.email);
+    const scope = await this.service.getManagerScopeFieldsByUserId(String(me?.sub || ""));
+    return this.service.getEmployeesPrepSummaryForManager(domain, scope.department, scope.email, scope.industry);
   }
 
   /** Manager / HR view: aggregated hub analytics for the overview dashboard. */
@@ -225,7 +228,8 @@ export class OrgAuthController {
     if (!domain) throw new UnauthorizedException("Missing companyDomain");
 
     if (isHR) return this.service.getManagerHubAnalytics(domain);
-    return this.service.getManagerHubAnalytics(domain, undefined, me?.email);
+    const scope = await this.service.getManagerScopeFieldsByUserId(String(me?.sub || ""));
+    return this.service.getManagerHubAnalytics(domain, scope.department, scope.email, scope.industry);
   }
 
   // ───────────────────── Organization structure ─────────────────────
