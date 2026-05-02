@@ -90,8 +90,6 @@ function rankRolesForSearch(roles: string[], rawQ: string, limit: number): strin
 }
 
 export default function HomePage() {
-  const [roles, setRoles] = useState<string[]>([]);
-  const [search, setSearch] = useState("");
   const [resuming, setResuming] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [activePreparations, setActivePreparations] = useState<
@@ -113,19 +111,6 @@ export default function HomePage() {
       window.removeEventListener("jbv2-org-auth-changed", refreshAuth);
       window.removeEventListener("storage", refreshAuth);
     };
-  }, []);
-
-  useEffect(() => {
-    let cancelled = false;
-    const load = async () => {
-      const prefix = getApiPrefix();
-      const r = await fetch(`${prefix}/api/blueprint/roles`);
-      const rolesData = r.ok ? await r.json() : [];
-      if (cancelled) return;
-      setRoles(Array.isArray(rolesData) ? rolesData : []);
-    };
-    void load();
-    return () => { cancelled = true; };
   }, []);
 
   useEffect(() => {
@@ -197,12 +182,6 @@ export default function HomePage() {
       cancelled = true;
     };
   }, [isAuthenticated]);
-
-  const rankedRoleMatches = useMemo(
-    () => rankRolesForSearch(roles, search, 12),
-    [roles, search],
-  );
-  const searchTrimmed = search.trim();
 
   const goToPreparation = async () => {
     if (resuming) return;
@@ -281,9 +260,6 @@ export default function HomePage() {
         .jb-feature-row:hover { background: #f3e8ff !important; }
         .jb-cta-btn { transition: background 0.18s, color 0.18s, transform 0.18s; }
         .jb-cta-btn:hover { background: #f3f4f6 !important; transform: scale(1.03); }
-        .jb-search-dropdown { position:absolute; top:calc(100% + 4px); left:0; right:0; background:#fff; border:1.5px solid #e5e7eb; border-radius:10px; box-shadow:0 8px 24px rgba(0,0,0,0.12); max-height:220px; overflow-y:auto; z-index:50; }
-        .jb-search-item { padding:10px 14px; font-size:14px; color:#374151; cursor:pointer; }
-        .jb-search-item:hover { background:#eef5ff; }
         .jb-hero-ref-panel {
           background: var(--surface);
           border: 1px solid var(--border);
@@ -327,7 +303,7 @@ export default function HomePage() {
           mask-image: radial-gradient(circle at 30% 35%, rgba(0, 0, 0, 0.9), transparent 70%);
         }
         .jb-hero-growth-img {
-          width: min(640px, 42vw);
+          width: min(460px, 30.2vw);
           height: auto;
           display: block;
           border-radius: 16px;
@@ -348,14 +324,14 @@ export default function HomePage() {
         style={{
           background: "linear-gradient(125deg, #dff1ff 0%, #e4e8ff 50%, #e8fff5 100%)",
           overflow: "hidden",
-          minHeight: 545,
+          minHeight: 392,
         }}
       >
         <div
           style={{
             maxWidth: 1440,
             margin: "0 auto",
-            padding: "clamp(16px, 3.6vw, 52px) clamp(16px, 3.6vw, 52px) clamp(24px, 4vw, 48px)",
+            padding: "clamp(10px, 2.6vw, 38px) clamp(10px, 2.6vw, 38px) clamp(16px, 2.9vw, 34px)",
             boxSizing: "border-box",
           }}
         >
@@ -364,10 +340,10 @@ export default function HomePage() {
             style={{
               display: "flex",
               flexDirection: "row",
-              alignItems: "flex-end",
+              alignItems: "center",
               justifyContent: "space-between",
-              gap: 12,
-              minHeight: 450,
+              gap: 9,
+              minHeight: 324,
               position: "relative",
               overflow: "hidden",
             }}
@@ -376,18 +352,20 @@ export default function HomePage() {
               style={{
                 flex: "1 1 0",
                 minWidth: 0,
-                padding: "clamp(28px, 5vw, 56px) clamp(16px, 4vw, 56px) clamp(28px, 4vw, 40px)",
+                padding: "clamp(20px, 3.6vw, 40px) clamp(11px, 2.9vw, 40px) clamp(20px, 2.9vw, 29px)",
                 zIndex: 2,
                 display: "flex",
                 flexDirection: "column",
-                alignItems: "stretch",
+                alignItems: "center",
+                justifyContent: "center",
+                textAlign: "center",
               }}
             >
               <h1
                 className="jb-hero-ref-title"
                 style={{
-                  margin: "0 0 12px",
-                  fontSize: "clamp(28px, 4.2vw, 56px)",
+                  margin: "0 0 9px",
+                  fontSize: "clamp(20px, 3.02vw, 40px)",
                   fontWeight: 800,
                   lineHeight: 1.12,
                   letterSpacing: "-0.03em",
@@ -397,60 +375,20 @@ export default function HomePage() {
                 <br />
                 Clearly Tracked
               </h1>
-              <p className="jb-fade2" style={{ margin: "0 0 22px", fontSize: 15, color: "rgba(71,84,103,0.92)", lineHeight: 1.75, maxWidth: 620 }}>
+              <p className="jb-fade2" style={{ margin: "0 0 16px", fontSize: 11, color: "rgba(71,84,103,0.92)", lineHeight: 1.68, maxWidth: 446 }}>
                 This platform helps every employee plan their next role, learn required skills, complete assessments, and track progress with clear visibility for both employee and company authority.
               </p>
-              <div className="jb-fade3" style={{ position: "relative", maxWidth: 400 }}>
-                <input
-                  type="text"
-                  placeholder="Search target roles and growth paths..."
-                  value={search}
-                  onChange={e => setSearch(e.target.value)}
-                  style={{
-                    width: "100%",
-                    minHeight: 52,
-                    padding: "16px 18px",
-                    borderRadius: 10,
-                    border: "2px solid rgba(5, 74, 144, 0.32)",
-                    fontSize: 15,
-                    background: "#fff",
-                    outline: "none",
-                    boxSizing: "border-box",
-                    color: "#050F20",
-                  }}
-                />
-                {searchTrimmed.length > 0 && rankedRoleMatches.length > 0 && (
-                  <div className="jb-search-dropdown" role="listbox" aria-label="Matching roles">
-                    {rankedRoleMatches.map(r => (
-                      <Link
-                        key={r}
-                        href={`/role/${encodeURIComponent(r)}`}
-                        style={{ textDecoration: "none", display: "block" }}
-                        onClick={() => setSearch("")}
-                      >
-                        <div className="jb-search-item" role="option">{r}</div>
-                      </Link>
-                    ))}
-                  </div>
-                )}
-                {searchTrimmed.length > 0 && roles.length > 0 && rankedRoleMatches.length === 0 && (
-                  <div className="jb-search-dropdown" style={{ padding: "12px 14px", fontSize: 13, color: "#6b7280" }}>
-                    No close role matches. Try keywords from the job title or browse{" "}
-                    <Link href="/role/" style={{ color: "#2563eb", fontWeight: 600 }} onClick={() => setSearch("")}>all roles</Link>.
-                  </div>
-                )}
-              </div>
-              <div className="jb-fade3" style={{ marginTop: 12, display: "flex", gap: 10, flexWrap: "wrap" }}>
+              <div className="jb-fade3" style={{ marginTop: 8, display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "center" }}>
                 <button
                   onClick={() => { void goToPreparation(); }}
                   style={{
                     display: "inline-block",
-                    padding: "10px 20px",
+                    padding: "7px 14px",
                     borderRadius: 9,
                     border: "2px solid #4f46e5",
                     background: "linear-gradient(90deg,#4f46e5 0%,#054a90 55%,#00bfa6 100%)",
                     color: "#fff",
-                    fontSize: 14,
+                    fontSize: 11,
                     fontWeight: 700,
                     cursor: "pointer",
                   }}
@@ -461,12 +399,12 @@ export default function HomePage() {
                   onClick={goToTargetNewRole}
                   style={{
                     display: "inline-block",
-                    padding: "10px 20px",
+                    padding: "7px 14px",
                     borderRadius: 9,
                     border: "2px solid #054a90",
                     background: "#054a90",
                     color: "#fff",
-                    fontSize: 14,
+                    fontSize: 11,
                     fontWeight: 700,
                     cursor: "pointer",
                   }}
@@ -477,12 +415,12 @@ export default function HomePage() {
                   href="/role/"
                   style={{
                     display: "inline-block",
-                    padding: "10px 20px",
+                    padding: "7px 14px",
                     borderRadius: 9,
                     border: "2px solid #4f46e5",
                     background: "#fff",
                     color: "#4f46e5",
-                    fontSize: 14,
+                    fontSize: 11,
                     fontWeight: 700,
                     textDecoration: "none",
                   }}
@@ -496,10 +434,10 @@ export default function HomePage() {
               className="jb-hero-ref-images jb-fade2"
               style={{
                 flex: "0 0 auto",
-                padding: "clamp(18px, 3vw, 36px)",
+                padding: "clamp(12px, 2.2vw, 26px)",
                 zIndex: 1,
                 display: "flex",
-                alignItems: "flex-end",
+                alignItems: "center",
                 justifyContent: "center",
               }}
               aria-hidden
@@ -517,116 +455,7 @@ export default function HomePage() {
         </div>
       </div>
 
-      {activePreparations.length > 0 && (
-        <div style={{ background: "#fff", padding: "16px 32px 6px" }}>
-          <div style={{ maxWidth: 1100, margin: "0 auto" }}>
-            <h2 style={{ margin: "0 0 10px", fontSize: 22, fontWeight: 800, color: "#1e1b4b" }}>Active Preparations</h2>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 12 }}>
-              {activePreparations.map((prep) => (
-                <div
-                  key={`${prep.roleName}-${prep.preparationStartDate || ""}`}
-                  style={{ background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 14, padding: 14 }}
-                >
-                  <div style={{ fontSize: 16, fontWeight: 900, color: "#0f172a" }}>{prep.roleName}</div>
-                  <div style={{ marginTop: 8, fontSize: 12, color: "#64748b" }}>
-                    Started: {prep.preparationStartDate ? new Date(prep.preparationStartDate).toLocaleDateString() : "—"}
-                  </div>
-                  <div style={{ marginTop: 3, fontSize: 12, color: "#64748b" }}>
-                    Target completion: {prep.targetCompletionDate ? new Date(prep.targetCompletionDate).toLocaleDateString() : "—"}
-                  </div>
-                  <div style={{ marginTop: 10 }}>
-                    <Link
-                      href={`/role/${encodeURIComponent(prep.roleName)}`}
-                      style={{
-                        textDecoration: "none",
-                        display: "inline-flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        padding: "8px 12px",
-                        borderRadius: 10,
-                        background: "#ede9fe",
-                        border: "1px solid #c4b5fd",
-                        color: "#5b21b6",
-                        fontSize: 13,
-                        fontWeight: 800,
-                      }}
-                    >
-                      Open Blueprint
-                    </Link>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {testReportCards.length > 0 && (
-        <div style={{ background: "#f8fafc", padding: "22px 32px 10px" }}>
-          <div style={{ maxWidth: 1100, margin: "0 auto" }}>
-            <h2 style={{ margin: "0 0 10px", fontSize: 22, fontWeight: 800, color: "#1e1b4b" }}>Your Test Reports</h2>
-            <p style={{ margin: "0 0 12px", fontSize: 13, color: "#64748b" }}>
-              Quick summary of latest skill-test results by role.
-            </p>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: 12, alignItems: "stretch" }}>
-              {testReportCards.map((card) => (
-                <div
-                  key={card.roleName}
-                  style={{
-                    background: "#fff",
-                    border: "1px solid #e2e8f0",
-                    borderRadius: 14,
-                    padding: 14,
-                    boxShadow: "0 4px 14px rgba(15,23,42,.06)",
-                    display: "flex",
-                    flexDirection: "column",
-                    minHeight: 158,
-                  }}
-                >
-                  <div style={{ fontSize: 16, fontWeight: 900, color: "#0f172a", marginBottom: 8 }}>{card.roleName}</div>
-                  <div style={{ marginTop: 2, display: "flex", gap: 8, flexWrap: "wrap", fontSize: 12 }}>
-                    <span style={{ background: "#ecfeff", color: "#155e75", border: "1px solid #a5f3fc", borderRadius: 999, padding: "3px 8px", fontWeight: 700 }}>
-                      Tests: {card.tests}
-                    </span>
-                    <span style={{ background: "#ecfdf5", color: "#166534", border: "1px solid #bbf7d0", borderRadius: 999, padding: "3px 8px", fontWeight: 700 }}>
-                      Passed: {card.passed}
-                    </span>
-                    <span style={{ background: "#fef2f2", color: "#991b1b", border: "1px solid #fecaca", borderRadius: 999, padding: "3px 8px", fontWeight: 700 }}>
-                      Failed: {card.failed}
-                    </span>
-                  </div>
-                  <div style={{ marginTop: 10, fontSize: 12, color: "#64748b" }}>
-                    {card.latestCompletedAt ? `Last updated: ${new Date(card.latestCompletedAt).toLocaleDateString()}` : "No recent update"}
-                  </div>
-                  <div style={{ marginTop: "auto", paddingTop: 10 }}>
-                    <Link
-                      href={`/role/${encodeURIComponent(card.roleName)}/report`}
-                      style={{
-                        textDecoration: "none",
-                        display: "inline-flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        padding: "8px 12px",
-                        borderRadius: 10,
-                        background: "#eff6ff",
-                        border: "1px solid #bfdbfe",
-                        color: "#1d4ed8",
-                        fontSize: 13,
-                        fontWeight: 800,
-                      }}
-                    >
-                      View Detailed Report
-                    </Link>
-                    <div style={{ marginTop: 8, fontSize: 11, color: "#64748b" }}>
-                      Includes skill-wise test summary for this role.
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
+      
 
       {/* ══ WHY CHOOSE JOB BLUEPRINT? ════════════════════════════════ */}
       <div style={{ background: "#f6f8fc", padding: "72px 32px" }}>

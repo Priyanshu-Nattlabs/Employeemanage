@@ -16,30 +16,16 @@ type RoleOption = {
   level?: string;
 };
 
+function roleRowKey(role: RoleOption): string {
+  return `${String(role.name || "").trim()}|${String(role.level || "").trim()}`;
+}
+
 function normalizeRoleText(value: string): string {
   return String(value || "")
     .toLowerCase()
     .replace(/[^a-z0-9\s]/g, " ")
     .replace(/\s+/g, " ")
     .trim();
-}
-
-function expandQueryTokens(value: string): string[][] {
-  const base = normalizeRoleText(value).split(" ").filter(Boolean);
-  const out: string[][] = [];
-  const aliases: Record<string, string[]> = {
-    developer: ["development", "engineer", "engineering", "dev"],
-    development: ["developer", "engineer", "engineering", "dev"],
-    engineer: ["engineering", "developer", "development"],
-    engineering: ["engineer", "developer", "development"],
-    frontend: ["front end", "front-end", "ui"],
-    backend: ["back end", "back-end", "api"],
-    fullstack: ["full stack", "full-stack"],
-  };
-  for (const token of base) {
-    out.push([token, ...(aliases[token] || [])]);
-  }
-  return out;
 }
 
 function inferLevel(name: string, explicitLevel?: string): string {
@@ -57,6 +43,20 @@ export default function TargetRolePage() {
   const [error, setError] = useState("");
   const [targetDurationMonths, setTargetDurationMonths] = useState("");
   const [selectedLevel, setSelectedLevel] = useState("");
+
+  useEffect(() => {
+    const onPageShow = (e: PageTransitionEvent) => {
+      // Back/forward cache restores can keep React state (including savingRole) frozen.
+      if (e.persisted) {
+        setSavingRole("");
+        setError("");
+      }
+    };
+    window.addEventListener("pageshow", onPageShow);
+    return () => {
+      window.removeEventListener("pageshow", onPageShow);
+    };
+  }, []);
 
   useEffect(() => {
     const auth = getOrgAuthFromStorage();
@@ -98,18 +98,38 @@ export default function TargetRolePage() {
     void load();
   }, []);
 
+  /** Same logical role row can appear twice from the API; keep one per name+level for search + pick. */
+  const uniqueRoles = useMemo(() => {
+    const m = new Map<string, RoleOption>();
+    for (const r of roles) {
+      const k = roleRowKey(r);
+      if (!m.has(k)) m.set(k, r);
+    }
+    return Array.from(m.values());
+  }, [roles]);
+
   const filteredRoles = useMemo(() => {
     const q = search.trim();
-    const byLevel = selectedLevel ? roles.filter((r) => String(r.level || "") === selectedLevel) : roles;
+    const byLevel = selectedLevel ? uniqueRoles.filter((r) => String(r.level || "") === selectedLevel) : uniqueRoles;
     if (!q) return byLevel;
-    const tokenGroups = expandQueryTokens(q);
+
+    const qn = normalizeRoleText(q);
+    // Punctuation-only input used to normalize to "" — do not treat as "match everything"
+    if (!qn) return [];
+
+    const hay = (r: RoleOption) => normalizeRoleText(`${r.name} level ${r.level || ""}`);
+
+    // Prefer full query as a contiguous substring in the role text (e.g. "software" → Software Developer).
+    const phraseMatches = byLevel.filter((r) => hay(r).includes(qn));
+    if (phraseMatches.length > 0) return phraseMatches;
+
+    // Multi-word query: every word must appear somewhere in the role text (AND).
+    const words = qn.split(" ").filter(Boolean);
     return byLevel.filter((r) => {
-      const hay = normalizeRoleText(`${r.name} level ${r.level || ""}`);
-      return tokenGroups.every((group) =>
-        group.some((term) => hay.includes(normalizeRoleText(term)))
-      );
+      const h = hay(r);
+      return words.every((w) => h.includes(w));
     });
-  }, [roles, search, selectedLevel]);
+  }, [uniqueRoles, search, selectedLevel]);
 
   const hasSearchInput = search.trim().length > 0;
 
@@ -129,7 +149,7 @@ export default function TargetRolePage() {
       return;
     }
     const roleName = role.name;
-    setSavingRole(roleName);
+    setSavingRole(roleRowKey(role));
     setError("");
     try {
       const start = new Date();
@@ -220,7 +240,7 @@ export default function TargetRolePage() {
               <button
                 key={`${role.name}|${role.level || ""}`}
                 onClick={() => selectRole(role)}
-                disabled={!!savingRole}
+                disabled={!!savingRole && savingRole === roleRowKey(role)}
                 style={roleBtn}
                 title={`Set ${role.name}${role.level ? ` (Level ${role.level})` : ""} as target role`}
               >
@@ -228,7 +248,7 @@ export default function TargetRolePage() {
                   {role.name}{role.level ? ` (Level ${role.level})` : ""}
                 </span>
                 <span style={{ fontSize: 12, color: "#2563eb", fontWeight: 700 }}>
-                  {savingRole === role.name ? "Opening..." : "Open Blueprint"}
+                  {savingRole === roleRowKey(role) ? "Opening..." : "Open Blueprint"}
                 </span>
               </button>
             ))
