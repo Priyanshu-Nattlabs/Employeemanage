@@ -32,10 +32,15 @@ export class BlueprintController {
   }
   @Get("skills") getSkills(@Query("query") query?: string) { return this.service.getAllSkillNames(query); }
   @Get("role/:roleName/proficiency-delta")
-  getRoleProficiencyDelta(@Param("roleName") roleName: string, @Query("level") level?: string) {
+  getRoleProficiencyDelta(
+    @Param("roleName") roleName: string,
+    @Query("level") level?: string,
+    @Query("baselineRole") baselineRole?: string
+  ) {
     return this.service.getSkillProficiencyDelta(
       decodeURIComponent(roleName),
-      level ? decodeURIComponent(level) : undefined
+      level ? decodeURIComponent(level) : undefined,
+      baselineRole ? decodeURIComponent(baselineRole) : undefined
     );
   }
   @Get("role/:roleName/mappings") getRoleMappings(@Param("roleName") roleName: string) { return this.service.roleMappings(decodeURIComponent(roleName)); }
@@ -162,9 +167,19 @@ export class BlueprintController {
     @Param("skillName") skillName: string,
     @Query("totalMonths") _totalMonths: string,
     @Query("startMonth") startMonth: string,
-    @Query("endMonth") endMonth: string
+    @Query("endMonth") endMonth: string,
+    @Query("level") level?: string
   ) {
-    return this.service.getSkillTopics(decodeURIComponent(roleName), decodeURIComponent(skillName), Number(startMonth), Number(endMonth));
+    const raw = level?.trim();
+    const n = raw ? Number(raw) : NaN;
+    const targetRoleLevel = Number.isFinite(n) && n >= 1 ? Math.floor(n) : undefined;
+    return this.service.getSkillTopics(
+      decodeURIComponent(roleName),
+      decodeURIComponent(skillName),
+      Number(startMonth),
+      Number(endMonth),
+      targetRoleLevel
+    );
   }
 
   @Post("role/:roleName/map-industry")

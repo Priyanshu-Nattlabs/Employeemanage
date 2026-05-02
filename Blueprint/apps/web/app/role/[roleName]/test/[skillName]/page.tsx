@@ -1,10 +1,11 @@
 "use client";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 
 import { getApiPrefix } from "@/lib/apiBase";
 import { getOrgAuthFromStorage } from "@/lib/orgAuth";
+import { flowQueryString, pickRoleFlowParams } from "@/lib/roleFlowParams";
 
 const API = getApiPrefix();
 
@@ -141,8 +142,11 @@ function PassBadge({ skillName, roleName, score, date }: { skillName: string; ro
 export default function SkillTestPage() {
   const params   = useParams<{ roleName: string; skillName: string }>();
   const router   = useRouter();
+  const searchParams = useSearchParams();
   const roleName = decodeURIComponent(params.roleName);
   const skillName = decodeURIComponent(params.skillName);
+  const roleFlowQs = useMemo(() => flowQueryString(pickRoleFlowParams(searchParams)), [searchParams]);
+  const roleBase = `/role/${encodeURIComponent(roleName)}`;
   const isCombinedKnownSkillsTest = skillName.toLowerCase() === "known-skills";
   const displayTestTitle = isCombinedKnownSkillsTest ? "Combined Known Skills Test" : skillName;
 
@@ -388,7 +392,7 @@ export default function SkillTestPage() {
         stopCamera();
         if (document.fullscreenElement) void document.exitFullscreen().catch(() => {});
         setTimeout(() => {
-          router.push(`/role/${encodeURIComponent(roleName)}`);
+          router.push(`${roleBase}${roleFlowQs}`);
         }, 300);
       } else {
         setError(`Warning ${next}/3: Tab switching detected. On 3rd switch, test will be exited.`);
@@ -516,7 +520,7 @@ export default function SkillTestPage() {
       <p style={{ color:"#64748b", fontSize:14, marginBottom:24 }}>{error}</p>
       <div style={{ display:"flex", gap:10, justifyContent:"center" }}>
         <button style={btn("white","#6366f1")} onClick={() => { setLoading(true); void loadTest(userId, false); }}>🔄 Try Again</button>
-        <Link href={`/role/${encodeURIComponent(roleName)}`}>
+        <Link href={`${roleBase}${roleFlowQs}`}>
           <button style={btn("#1e293b","#f1f5f9","#e2e8f0")}>← Back to Role</button>
         </Link>
       </div>
@@ -541,7 +545,7 @@ export default function SkillTestPage() {
             <button style={btn("white", "#2563eb")} onClick={() => { void startProctoring(); }}>
               Enable Camera & Start Proctoring
             </button>
-            <Link href={`/role/${encodeURIComponent(roleName)}`}>
+            <Link href={`${roleBase}${roleFlowQs}`}>
               <button style={btn("#1e293b", "#f1f5f9", "#e2e8f0")}>Cancel</button>
             </Link>
           </div>
@@ -579,7 +583,7 @@ export default function SkillTestPage() {
 
         {/* breadcrumb */}
         <p style={{ color:"#94a3b8", fontSize:13, marginBottom:20 }}>
-          <Link href={`/role/${encodeURIComponent(roleName)}`} style={{ color:"#6366f1", textDecoration:"none", fontWeight:600 }}>← {roleName}</Link>
+          <Link href={`${roleBase}${roleFlowQs}`} style={{ color:"#6366f1", textDecoration:"none", fontWeight:600 }}>← {roleName}</Link>
           <span style={{ margin:"0 6px", color:"#e2e8f0" }}>›</span>
           <span>Test Result</span>
         </p>
@@ -610,13 +614,13 @@ export default function SkillTestPage() {
               <div style={{ display:"flex", gap:10, flexWrap:"wrap" }}>
                 <button
                   style={{ ...btn("white","#6366f1"), flex:1, justifyContent:"center", borderRadius:12, minWidth:220 }}
-                  onClick={() => router.replace(`/role/${encodeURIComponent(roleName)}`)}
+                  onClick={() => router.replace(`${roleBase}${roleFlowQs}`)}
                 >
                   Go to Blueprint
                 </button>
                 <button
                   style={{ ...btn("white","#0ea5e9"), flex:1, justifyContent:"center", borderRadius:12, minWidth:220 }}
-                  onClick={() => router.replace(`/role/${encodeURIComponent(roleName)}/report`)}
+                  onClick={() => router.replace(`${roleBase}/report${roleFlowQs}`)}
                 >
                   Detailed Report
                 </button>
@@ -717,13 +721,13 @@ export default function SkillTestPage() {
                   <div style={{ display:"flex", gap:10, flexWrap:"wrap" }}>
                     <button
                       style={{ ...btn("white","#6366f1"), flex:1, justifyContent:"center", borderRadius:12, minWidth:220 }}
-                      onClick={() => router.replace(`/role/${encodeURIComponent(roleName)}`)}
+                      onClick={() => router.replace(`${roleBase}${roleFlowQs}`)}
                     >
                       Go to Blueprint
                     </button>
                     <button
                       style={{ ...btn("white","#0ea5e9"), flex:1, justifyContent:"center", borderRadius:12, minWidth:220 }}
-                      onClick={() => router.replace(`/role/${encodeURIComponent(roleName)}/report`)}
+                      onClick={() => router.replace(`${roleBase}/report${roleFlowQs}`)}
                     >
                       Detailed Report
                     </button>
@@ -877,9 +881,9 @@ export default function SkillTestPage() {
           </p>
           {error && <p style={{ margin:"8px 0 0", fontSize:12, color:"#dc2626" }}>{error}</p>}
           <button
-            style={{ ...btn("white", answered < questionCount ? "#94a3b8" : "#16a34a"), marginTop:12, width:"100%", justifyContent:"center", opacity: submitting ? .7 : 1 }}
+            style={{ ...btn("white", "#16a34a"), marginTop:12, width:"100%", justifyContent:"center", opacity: submitting ? .7 : 1 }}
             onClick={submit}
-            disabled={submitting || answered === 0}
+            disabled={submitting}
           >
             {submitting
               ? <><span style={{ width:13, height:13, border:"2px solid rgba(255,255,255,.4)", borderTop:"2px solid white", borderRadius:"50%", animation:"spin 1s linear infinite", display:"inline-block" }}/>Submitting…</>
@@ -912,7 +916,7 @@ export default function SkillTestPage() {
         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
           <button
             style={btn("#7f1d1d", "#fee2e2", "#fecaca")}
-            onClick={() => router.push(`/role/${encodeURIComponent(roleName)}`)}
+            onClick={() => router.push(`${roleBase}${roleFlowQs}`)}
           >
             Exit
           </button>
@@ -933,9 +937,9 @@ export default function SkillTestPage() {
             Next →
           </button>
           <button
-            style={{ ...btn("white", answered < questionCount ? "#94a3b8" : "#16a34a"), opacity: submitting ? .7 : 1 }}
+            style={{ ...btn("white", "#16a34a"), opacity: submitting ? .7 : 1 }}
             onClick={submit}
-            disabled={submitting || answered === 0}
+            disabled={submitting}
           >
             {submitting
               ? <><span style={{ width:13, height:13, border:"2px solid rgba(255,255,255,.4)", borderTop:"2px solid white", borderRadius:"50%", animation:"spin 1s linear infinite", display:"inline-block" }}/>Submitting…</>
