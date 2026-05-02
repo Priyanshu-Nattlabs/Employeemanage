@@ -1,9 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { appPath } from "@/lib/apiBase";
-import { orgRegisterEmployee, setOrgAuthInStorage } from "@/lib/orgAuth";
+import { orgGetDesignationOptions, orgRegisterEmployee, setOrgAuthInStorage } from "@/lib/orgAuth";
 
 const DEPARTMENT_OPTIONS = [
   "AI",
@@ -16,7 +16,7 @@ const DEPARTMENT_OPTIONS = [
 ];
 
 const INDUSTRY_OPTIONS = [
-  "Technology",
+  "IT",
   "Healthcare",
   "Finance & Banking",
   "Manufacturing",
@@ -45,15 +45,42 @@ export default function EmployeeRegisterPage() {
   const [fullName, setFullName] = useState("");
   const [companyName, setCompanyName] = useState("");
   const [designation, setDesignation] = useState("");
+  const [designationMode, setDesignationMode] = useState<"PICK" | "OTHER">("PICK");
+  const [designationOther, setDesignationOther] = useState("");
+  const [designationOptions, setDesignationOptions] = useState<string[]>([]);
   const [department, setDepartment] = useState("");
   const [deptMode, setDeptMode] = useState<"PICK" | "OTHER">("PICK");
   const [deptOther, setDeptOther] = useState("");
   const [industry, setIndustry] = useState("");
   const [industryMode, setIndustryMode] = useState<"PICK" | "OTHER">("PICK");
   const [industryOther, setIndustryOther] = useState("");
+  const [reportingManagerEmail, setReportingManagerEmail] = useState("");
   const [employeeId, setEmployeeId] = useState("");
   const [mobileNo, setMobileNo] = useState("");
   const inferredDomain = useMemo(() => domainFromEmail(email), [email]);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        if (!inferredDomain) return;
+        const opts = await orgGetDesignationOptions();
+        if (cancelled) return;
+        setDesignationOptions(Array.isArray(opts) ? opts : []);
+      } catch {
+        if (cancelled) return;
+        setDesignationOptions([]);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [inferredDomain]);
+
+  const effectiveDesignation = useMemo(() => {
+    if (designationMode === "OTHER") return designationOther.trim();
+    return designation.trim();
+  }, [designationMode, designationOther, designation]);
 
   const effectiveDepartment = useMemo(() => {
     if (deptMode === "OTHER") return deptOther.trim();
@@ -71,6 +98,7 @@ export default function EmployeeRegisterPage() {
     setLoading(true);
     try {
       if (!inferredDomain) throw new Error("Please enter a valid company email");
+      if (!effectiveDesignation) throw new Error("Designation is required");
       if (!effectiveDepartment) throw new Error("Department is required");
       if (!effectiveIndustry) throw new Error("Industry is required");
 
@@ -78,13 +106,14 @@ export default function EmployeeRegisterPage() {
         email,
         password,
         fullName,
-        designation,
+        designation: effectiveDesignation,
         department: effectiveDepartment,
         industry: effectiveIndustry,
         companyName,
         employeeId,
         currentRole: "EMPLOYEE",
         mobileNo,
+        reportingManagerEmail: reportingManagerEmail.trim() || undefined,
         companyDomain: inferredDomain,
       });
       if ("verificationRequired" in r && r.verificationRequired) {
@@ -127,7 +156,46 @@ export default function EmployeeRegisterPage() {
         </Field>
 
         <Field label="Designation">
-          <input value={designation} onChange={(e) => setDesignation(e.target.value)} required style={inputStyle} placeholder="e.g. Software Engineer" />
+          <div style={{ display: "grid", gap: 8 }}>
+            <select
+              value={designationMode === "OTHER" ? "__OTHER__" : (designation || "")}
+              onChange={(e) => {
+                const v = e.target.value;
+                if (v === "__OTHER__") {
+                  setDesignationMode("OTHER");
+                  setDesignation("");
+                } else {
+                  setDesignationMode("PICK");
+                  setDesignation(v);
+                }
+              }}
+              required
+              style={inputStyle}
+              disabled={!inferredDomain || !designationOptions.length}
+            >
+              <option value="" disabled>
+                {designationOptions.length ? "Select designation" : (inferredDomain ? "Loading designations…" : "Enter email to load designations")}
+              </option>
+              {designationOptions.map((d) => (
+                <option key={d} value={d}>
+                  {d}
+                </option>
+              ))}
+              <option value="__OTHER__">Other (type…)</option>
+            </select>
+
+            {designationMode === "OTHER" ? (
+              <input
+                value={designationOther}
+                onChange={(e) => setDesignationOther(e.target.value)}
+                required
+                style={inputStyle}
+                placeholder="Type your designation"
+              />
+            ) : null}
+
+            <div style={hintStyle}>Choose from the list, or select <b>Other</b> to type a custom designation.</div>
+          </div>
         </Field>
         <Field label="Department">
           <div style={{ display: "grid", gap: 8 }}>
@@ -170,6 +238,19 @@ export default function EmployeeRegisterPage() {
         </Field>
         <Field label="Employee ID">
           <input value={employeeId} onChange={(e) => setEmployeeId(e.target.value)} required style={inputStyle} placeholder="Employee ID" />
+        </Field>
+
+        <Field label="Reporting manager email (Gmail)">
+          <input
+            value={reportingManagerEmail}
+            onChange={(e) => setReportingManagerEmail(e.target.value)}
+            type="email"
+            style={inputStyle}
+            placeholder="manager@gmail.com"
+          />
+          <div style={hintStyle}>
+            Optional. If provided, your manager will see you in their employee database.
+          </div>
         </Field>
 
         <Field label="Industry">

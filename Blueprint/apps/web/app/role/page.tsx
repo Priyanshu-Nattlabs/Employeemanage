@@ -9,7 +9,7 @@ const API = getApiPrefix();
 
 const ROLE_CATEGORIES = [
   { label: "All", icon: "🗺" },
-  { label: "Technology", icon: "💻", keywords: ["developer", "engineer", "programmer", "software", "web", "mobile", "devops", "cloud", "data", "ml ", "ai ", "security", "network", "it ", "system", "database", "frontend", "backend", "fullstack"] },
+  { label: "IT", icon: "💻", keywords: ["developer", "engineer", "programmer", "software", "web", "mobile", "devops", "cloud", "data", "ml ", "ai ", "security", "network", "it ", "system", "database", "frontend", "backend", "fullstack"] },
   { label: "Management", icon: "👔", keywords: ["manager", "director", "head", "lead", "chief", "officer", "president", "vp ", "cto", "ceo", "cfo", "coo", "executive"] },
   { label: "Design & Creative", icon: "🎨", keywords: ["design", "ux", "ui ", "graphic", "creative", "visual", "artist", "animator", "illustrat"] },
   { label: "Finance & Accounting", icon: "💰", keywords: ["finance", "account", "audit", "tax", "invest", "banking", "actuari", "financial analyst", "cfo"] },

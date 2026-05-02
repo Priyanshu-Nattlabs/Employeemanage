@@ -92,6 +92,11 @@ export async function orgRegisterEmployee(body: {
   });
 }
 
+export async function orgGetDesignationOptions(q?: string) {
+  const qs = q ? `?q=${encodeURIComponent(q)}` : "";
+  return apiJson<string[]>(`/api/org-auth/designations${qs}`, { method: "GET" });
+}
+
 export async function orgRegisterAdmin(body: { email: string; password: string; fullName: string; companyName: string; companyDomain?: string }) {
   return apiJson<OrgRegisterResponse>("/api/org-auth/register/admin", {
     method: "POST",

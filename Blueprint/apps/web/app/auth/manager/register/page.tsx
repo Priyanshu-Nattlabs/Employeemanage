@@ -15,7 +15,7 @@ const DEPARTMENT_OPTIONS = [
 ];
 
 const INDUSTRY_OPTIONS = [
-  "Technology",
+  "IT",
   "Healthcare",
   "Finance & Banking",
   "Manufacturing",
