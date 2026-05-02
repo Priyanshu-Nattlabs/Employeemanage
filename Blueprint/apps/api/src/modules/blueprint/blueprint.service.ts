@@ -70,18 +70,16 @@ export class BlueprintService {
     return Array.from(new Set([...fromReq, ...fromTech, ...fromSoft]));
   }
 
-  async getSkillProficiencyDelta(roleName: string, level?: string) {
-    const lvl = Number(String(level || "").trim());
-    if (!Number.isFinite(lvl) || lvl <= 1) {
-      return { roleName, level: String(level || ""), previousLevel: "", items: [] as any[] };
-    }
-
-    const current = await this.getRole(roleName, String(lvl));
-    const previous = await this.getRole(roleName, String(lvl - 1));
-    if (!current || !previous) {
-      return { roleName, level: String(lvl), previousLevel: String(lvl - 1), items: [] as any[] };
-    }
-
+  /**
+   * Compares target role skills (current doc) to a baseline role (previous doc): exact + fuzzy pairs, then AI-scored gaps.
+   * Used for level ≥2 (same role, adjacent levels) and level 1 vs user's current job role (baselineRoleName).
+   */
+  private async buildProficiencyDeltaForRolePair(
+    roleName: string,
+    current: any,
+    previous: any,
+    out: { level: string; previousLevel: string; baselineRole?: string; pairIntro: string; evalIntro: string }
+  ) {
     const currentSkills = this.extractRoleSkillNames(current);
     const previousSkills = this.extractRoleSkillNames(previous);
     const norm = (v: string) => String(v || "").toLowerCase().replace(/[^a-z0-9\s]/g, " ").replace(/\s+/g, " ").trim();
@@ -121,15 +119,13 @@ export class BlueprintService {
     }
 
     const aiPairFallback = heuristicSimilar.map((m) => ({ currentSkill: m.currentSkill, previousSkill: m.previousSkill, similarityType: "similar" }));
-    const aiPairSystem = `You map skill names across adjacent levels. Return ONLY valid JSON.`;
-    const aiPairPrompt = `Role: ${roleName}
-Current level: ${lvl}
-Previous level: ${lvl - 1}
+    const aiPairSystem = `You map skill names between two role definitions. Return ONLY valid JSON.`;
+    const aiPairPrompt = `${out.pairIntro}
 
-Current level skills not matched exactly:
+Target role skills not matched exactly:
 ${unmatchedCurrent.map((s) => `- ${s}`).join("\n") || "- none"}
 
-Previous level skills available:
+Baseline role skills available:
 ${unmatchedPrevious.map((s) => `- ${s}`).join("\n") || "- none"}
 
 Map only truly similar skills (examples: "Excel" and "Advanced Excel", "SQL" and "Advanced SQL").
@@ -163,7 +159,13 @@ Rules:
 
     const matchedCurrentSkills = Array.from(matchedByCurrent.keys());
     if (!matchedCurrentSkills.length) {
-      return { roleName, level: String(lvl), previousLevel: String(lvl - 1), items: [] as any[] };
+      return {
+        roleName,
+        level: out.level,
+        previousLevel: out.previousLevel,
+        ...(out.baselineRole ? { baselineRole: out.baselineRole } : {}),
+        items: [] as any[],
+      };
     }
 
     const currentReqMap = new Map(
@@ -173,6 +175,7 @@ Rules:
       (previous.skillRequirements || []).map((s: any) => [String(s?.skillName || "").trim().toLowerCase(), s])
     );
 
+    const isBaselineCompare = !!out.baselineRole;
     const fallbackItems = matchedCurrentSkills.map((skillName) => {
       const pair = matchedByCurrent.get(skillName)!;
       const c = currentReqMap.get(skillName.toLowerCase()) || {};
@@ -192,24 +195,25 @@ Rules:
       return {
         skillName,
         increasePct,
-        reason: pair.similarityType === "similar"
-          ? `Progression from "${pair.previousSkill}" to deeper variant.`
-          : "More depth and practical complexity expected at this level.",
+        reason: isBaselineCompare
+          ? pair.similarityType === "similar"
+            ? `Gap vs current role on "${pair.previousSkill}".`
+            : "Depth or coverage expected beyond your current role."
+          : pair.similarityType === "similar"
+            ? `Progression from "${pair.previousSkill}" to deeper variant.`
+            : "More depth and practical complexity expected at this level.",
         previousSkill: pair.previousSkill,
         similarityType: pair.similarityType,
       };
     });
 
     const system = `You are a technical learning evaluator. Return ONLY valid JSON.`;
-    const prompt = `Role: ${roleName}
-Current level: ${lvl}
-Previous level: ${lvl - 1}
+    const prompt = `${out.evalIntro}
 
-Estimate proficiency increase for these matched skills from previous level to current level.
 Matched skills:
 ${matchedCurrentSkills.map((s) => {
   const p = matchedByCurrent.get(s)!;
-  return `- current: ${s} | previous: ${p.previousSkill} | type: ${p.similarityType}`;
+  return `- target: ${s} | baseline: ${p.previousSkill} | type: ${p.similarityType}`;
 }).join("\n")}
 
 Return JSON object:
@@ -220,10 +224,11 @@ Return JSON object:
 }
 
 Rules:
-- Include ONLY the listed matched current skills
-- Keep skillName exactly as provided for current skill
-- increasePct should reflect higher depth/complexity at current level
-- For similar pairs (e.g., Excel -> Advanced Excel), assign meaningful increase
+- Include ONLY the listed matched target skills (skillName must match target list)
+- increasePct reflects additional proficiency needed on the target skill${
+      isBaselineCompare ? " versus the baseline job role" : " moving from the previous level to this level"
+    }
+- For similar pairs, assign meaningful increase
 - No markdown`;
 
     const aiOut = await this.ai.chatJson<any>(prompt, system, { items: fallbackItems });
@@ -245,7 +250,64 @@ Rules:
       if (!dedup.has(k)) dedup.set(k, it);
     }
     const items = Array.from(dedup.values());
-    return { roleName, level: String(lvl), previousLevel: String(lvl - 1), items: items.length ? items : fallbackItems };
+    return {
+      roleName,
+      level: out.level,
+      previousLevel: out.previousLevel,
+      ...(out.baselineRole ? { baselineRole: out.baselineRole } : {}),
+      items: items.length ? items : fallbackItems,
+    };
+  }
+
+  async getSkillProficiencyDelta(roleName: string, level?: string, baselineRoleName?: string) {
+    const lvl = Number(String(level || "").trim());
+    const baseline = String(baselineRoleName || "").trim();
+
+    if (Number.isFinite(lvl) && lvl === 1 && baseline) {
+      const target = (await this.getRole(roleName, "1")) || (await this.getRole(roleName));
+      let base = await this.getRole(baseline);
+      if (!base) base = await this.getRole(baseline, "1");
+      if (!base) base = await this.getRole(baseline, "2");
+      if (!target || !base) {
+        return { roleName, level: "1", previousLevel: baseline, baselineRole: baseline, items: [] as any[] };
+      }
+      return this.buildProficiencyDeltaForRolePair(roleName, target, base, {
+        level: "1",
+        previousLevel: baseline,
+        baselineRole: baseline,
+        pairIntro: `Role: ${roleName}
+Target: level 1 requirements for "${roleName}"
+Baseline (current job from profile): "${baseline}"`,
+        evalIntro: `Role: ${roleName}
+Target: level 1 skill expectations for "${roleName}"
+Baseline job role: "${baseline}"
+
+Estimate proficiency gap to reach target expectations where a skill appears in both roles.`,
+      });
+    }
+
+    if (!Number.isFinite(lvl) || lvl <= 1) {
+      return { roleName, level: String(level || ""), previousLevel: "", items: [] as any[] };
+    }
+
+    const current = await this.getRole(roleName, String(lvl));
+    const previous = await this.getRole(roleName, String(lvl - 1));
+    if (!current || !previous) {
+      return { roleName, level: String(lvl), previousLevel: String(lvl - 1), items: [] as any[] };
+    }
+
+    return this.buildProficiencyDeltaForRolePair(roleName, current, previous, {
+      level: String(lvl),
+      previousLevel: String(lvl - 1),
+      pairIntro: `Role: ${roleName}
+Current level: ${lvl}
+Previous level: ${lvl - 1}`,
+      evalIntro: `Role: ${roleName}
+Current level: ${lvl}
+Previous level: ${lvl - 1}
+
+Estimate proficiency increase for these matched skills from previous level to current level.`,
+    });
   }
   async getAllSkillNames(query?: string) {
     const docs = await this.blueprintModel.find().lean();
@@ -408,25 +470,48 @@ Rules:
     };
   }
 
-  async getSkillTopics(roleName: string, skillName: string, startMonth: number, endMonth: number) {
+  async getSkillTopics(
+    roleName: string,
+    skillName: string,
+    startMonth: number,
+    endMonth: number,
+    targetRoleLevel?: number
+  ) {
     const duration = Math.max(1, endMonth - startMonth + 1);
+    const lvl = Number(targetRoleLevel);
+    const skipBasics = Number.isFinite(lvl) && lvl >= 2;
 
     // Fallback: sensible default topics
     const fallback: Record<number, string[]> = {};
-    const defaultPhases = ["Core Fundamentals", "Hands-on Practice", "Projects & Revision"];
+    const defaultPhases = skipBasics
+      ? ["Applied depth & patterns", "Integration in real systems", "Quality, trade-offs & review"]
+      : ["Core Fundamentals", "Hands-on Practice", "Projects & Revision"];
     for (let i = 0; i < duration; i++) {
       fallback[startMonth + i] = [defaultPhases[i % defaultPhases.length], `${skillName} deep-dive`, "Review & self-test"];
     }
     const fallbackRel: Record<string, string[]> = {};
     for (let i = 0; i < duration; i++) fallbackRel[String(i + 1)] = fallback[startMonth + i];
 
-    const system = `You are a curriculum designer. Return ONLY a valid JSON object mapping relative month numbers (as string keys "1", "2", ...) to arrays of 3-5 specific learning topics for that month. No markdown, no extra text.
+    const system = skipBasics
+      ? `You are a curriculum designer. Return ONLY a valid JSON object mapping relative month numbers (as string keys "1", "2", ...) to arrays of 3-5 specific learning topics for that month. No markdown, no extra text.
+The learner already satisfies the **previous role level** foundation for shared skills — do NOT include introductory or "basics" topics (no "introduction to", definitions-only, or first-exposure material).
+Example for 2 months: {"1":["Design trade-offs in X","X in production constraints","Refactor legacy using X"],"2":["Advanced X patterns","Observability & testing for X","Team review & assessment"]}`
+      : `You are a curriculum designer. Return ONLY a valid JSON object mapping relative month numbers (as string keys "1", "2", ...) to arrays of 3-5 specific learning topics for that month. No markdown, no extra text.
 Example for 2 months: {"1":["Intro to X","Basic syntax","First project"],"2":["Advanced X","Real-world usage","Assessment"]}`;
+
+    const levelBlock = skipBasics
+      ? `
+Target role level: **Level ${lvl}** (integer). For skills that also exist at Level ${lvl - 1}, the learner is assumed to **already know** Level ${lvl - 1} depth (fundamentals, core syntax/APIs, basic usage). 
+**Do not** include topics that only teach introductions, definitions, "what is", beginner tutorials, or first-time exposure appropriate to Level ${lvl - 1}.
+Start from **Level ${lvl}** depth: applied design, patterns, trade-offs, testing, performance, refactoring, production scenarios, and assessments at that depth.
+`
+      : "";
 
     const prompt = `Create a month-by-month study plan for the skill "${skillName}" as required for the role "${roleName}".
 Duration: ${duration} month(s).
 Keys must be "1" through "${duration}" (relative month numbers).
 Each value must be an array of 3-5 specific, actionable learning topics.
+${levelBlock}
 Return ONLY the JSON object.`;
 
     const raw = await this.ai.chatJson<Record<string, string[]>>(prompt, system, fallbackRel);

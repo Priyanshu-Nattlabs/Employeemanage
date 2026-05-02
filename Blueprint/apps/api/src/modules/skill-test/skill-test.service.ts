@@ -8,6 +8,7 @@ import { AiService } from "../shared/ai.service";
 @Injectable()
 export class SkillTestService {
   private readonly logger = new Logger(SkillTestService.name);
+  private static readonly MAX_ATTEMPTS_PER_TEST = 3;
 
   constructor(
     @InjectModel(SkillTest.name) private readonly testModel: Model<SkillTestDocument>,
@@ -16,9 +17,33 @@ export class SkillTestService {
     private readonly ai: AiService
   ) {}
 
+  private async assertAttemptLimitSingleSkill(studentId: string, roleName: string, skillName: string) {
+    const attempts = await this.testModel.countDocuments({
+      studentId,
+      roleName,
+      skillName,
+      testType: "SINGLE_SKILL",
+    });
+    if (attempts >= SkillTestService.MAX_ATTEMPTS_PER_TEST) {
+      throw new BadRequestException(`Retake limit reached. You can attempt this skill test only ${SkillTestService.MAX_ATTEMPTS_PER_TEST} times.`);
+    }
+  }
+
+  private async assertAttemptLimitKnownSkills(studentId: string, roleName: string) {
+    const attempts = await this.testModel.countDocuments({
+      studentId,
+      roleName,
+      testType: "KNOWN_SKILLS",
+    });
+    if (attempts >= SkillTestService.MAX_ATTEMPTS_PER_TEST) {
+      throw new BadRequestException(`Retake limit reached. You can attempt this combined test only ${SkillTestService.MAX_ATTEMPTS_PER_TEST} times.`);
+    }
+  }
+
   async start(studentId: string, roleName: string, skillName: string) {
     const existing = await this.testModel.findOne({ studentId, roleName, skillName, status: "IN_PROGRESS" });
     if (existing) return existing;
+    await this.assertAttemptLimitSingleSkill(studentId, roleName, skillName);
 
     this.logger.log(`Generating AI questions for skill: "${skillName}" (role: "${roleName}")`);
     // generateQuestions always returns at least the fallback — never throws
@@ -35,6 +60,7 @@ export class SkillTestService {
 
     const existing = await this.testModel.findOne({ studentId, roleName, testType: "KNOWN_SKILLS", status: "IN_PROGRESS" });
     if (existing) return existing;
+    await this.assertAttemptLimitKnownSkills(studentId, roleName);
 
     const questions = await this.generateKnownSkillsQuestions(roleName, skills).catch(() => this.buildKnownSkillsFallback(skills, skills.length * 5));
     return this.testModel.create({
