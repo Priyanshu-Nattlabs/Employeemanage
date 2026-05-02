@@ -1,0 +1,591 @@
+Industry - Department,Role
+Legal -  Corporate / Commercial Law,Corporate Lawyer
+Legal -  Corporate / Commercial Law,Corporate Civil Lawyer
+Legal -  Corporate / Commercial Law,Legal Counsel
+Legal -  Corporate / Commercial Law,Legal Advisor
+Legal -  Litigation & Dispute Resolution,Civil Litigation Lawyer
+Legal -  Litigation & Dispute Resolution,Criminal Lawyer
+Legal -  Litigation & Dispute Resolution,Public Prosecutor
+Legal -  Litigation & Dispute Resolution,Family Law Advocate
+Legal -  Litigation & Dispute Resolution,Divorce & Matrimonial Lawyer
+Legal -  Intellectual Property (IP) Law,IP Lawyer
+Legal -  Intellectual Property (IP) Law,Patent Agent
+Legal -  Intellectual Property (IP) Law,Trademark Attorney
+Legal -  Intellectual Property (IP) Law,IP Consultant
+Legal -  Banking & Finance Law,Bank Legal Officer
+Legal -  Banking & Finance Law,Corporate Banking Lawyer
+Legal -  Banking & Finance Law,Insolvency & Bankruptcy Lawyer
+Legal -  Taxation Law,Tax Lawyer
+Legal -  Taxation Law,Tax Consultant
+Legal -  Taxation Law,Corporate Tax Consultant
+Legal -  Taxation Law,GST Specialist Lawyer
+Legal -  Labour & Employment Law,Corporate Labour Law Advisor
+Legal -  Real Estate & Property Law,Property Lawyer
+Legal -  Regulatory & Compliance,Compliance Officer
+Legal -  Regulatory & Compliance,Corporate Governance Consultant
+Legal -  Regulatory & Compliance,Data Privacy Officer
+Legal -  Regulatory & Compliance,Legal Policy Advisor
+Legal -  Regulatory & Compliance,Environmental Lawyer
+Legal -  Regulatory & Compliance,NGO Legal Specialist
+Legal -  Regulatory & Compliance,Government Legal Officer
+"Legal -  Technology, Media & Telecommunications (TMT)",Cyber Lawyer
+"Legal -  Technology, Media & Telecommunications (TMT)",Digital Evidence Lawyer
+Legal -  Arbitration & ADR,International Arbitration Lawyer
+Legal -  Public Law & International Law,Constitutional Lawyer
+Legal -  Public Law & International Law,International Lawyer
+Legal -  Public Law & International Law,Legislative Consultant
+Legal -  Public Law & International Law,Human Rights Lawyer
+Education -  Content & Localization,Translator
+Education -  Student Support & Wellbeing,Mental Health Educator
+Education -  Content & Curriculum Development,Content Writer
+Education -  Teaching & Instruction,Teacher
+Education -  Research & Innovation,Academic Researcher
+Education -  Student Support & Wellbeing,Yoga Instructor
+Education -  Teaching & Instruction,Drawing Teacher
+Education -  Content & Curriculum Development,Curriculum Developer
+Education -  Research & Innovation,Research Scientist
+Education -  Research & Innovation,Veterinary Research Scientist
+Education -  Teaching & Instruction,Teacher
+Education -  Student Support & Wellbeing,Counselor
+Education -  Knowledge Management & Archives,Museum Curator
+Education -  Knowledge Management & Archives,Archivist
+Education -  Research & Innovation,Research Associate
+Education -  Student Support & Wellbeing,Yoga Therapist
+Education -  Content & Curriculum Development,Content Developer
+Education -  Research & Innovation,Researcher
+Education -  Training & Faculty Development,Trainer
+Education -  Operations & Administration,Corporate Operations Manager
+Education -  Human Resources,Human Resources Associate
+Education -  Academic Operations,Academic Coordinator
+Education -  Research & Innovation,Researcher
+Education -  Research & Innovation,Research Assistant
+Education -  Teaching & Instruction,Nurse Educator
+Education -  Student Support & Wellbeing,Sports Instructor
+Education -  Training & Faculty Development,Teacher Trainer
+Education -  Research & Innovation,Veterinary Researcher
+Education -  Student Support & Wellbeing,Counsellor
+Education -  Research & Innovation,AI Research Scientist
+Education -  Teaching & Instruction,Educator
+BFSI -  Function,Role
+BFSI -  Finance & Accounting,Accountant
+BFSI -  Finance & Accounting,Chartered Accountant
+BFSI -  Finance & Accounting,Cost Accountant
+BFSI -  Finance & Accounting,Management Accountant
+BFSI -  Finance & Accounting,Accounts Executive
+BFSI -  Finance & Accounting,Financial Controller
+BFSI -  Finance & Accounting,Corporate Finance Manager
+BFSI -  Finance & Accounting,Financial Manager
+"BFSI -  Risk, Compliance & Legal",Compliance Officer
+"BFSI -  Risk, Compliance & Legal",Bank Legal Officer
+"BFSI -  Risk, Compliance & Legal",Corporate Banking Lawyer
+"BFSI -  Risk, Compliance & Legal",Corporate Governance Consultant
+"BFSI -  Risk, Compliance & Legal",Data Privacy Officer
+"BFSI -  Risk, Compliance & Legal",GST Specialist Lawyer
+"BFSI -  Risk, Compliance & Legal",Insolvency & Bankruptcy Lawyer
+"BFSI -  Risk, Compliance & Legal",Financial Crime Analyst
+BFSI -  Audit & Assurance,Auditor
+BFSI -  Audit & Assurance,Forensic Accountant
+BFSI -  Audit & Assurance,Quality Assurance Analyst
+BFSI -  Taxation,Tax Consultant
+BFSI -  Taxation,Tax Assistant
+BFSI -  Taxation,Corporate Tax Consultant
+"BFSI -  Sales, Marketing & Relationship Management",Sales Executive
+"BFSI -  Sales, Marketing & Relationship Management",Marketing Executive
+"BFSI -  Sales, Marketing & Relationship Management",Advertising Account Executive
+"BFSI -  Sales, Marketing & Relationship Management",Relationship Manager
+BFSI -  Investment & Treasury,Investment Analyst
+BFSI -  Investment & Treasury,Investment Banking Analyst
+BFSI -  Investment & Treasury,Venture Capital Associate
+BFSI -  Investment & Treasury,Foreign Exchange Analyst
+BFSI -  Investment & Treasury,Quantitative Analyst
+BFSI -  Investment & Treasury,Credit Analyst
+"BFSI -  Strategy, Consulting & Research",Economist
+"BFSI -  Strategy, Consulting & Research",Business Analyst
+"BFSI -  Strategy, Consulting & Research",Policy Analyst
+"BFSI -  Strategy, Consulting & Research",Business Consultant
+"BFSI -  Strategy, Consulting & Research",International Trade Consultant
+"BFSI -  Strategy, Consulting & Research",International Business Manager
+"BFSI -  Strategy, Consulting & Research",Project Manager
+"BFSI -  Data, Analytics & Technology",Data Analyst
+"BFSI -  Data, Analytics & Technology",BI Analyst
+"BFSI -  Data, Analytics & Technology",Statistician
+"BFSI -  Data, Analytics & Technology",Actuarial Analyst
+"BFSI -  Data, Analytics & Technology",Penetration Tester
+"BFSI -  Data, Analytics & Technology",Security Architect
+BFSI -  Operations & Administration,Operations Executive
+BFSI -  Operations & Administration,Operations Analyst
+BFSI -  Operations & Administration,Corporate Operations Manager
+BFSI -  Operations & Administration,Administrative Officer
+BFSI -  Operations & Administration,Administrative Head
+BFSI -  Operations & Administration,Procurement/Contract Analyst
+BFSI -  Human Resources & Talent,HR Executive
+BFSI -  Human Resources & Talent,HR Generalist
+BFSI -  Human Resources & Talent,Human Resources Associate
+BFSI -  Human Resources & Talent,Talent Acquisition Specialist
+"BFSI -  Risk, Compliance & Legal",Company Secretary
+"BFSI -  Strategy, Consulting & Research",EHS/ESG Consultant
+BFSI -  Finance & Accounting,Financial Analyst
+BFSI -  Finance & Accounting,Financial Analyst
+Healthcare -  Medical Services,General Physician
+Healthcare -  Medical Services,Obstetrician
+Healthcare -  Medical Services,Radiologist
+Healthcare -  Medical Services,Junior Resident Doctor
+Healthcare -  Medical Services,Medical Officer
+Healthcare -  Medical Services,ICU Doctors
+Healthcare -  Medical Services,Reconstructive Surgeon
+Healthcare -  Nursing & Patient Care,Staff Nurse
+Healthcare -  Nursing & Patient Care,Clinical Nurse Specialist
+Healthcare -  Nursing & Patient Care,Labor and Delivery Nurse
+Healthcare -  Nursing & Patient Care,Postpartum Nurse
+Healthcare -  Nursing & Patient Care,Maternity Ward Nurse
+Healthcare -  Nursing & Patient Care,Nurse Educator
+Healthcare -  Allied Health & Therapy,Clinical Physiotherapist
+Healthcare -  Allied Health & Therapy,Sports Physiotherapist
+Healthcare -  Allied Health & Therapy,Pediatric Physiotherapist
+Healthcare -  Allied Health & Therapy,Speech and Language Therapist
+Healthcare -  Allied Health & Therapy,Therapist
+Healthcare -  Allied Health & Therapy,Rehabilitation Specialist
+Healthcare -  Allied Health & Therapy,Rehabilitator
+Healthcare -  Diagnostics & Laboratory,Lab Technician
+Healthcare -  Diagnostics & Laboratory,Diagnostic Lab Technician
+Healthcare -  Diagnostics & Laboratory,Diagnostic Technologist
+Healthcare -  Diagnostics & Laboratory,Pathologist
+Healthcare -  Diagnostics & Laboratory,Microbiologist
+Healthcare -  Diagnostics & Laboratory,Medical Imaging Specialist
+Healthcare -  Pharmacy & Drug Safety,Pharmacist
+Healthcare -  Pharmacy & Drug Safety,Drug Inspector
+Healthcare -  Pharmacy & Drug Safety,Drug Safety Analyst
+Healthcare -  Pharmacy & Drug Safety,Pharmacovigilance
+Healthcare -  Public Health & Research,Epidemiologist
+Healthcare -  Public Health & Research,Genetic Consultant
+Healthcare -  Public Health & Research,Veterinary Research Scientist
+Healthcare -  Veterinary & Animal Health,Veterinary Surgeon
+Healthcare -  Veterinary & Animal Health,Veterinary Pathologist
+Healthcare -  Veterinary & Animal Health,Veterinary Officer
+Healthcare -  Veterinary & Animal Health,Veterinary Officers
+Healthcare -  Veterinary & Animal Health,Veterinary Assistant
+Healthcare -  Veterinary & Animal Health,Veterinary Inspector
+Healthcare -  Veterinary & Animal Health,Animal Health Manager
+Healthcare -  Veterinary & Animal Health,Livestock Development Officer
+Healthcare -  Veterinary & Animal Health,Veterinary Gynaecologist
+Healthcare -  Wellness & Alternative Medicine,Yoga Instructor
+Healthcare -  Wellness & Alternative Medicine,Yoga Therapist
+Healthcare -  Wellness & Alternative Medicine,Fitness Trainer
+Healthcare -  Wellness & Alternative Medicine,Wellness Consultant
+Healthcare -  Wellness & Alternative Medicine,Ayurvedic Doctor
+Healthcare -  Wellness & Alternative Medicine,Mental Health Educator
+Healthcare -  Wellness & Alternative Medicine,Counselor
+Healthcare -  Wellness & Alternative Medicine,Counsellor
+Healthcare -  Hospital Administration & Operations,Hospital Administrator
+Healthcare -  Hospital Administration & Operations,Patient Experience Manager
+Healthcare -  Hospital Administration & Operations,Medical Superintendent
+"Healthcare -  Food, Nutrition & Safety",Nutritionist
+"Healthcare -  Food, Nutrition & Safety",Food Technologist
+"Healthcare -  Food, Nutrition & Safety",Food Safety Officer
+"Healthcare -  Food, Nutrition & Safety",Food Safety & Inspection Officer
+"Healthcare -  Food, Nutrition & Safety",Food Quality Controller
+"Healthcare -  Food, Nutrition & Safety",Hospital Diet Clerk
+Healthcare -  Diagnostics & Laboratory,Biomedical Equipment Technician
+Healthcare -  Diagnostics & Laboratory,Clinical Engineer
+Healthcare -  Diagnostics & Laboratory,Bioprocess Engineer
+Healthcare -  Diagnostics & Laboratory,Medical Textile Engineer
+Healthcare -  Medical Services,General Dental Surgeon
+Healthcare -  Medical Services,Orthodontist
+Healthcare -  Medical Services,Periodontist
+Healthcare -  Medical Services,Dental Officer
+Healthcare -  Medical Services,Dental Surgeon
+Healthcare -  Medical Services,Dental Implantologist
+Healthcare -  Medical Services,Oral & Maxillofacial Surgeon
+Healthcare -  Medical Services,Periodontal Surgeon
+Healthcare -  Public Health & Research,Social Worker
+Lifesciences -  Research & Development,Research Scientist
+Lifesciences -  Research & Development,Research Associate
+Lifesciences -  Research & Development,Research Assistant
+Lifesciences -  Research & Development,Researcher
+Lifesciences -  Research & Development,Genetic Engineer
+Lifesciences -  Research & Development,Biochemical Engineer
+Lifesciences -  Research & Development,Bioinformatics Analyst
+Lifesciences -  Research & Development,Bioinformatics
+Lifesciences -  Laboratory & Diagnostics,Lab Technician
+Lifesciences -  Laboratory & Diagnostics,Diagnostic Lab Technician
+Lifesciences -  Laboratory & Diagnostics,Diagnostic Technologist
+Lifesciences -  Laboratory & Diagnostics,DNA Analyst
+Lifesciences -  Laboratory & Diagnostics,Microbiologist
+Lifesciences -  Laboratory & Diagnostics,Pathologist
+Lifesciences -  Laboratory & Diagnostics,Medical Imaging Specialist
+Lifesciences -  Forensics & Toxicology,Forensic Scientist
+Lifesciences -  Forensics & Toxicology,Forensic Toxicologist
+Lifesciences -  Forensics & Toxicology,Forensic Laboratory Analyst
+Lifesciences -  Forensics & Toxicology,Crime Laboratory Analyst
+Lifesciences -  Forensics & Toxicology,Forensic Chemical Analyst
+Lifesciences -  Forensics & Toxicology,Trace Evidence Analyst
+Lifesciences -  Forensics & Toxicology,Forensic Anthropologist
+Lifesciences -  Forensics & Toxicology,Narcotics Analyst
+Lifesciences -  Pharma & Drug Development,Pharmacist
+Lifesciences -  Pharma & Drug Development,Pharmaceutical Engineer
+Lifesciences -  Pharma & Drug Development,Biopharmaceuticals
+Lifesciences -  Pharma & Drug Development,Drug Inspector
+Lifesciences -  Pharma & Drug Development,Drug Safety Analyst
+Lifesciences -  Pharma & Drug Development,Pharmacovigilance
+Lifesciences -  Clinical & Healthcare Services,General Physician
+Lifesciences -  Clinical & Healthcare Services,Obstetrician
+Lifesciences -  Clinical & Healthcare Services,Radiologist
+Lifesciences -  Clinical & Healthcare Services,Medical Officer
+Lifesciences -  Clinical & Healthcare Services,ICU Doctors
+Lifesciences -  Clinical & Healthcare Services,Reconstructive Surgeon
+Lifesciences -  Clinical & Healthcare Services,Dental Surgeon
+Lifesciences -  Clinical & Healthcare Services,Orthodontist
+Lifesciences -  Clinical & Healthcare Services,Periodontist
+Lifesciences -  Nursing & Allied Health,Staff Nurse
+Lifesciences -  Nursing & Allied Health,Clinical Nurse Specialist
+Lifesciences -  Nursing & Allied Health,Labor and Delivery Nurse
+Lifesciences -  Nursing & Allied Health,Postpartum Nurse
+Lifesciences -  Nursing & Allied Health,Maternity Ward Nurse
+Lifesciences -  Nursing & Allied Health,Nurse Educator
+Lifesciences -  Nursing & Allied Health,Clinical Physiotherapist
+Lifesciences -  Nursing & Allied Health,Sports Physiotherapist
+Lifesciences -  Nursing & Allied Health,Pediatric Physiotherapist
+"Lifesciences -  Agri, Animal & Environmental Sciences",Agricultural Officer
+"Lifesciences -  Agri, Animal & Environmental Sciences",Botanist
+"Lifesciences -  Agri, Animal & Environmental Sciences",Zoologist
+"Lifesciences -  Agri, Animal & Environmental Sciences",Ecologist
+"Lifesciences -  Agri, Animal & Environmental Sciences",Environmental Scientist
+"Lifesciences -  Agri, Animal & Environmental Sciences",Animal Breeder
+"Lifesciences -  Agri, Animal & Environmental Sciences",Animal Breeders
+"Lifesciences -  Agri, Animal & Environmental Sciences",Veterinary Surgeon
+"Lifesciences -  Agri, Animal & Environmental Sciences",Veterinary Officer
+"Lifesciences -  Agri, Animal & Environmental Sciences",Veterinary Officers
+"Lifesciences -  Agri, Animal & Environmental Sciences",Veterinary Assistant
+"Lifesciences -  Agri, Animal & Environmental Sciences",Livestock Development Officer
+"Lifesciences -  Agri, Animal & Environmental Sciences",Animal Health Manager
+"Lifesciences -  Agri, Animal & Environmental Sciences",Veterinary Researcher
+"Lifesciences -  Agri, Animal & Environmental Sciences",Veterinary Research Scientist
+"Lifesciences -  Agri, Animal & Environmental Sciences",Veterinary Inspector
+"Lifesciences -  Agri, Animal & Environmental Sciences",Veterinary Pathologist
+"Lifesciences -  Agri, Animal & Environmental Sciences",Veterinary Gynaecologist
+"Lifesciences -  Agri, Animal & Environmental Sciences",Wildlife Technician
+"Lifesciences -  Agri, Animal & Environmental Sciences",Zookeeper
+"Lifesciences -  Agri, Animal & Environmental Sciences",Farm Manager
+"Lifesciences -  Agri, Animal & Environmental Sciences",Crop Specialist
+"Lifesciences -  Agri, Animal & Environmental Sciences",Agronomist
+"Lifesciences -  Agri, Animal & Environmental Sciences",Bioagriculture
+Lifesciences -  Food & Nutrition Sciences,Nutritionist
+Lifesciences -  Food & Nutrition Sciences,Food Technologist
+Lifesciences -  Food & Nutrition Sciences,Food Safety Officer
+Lifesciences -  Food & Nutrition Sciences,Food Safety & Inspection Officer
+Lifesciences -  Food & Nutrition Sciences,Food Quality Controller
+Lifesciences -  Food & Nutrition Sciences,Hospital Diet Clerk
+Lifesciences -  Engineering & Biotechnology,Bioprocess Engineer
+Lifesciences -  Engineering & Biotechnology,Biomedical Equipment Technician
+Lifesciences -  Engineering & Biotechnology,Clinical Engineer
+Lifesciences -  Engineering & Biotechnology,Medical Textile Engineer
+Lifesciences -  Engineering & Biotechnology,Textile Scientist
+Lifesciences -  Engineering & Biotechnology,Sustainable Textile Developer
+Lifesciences -  Engineering & Biotechnology,Bioinstrumentation Engineer
+Lifesciences -  Public Health & Wellness,Epidemiologist
+Lifesciences -  Public Health & Wellness,Mental Health Educator
+Lifesciences -  Public Health & Wellness,Counselor
+Lifesciences -  Public Health & Wellness,Counsellor
+Lifesciences -  Public Health & Wellness,Yoga Therapist
+Lifesciences -  Public Health & Wellness,Therapist
+Lifesciences -  Public Health & Wellness,Rehabilitation Specialist
+Lifesciences -  Public Health & Wellness,Rehabilitator
+Lifesciences -  Public Health & Wellness,Speech and Language Therapist
+Lifesciences -  Public Health & Wellness,Patient Experience Manager
+Lifesciences -  Public Health & Wellness,Healthcare Quality Manager
+Agriculture -  Crop Science & Agronomy,Botanist
+Agriculture -  Crop Science & Agronomy,Agronomist
+Agriculture -  Crop Science & Agronomy,Crop Specialist
+Agriculture -  Crop Science & Agronomy,Plant Pathologist
+Agriculture -  Crop Science & Agronomy,Entomologist
+Agriculture -  Animal Husbandry & Veterinary,Animal Breeder
+Agriculture -  Animal Husbandry & Veterinary,Animal Breeders
+Agriculture -  Animal Husbandry & Veterinary,Veterinary Officer
+Agriculture -  Animal Husbandry & Veterinary,Veterinary Officers
+Agriculture -  Animal Husbandry & Veterinary,Veterinary Assistant
+Agriculture -  Animal Husbandry & Veterinary,Veterinary Inspector
+Agriculture -  Animal Husbandry & Veterinary,Animal Health Manager
+Agriculture -  Animal Husbandry & Veterinary,Livestock Development Officer
+Agriculture -  Research & Development,Veterinary Research Scientist
+Agriculture -  Research & Development,Veterinary Researcher
+Agriculture -  Research & Development,Bioinformatics Analyst
+Agriculture -  Research & Development,Microbiologist
+Agriculture -  Research & Development,Biochemical Engineer
+Agriculture -  Farm Operations & Management,Farm Manager
+Agriculture -  Farm Operations & Management,Agricultural Officer
+Agriculture -  Environmental & Sustainability,Environmental Engineer
+Agriculture -  Environmental & Sustainability,Environmental Scientist
+Agriculture -  Environmental & Sustainability,Ecologist
+Agriculture -  Environmental & Sustainability,Wildlife Technician
+Agriculture -  Food Safety & Quality,Food Safety Officer
+Agriculture -  Food Safety & Quality,Food Safety & Inspection Officer
+Agriculture -  Food Safety & Quality,Food Quality Controller
+Agriculture -  Food Safety & Quality,Quality Assurance Analyst
+Agriculture -  Laboratory & Diagnostics,Lab Technician
+Agriculture -  Biotechnology & Engineering,Bioprocess Engineer
+Agriculture -  Biotechnology & Engineering,Bioagriculture
+Agriculture -  Earth & Geo Sciences,Geophysicist
+Agriculture -  Earth & Geo Sciences,Earth Science Technician
+Agriculture -  Regulatory & Inspection,Veterinary Inspector
+Manufacturing -  Production & Manufacturing,Production Engineer
+Manufacturing -  Production & Manufacturing,Manufacturing Engineer
+Manufacturing -  Production & Manufacturing,Process Engineer
+Manufacturing -  Production & Manufacturing,Operations Executive
+Manufacturing -  Engineering & Design,Design Engineer
+Manufacturing -  Engineering & Design,CAD Technician
+Manufacturing -  Engineering & Design,Product Developer
+Manufacturing -  Engineering & Design,Materials Engineer
+Manufacturing -  Engineering & Design,Site Engineer
+Manufacturing -  Engineering & Design,Power Engineer
+Manufacturing -  Engineering & Design,Welding Engineer
+Manufacturing -  Engineering & Design,Mechatronics Technician
+Manufacturing -  Quality Assurance & Control,Quality Control Supervisor
+Manufacturing -  Quality Assurance & Control,Quality Control Officer
+Manufacturing -  Supply Chain & Logistics,Logistics Coordinator
+Manufacturing -  Supply Chain & Logistics,Inventory Control Specialist
+Manufacturing -  Supply Chain & Logistics,Green Supply Chain Manager
+Manufacturing -  Finance & Costing,Cost Accountant
+Manufacturing -  HR & Industrial Relations,HR Executive
+Manufacturing -  HR & Industrial Relations,Industrial Relations Manager
+Manufacturing -  Compliance & Regulatory,Compliance Officer
+Manufacturing -  R&D & Innovation,Textile Scientist
+Manufacturing -  R&D & Innovation,Sustainable Textile Developer
+Manufacturing -  Operations Management,Engineering
+Manufacturing -  Operations Management,Pattern Master
+Manufacturing -  Maintenance & Utilities,Power Engineer
+Transport & Logistics -  Logistics & Transportation Operations,Logistics Coordinator
+Transport & Logistics -  Logistics & Transportation Operations,Operations Executive
+Transport & Logistics -  Supply Chain Management,Supply Chain Analyst
+Transport & Logistics -  Supply Chain Management,Green Supply Chain Manager
+Transport & Logistics -  Supply Chain Management,Inventory Control Specialist
+Transport & Logistics -  Warehouse & Distribution,Warehouse Manager
+Transport & Logistics -  Procurement & Sourcing,Procurement Executive
+Transport & Logistics -  Procurement & Sourcing,Procurement/Contract Analyst
+Transport & Logistics -  International Trade & Compliance,Export/Import Manager
+Transport & Logistics -  International Trade & Compliance,International Trade Consultant
+Transport & Logistics -  Engineering & Fleet Management,Production Engineer
+Transport & Logistics -  Engineering & Fleet Management,Automotive Design Engineer
+Transport & Logistics -  Engineering & Fleet Management,Maintenance Engineer
+Transport & Logistics -  Engineering & Fleet Management,Flight Test Engineer
+Transport & Logistics -  Infrastructure & Projects,Site Engineer
+Transport & Logistics -  Infrastructure & Projects,Architect
+Transport & Logistics -  Sustainability & Environment,Environmental Engineer
+Transport & Logistics -  Sustainability & Environment,Renewable Energy Engineer
+Transport & Logistics -  Quality & Safety,Quality Control Supervisor
+Transport & Logistics -  Technology & Analytics,GIS Analyst
+Transport & Logistics -  Technology & Analytics,GIS Specialist
+Transport & Logistics -  Technology & Analytics,Telecom Officer
+Retail -  Merchandising & Product,Fashion Designer
+Retail -  Merchandising & Product,Weave Designer
+Retail -  Merchandising & Product,Fashion Merchandiser
+Retail -  Merchandising & Product,Merchandise Planner
+Retail -  Merchandising & Product,Fashion Consultant
+Retail -  Merchandising & Product,Ethical Fashion Consultant
+Retail -  Sales & Customer Management,Sales Executive
+Retail -  Sales & Customer Management,Relationship Manager
+Retail -  Sales & Customer Management,Technical Sales Rep
+Retail -  Sales & Customer Management,Medical Representative
+Retail -  Sales & Customer Management,Medical Sales Representative
+Retail -  Marketing & Branding,Marketing Executive
+Retail -  Marketing & Branding,Brand Manager
+Retail -  Marketing & Branding,Public Relations Specialist
+Retail -  Marketing & Branding,Public Relations Officer
+Retail -  Marketing & Branding,Public Relations (PR) Specialist
+Retail -  Retail Store Operations,Retail Manager
+Retail -  Retail Store Operations,Front Office Manager
+Retail -  Retail Store Operations,Housekeeping Manager
+Retail -  Retail Store Operations,Food & Beverage Manager
+Retail -  Supply Chain & Logistics,Logistics Coordinator
+Retail -  Supply Chain & Logistics,Supply Chain Analyst
+Retail -  Supply Chain & Logistics,Warehouse Manager
+Retail -  Supply Chain & Logistics,Export/Import Manager
+Retail -  Procurement & Sourcing,Procurement Executive
+Retail -  Procurement & Sourcing,Procurement/Contract Analyst
+Retail -  Production & Quality,Production Engineer
+Retail -  Production & Quality,Production/Process Engineer
+Retail -  Production & Quality,Quality Control Engineer
+Retail -  Production & Quality,Quality Control Supervisor
+Retail -  Production & Quality,Quality Assurance Analyst
+Retail -  Operations & Management,Operations Executive
+Retail -  Operations & Management,Operations Analyst
+Retail -  Operations & Management,Corporate Operations Manager
+Retail -  Operations & Management,Project Manager
+Retail -  International Business,International Business Manager
+Retail -  Compliance & Support,Compliance Officer
+Retail -  Compliance & Support,Maintenance Engineer
+Food -  Food Production & Processing,Food Technologist
+Food -  Food Production & Processing,Production/Process Engineer
+Food -  Food Production & Processing,Process Engineer
+Food -  Food Production & Processing,Process Improvement Engineer
+Food -  Food Production & Processing,Product Developer
+Food -  Quality & Food Safety,Quality Control Engineer
+Food -  Quality & Food Safety,Quality Control Supervisor
+Food -  Quality & Food Safety,Quality Control Officer
+Food -  Quality & Food Safety,Quality Assurance Analyst
+Food -  Quality & Food Safety,Food Safety Officer
+Food -  Quality & Food Safety,Food Safety & Inspection Officer
+Food -  Quality & Food Safety,Food Quality Controller
+Food -  Supply Chain & Logistics,Warehouse Manager
+Food -  Supply Chain & Logistics,Inventory Control Specialist
+Food -  Supply Chain & Logistics,Export/Import Manager
+Food -  Procurement & Sourcing,Procurement Executive
+Food -  Procurement & Sourcing,Procurement/Contract Analyst
+Food -  Sales & Business Development,Technical Sales Rep
+Food -  Sales & Business Development,Biotech Product Executive
+Food -  Sales & Business Development,International Trade Consultant
+Food -  Farm & Agriculture Operations,Agricultural Officer
+Food -  Farm & Agriculture Operations,Farm Manager
+Food -  Farm & Agriculture Operations,Agronomist
+Food -  Farm & Agriculture Operations,Crop Specialist
+Food -  Farm & Agriculture Operations,Plant Pathologist
+Food -  Farm & Agriculture Operations,Entomologist
+Food -  Farm & Agriculture Operations,Bioagriculture
+Food -  Animal Husbandry & Veterinary,Animal Breeder
+Food -  Animal Husbandry & Veterinary,Animal Breeders
+Food -  Animal Husbandry & Veterinary,Veterinary Surgeon
+Food -  Animal Husbandry & Veterinary,Veterinary Officer
+Food -  Animal Husbandry & Veterinary,Veterinary Officers
+Food -  Animal Husbandry & Veterinary,Veterinary Assistant
+Food -  Animal Husbandry & Veterinary,Veterinary Inspector
+Food -  Animal Husbandry & Veterinary,Animal Health Manager
+Food -  Animal Husbandry & Veterinary,Livestock Development Officer
+Food -  Animal Husbandry & Veterinary,Veterinary Researcher
+Food -  R&D & Biotechnology,Bioprocess Engineer
+Food -  R&D & Biotechnology,Biochemical Engineer
+Food -  R&D & Biotechnology,Microbiologist
+Food -  Operations & Facility Management,Hotel Manager
+Food -  Operations & Facility Management,Food & Beverage Manager
+Food -  Operations & Facility Management,Front Office Manager
+Food -  Operations & Facility Management,Housekeeping Manager
+Food -  Operations & Facility Management,Maintenance Engineer
+Food -  Nutrition & Health,Nutritionist
+Food -  Nutrition & Health,Hospital Diet Clerk
+Media & Entertainment -  Content Creation & Journalism,Journalist
+Media & Entertainment -  Content Creation & Journalism,News Anchor
+Media & Entertainment -  Content Creation & Journalism,Photojournalist
+Media & Entertainment -  Content Creation & Journalism,Digital Content Creator
+Media & Entertainment -  Editing & Publishing,Editor
+Media & Entertainment -  Editing & Publishing,Editing & Publishing
+Media & Entertainment -  Music & Audio Production,Music Composer
+Media & Entertainment -  Music & Audio Production,Music Director
+Media & Entertainment -  Music & Audio Production,Disc Jockey
+Media & Entertainment -  Design & Creative,Graphic Designer
+Media & Entertainment -  Design & Creative,Commercial Artist
+Media & Entertainment -  Design & Creative,Graphic & Visualization Design
+Media & Entertainment -  Design & Creative,UI/UX Designer
+Media & Entertainment -  Fashion & Textile,Fashion Designer
+Media & Entertainment -  Fashion & Textile,Textile Designer
+Media & Entertainment -  Fashion & Textile,Textile/Print Designer
+Media & Entertainment -  Fashion & Textile,Weave Designer
+Media & Entertainment -  Fashion & Textile,Digital Textile Designer
+Media & Entertainment -  Fashion & Textile,Knitwear Designe
+Media & Entertainment -  Fashion & Textile,Sustainable Fashion Designer
+Media & Entertainment -  Fashion & Textile,Fashion Stylist
+Media & Entertainment -  Fashion & Textile,Fashion Merchandiser
+Media & Entertainment -  Fashion & Textile,Fashion Consultant
+Media & Entertainment -  Fashion & Textile,Ethical Fashion Consultant
+Media & Entertainment -  Fashion & Textile,Fabric Developer
+Media & Entertainment -  Fashion & Textile,Merchandise Planner
+Media & Entertainment -  Fashion & Textile,Trend Forecaster
+Media & Entertainment -  Marketing & Advertising,Advertising Account Executive
+Media & Entertainment -  Marketing & Advertising,Brand Manager
+Media & Entertainment -  Marketing & Advertising,Programmatic Advertising Specialist
+Media & Entertainment -  Marketing & Advertising,Social Media Manager
+Media & Entertainment -  Public Relations & Communications,Public Relations Specialist
+Media & Entertainment -  Public Relations & Communications,Public Relations Officer
+Media & Entertainment -  Public Relations & Communications,Public Relations (PR) Specialist
+Media & Entertainment -  Events & Production,Event Manager
+Media & Entertainment -  Events & Production,Broadcast Produce
+Media & Entertainment -  Heritage & Archival,Museum Curator
+Media & Entertainment -  Heritage & Archival,Archivist
+Media & Entertainment -  Heritage & Archival,Heritage Manager
+Media & Entertainment -  Heritage & Archival,Art Restoration Specialist
+Media & Entertainment -  Digital & Platform Experience,UI/UX Designer
+Oil & Gas -  Exploration & Geoscience,Geologist
+Oil & Gas -  Exploration & Geoscience,Geotechnical Engineer
+Oil & Gas -  Exploration & Geoscience,Hydrologist
+Oil & Gas -  Exploration & Geoscience,Earth Science Technician
+Oil & Gas -  Drilling & Production,Production Engineer
+Oil & Gas -  Drilling & Production,Production/Process Engineer
+Oil & Gas -  Drilling & Production,Process Engineer
+Oil & Gas -  Drilling & Production,Operations Executive
+Oil & Gas -  Drilling & Production,Operations Analyst
+Oil & Gas -  Engineering & Design,Design Engineer
+Oil & Gas -  Engineering & Design,Materials Engineer
+Oil & Gas -  Engineering & Design,Metallurgist
+Oil & Gas -  Engineering & Design,Structural Engineer
+Oil & Gas -  Engineering & Design,Metal Design Engineer
+Oil & Gas -  Engineering & Design,Site Engineer
+Oil & Gas -  Engineering & Design,Welding Engineer
+Oil & Gas -  Engineering & Design,Mechatronics Design Engineer
+Oil & Gas -  Process & Plant Engineering,Process Improvement Engineer
+Oil & Gas -  Process & Plant Engineering,Power Engineer
+Oil & Gas -  Process & Plant Engineering,Power Plant Engineer
+Oil & Gas -  Process & Plant Engineering,Energy Engineer
+Oil & Gas -  Maintenance & Asset Management,Maintenance Engineer
+Oil & Gas -  Maintenance & Asset Management,Service Engineer
+Oil & Gas -  Maintenance & Asset Management,Mechatronics Technician
+Oil & Gas -  Quality & Safety,Quality Control Engineer
+Oil & Gas -  Quality & Safety,Quality Control Supervisor
+Oil & Gas -  Quality & Safety,Quality Control Officer
+Oil & Gas -  Quality & Safety,Quality Assurance Analyst
+Oil & Gas -  Quality & Safety,EHS/ESG Consultant
+Oil & Gas -  Environment & Sustainability,Environmental Engineer
+Oil & Gas -  Environment & Sustainability,Environmental Scientist
+Oil & Gas -  Environment & Sustainability,Environmental Consultant
+Oil & Gas -  Environment & Sustainability,Air Quality Engineer
+Oil & Gas -  Environment & Sustainability,Water/Waste Management Specialist
+Oil & Gas -  Supply Chain & Procurement,Supply Chain Analyst
+Oil & Gas -  Supply Chain & Procurement,Procurement Executive
+Oil & Gas -  Supply Chain & Procurement,Procurement/Contract Analyst
+Oil & Gas -  Supply Chain & Procurement,Inventory Control Specialist
+Oil & Gas -  Supply Chain & Procurement,Warehouse Manager
+Oil & Gas -  Supply Chain & Procurement,Green Supply Chain Manager
+Oil & Gas -  Projects & Corporate Operations,Project Manager
+Oil & Gas -  Projects & Corporate Operations,Corporate Operations Manager
+Oil & Gas -  Projects & Corporate Operations,Building Contractor
+Oil & Gas -  Digital & Automation,Automation Engineer
+Oil & Gas -  Digital & Automation,Control Systems Engineer
+Oil & Gas -  Digital & Automation,Control & Instrumentation Engineer
+Oil & Gas -  Digital & Automation,Instrumentation Engineer
+Oil & Gas -  Digital & Automation,GIS Analyst
+Oil & Gas -  Digital & Automation,GIS Specialist
+Oil & Gas -  Digital & Automation,Application Engineer
+Oil & Gas -  Digital & Automation,Technical Sales Rep
+Oil & Gas -  Digital & Automation,International Trade Consultant
+Oil & Gas -  Digital & Automation,Export/Import Manager
+Oil & Gas -  Compliance & Governance,Compliance Officer
+Oil & Gas -  Laboratory & Testing,Lab Technician
+Oil & Gas -  Energy & Audit,Energy Auditor
+Real Estate -  Sales & Marketing,Sales Executive
+Real Estate -  Sales & Marketing,Technical Sales Rep
+Real Estate -  Project Development & Management,Project Manager
+Real Estate -  Project Development & Management,Operations Executive
+Real Estate -  Architecture & Design,Architect
+Real Estate -  Architecture & Design,Interior Designer
+Real Estate -  Architecture & Design,CAD Technician
+Real Estate -  Architecture & Design,Architecture & Urban Planner
+Real Estate -  Architecture & Design,Urban Planner
+Real Estate -  Architecture & Design,Metal Design Engineer
+Real Estate -  Engineering & Construction,Site Engineer
+Real Estate -  Engineering & Construction,Structural Engineer
+Real Estate -  Engineering & Construction,Welding Engineer
+Real Estate -  Engineering & Construction,Building Contractor
+Real Estate -  Engineering & Construction,Geotechnical Engineer
+Real Estate -  Quality & Assurance,Quality Control Engineer
+Real Estate -  Quality & Assurance,Quality Control Supervisor
+Real Estate -  Quality & Assurance,Quality Control Officer
+Real Estate -  Quality & Assurance,Quality Assurance Analyst
+Real Estate -  Procurement & Supply Chain,Procurement Executive
+Real Estate -  Procurement & Supply Chain,Procurement/Contract Analyst
+Real Estate -  Facility Management,Maintenance Engineer
+Real Estate -  Facility Management,Service Engineer
+Real Estate -  Facility Management,Front Office Manager
+Real Estate -  Sustainability & Environment,Environmental Consultant
+Real Estate -  Sustainability & Environment,Ecologist
+Real Estate -  Sustainability & Environment,Sustainability Consultant
+Real Estate -  Sustainability & Environment,EHS/ESG Consultant
+Real Estate -  Sustainability & Environment,Water/Waste Management Specialist
+Real Estate -  Technology & Automation,Automation Engineer
+Real Estate -  Technology & Automation,GIS Specialist
+Real Estate -  Operations & Administration,Operations Executive
