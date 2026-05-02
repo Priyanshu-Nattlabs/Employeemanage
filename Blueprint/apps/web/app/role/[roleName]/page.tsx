@@ -1201,7 +1201,8 @@ function RolePageContent() {
     ? (topicsCache[tooltip.topKey]?.[tooltip.month] ?? null)
     : null;
   const tooltipIsLoading = tooltip ? !!topicsLoading[tooltip.topKey] : false;
-  const showSkillSelectionOnly = !prep?.knownSkillsConfigured;
+  /** When null prep (e.g. manager recommend flow), avoid treating as "skill selection" and skipping the JD layout. */
+  const showSkillSelectionOnly = !isRecommendMode && !prep?.knownSkillsConfigured;
   const skillComparisonMode = useMemo(() => {
     const n = Number(employeeLevel);
     if (!Number.isFinite(n) || n < 1) return "none" as const;
