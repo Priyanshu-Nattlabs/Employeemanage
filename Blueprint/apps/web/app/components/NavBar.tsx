@@ -1,11 +1,12 @@
 "use client";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useState, type CSSProperties } from "react";
+import { useEffect, useLayoutEffect, useState, type CSSProperties } from "react";
 import { publicAssetUrl } from "@/lib/apiBase";
 import {
   clearOrgAuthInStorage,
   getOrgAuthFromStorage,
+  isOrgManagerOrHr,
   orgListMyRecommendations,
   orgUpdateRecommendationStatus,
   type RoleRecommendation,
@@ -45,9 +46,7 @@ export function NavBar() {
   const user = orgAuth.user as any | null;
   const isLoggedIn = mounted && Boolean(orgAuth.token);
   const isAdmin = Boolean(user && user.accountType === "ADMIN");
-  const isManager = Boolean(user && user.accountType === "EMPLOYEE" && user.currentRole === "MANAGER");
-  const isHR = Boolean(user && user.accountType === "EMPLOYEE" && user.currentRole === "HR");
-  const isManagerOrHR = isManager || isHR;
+  const isManagerOrHR = isOrgManagerOrHr(user);
   const isEmployee = Boolean(user && user.accountType === "EMPLOYEE" && !isManagerOrHR);
 
   useEffect(() => {
@@ -112,13 +111,23 @@ export function NavBar() {
   const dashboardHref = isAdmin ? "/dashboard/admin" : isManagerOrHR ? "/dashboard/manager" : "/";
   const profileHref = isAdmin ? "/profile/admin" : "/profile/employee";
   const profileLabel = isAdmin ? "Admin Profile" : "Employee Profile";
-  /** Individual contributors land on the employee hub; others keep home. */
-  const brandHref = isLoggedIn && isEmployee ? "/employee/" : "/";
+  /** Employees → employee hub; managers/HR → portal chooser; others → marketing home. */
+  const brandHref = isLoggedIn && isEmployee ? "/employee/" : isLoggedIn && isManagerOrHR ? "/dashboard/manager/home/" : "/";
 
   return (
     <header className="jb-nav">
       <div className="jb-nav__inner">
-        <Link href={brandHref} className="jb-nav__brand" aria-label="Corporate Development — go to employee home">
+        <Link
+          href={brandHref}
+          className="jb-nav__brand"
+          aria-label={
+            isLoggedIn && isEmployee
+              ? "Corporate Development — go to employee home"
+              : isLoggedIn && isManagerOrHR
+                ? "Corporate Development — manager and HR portal"
+                : "Corporate Development — home"
+          }
+        >
           <img
             src={publicAssetUrl("/brand/corporate-development.png")}
             alt="Corporate Development"

@@ -7,7 +7,9 @@ import {
   orgLogin,
   orgRequestManagerHrPasswordResetOtp,
   setOrgAuthInStorage,
+  isOrgManagerOrHr,
 } from "@/lib/orgAuth";
+import { appPath } from "@/lib/apiBase";
 
 export default function ManagerLoginPage() {
   const [email, setEmail] = useState("");
@@ -43,7 +45,7 @@ export default function ManagerLoginPage() {
       const allowed = r.user.accountType === "EMPLOYEE" && (role === "MANAGER" || role === "HR");
       if (!allowed) throw new Error("This area is for Manager / HR accounts. Please use Employee login.");
       setOrgAuthInStorage(r.token, r.user);
-      window.location.href = "/dashboard/manager/hub";
+      window.location.href = appPath("/dashboard/manager/home");
     } catch (err: any) {
       setError(err?.message || "Login failed");
     } finally {
@@ -97,11 +99,9 @@ export default function ManagerLoginPage() {
         otp: ot,
         newPassword,
       });
-      const role = r.user.currentRole;
-      const allowed = r.user.accountType === "EMPLOYEE" && (role === "MANAGER" || role === "HR");
-      if (!allowed) throw new Error("Session error for Manager / HR account.");
+      if (!isOrgManagerOrHr(r.user)) throw new Error("Session error for Manager / HR account.");
       setOrgAuthInStorage(r.token, r.user);
-      window.location.href = "/dashboard/manager/hub";
+      window.location.href = appPath("/dashboard/manager/home");
     } catch (err: any) {
       setError(err?.message || "Could not reset password.");
     } finally {
@@ -225,7 +225,7 @@ export default function ManagerLoginPage() {
         {error?.toLowerCase?.().includes("not verified") ? (
           <div style={{ fontSize: 13, color: "#475569" }}>
             Need to verify?{" "}
-            <Link href={`/auth/verify-otp?email=${encodeURIComponent(email)}&next=${encodeURIComponent("/dashboard/manager/hub")}`} style={link}>
+            <Link href={`/auth/verify-otp?email=${encodeURIComponent(email)}&next=${encodeURIComponent(appPath("/dashboard/manager/home"))}`} style={link}>
               Enter OTP
             </Link>
           </div>

@@ -1,8 +1,8 @@
 "use client";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { getApiPrefix, publicAssetUrl } from "@/lib/apiBase";
-import { getOrgAuthFromStorage } from "@/lib/orgAuth";
+import { appPath, getApiPrefix, publicAssetUrl } from "@/lib/apiBase";
+import { getOrgAuthFromStorage, isOrgManagerOrHr } from "@/lib/orgAuth";
 import { SiteFooter } from "@/app/components/SiteFooter";
 import { PublicHomePage } from "@/app/components/PublicHomePage";
 
@@ -114,6 +114,15 @@ export default function HomePage() {
       window.removeEventListener("storage", refreshAuth);
     };
   }, []);
+
+  /** `/` is the employee role-explorer; managers/HR should land on the portal chooser instead. */
+  useLayoutEffect(() => {
+    if (!isAuthenticated) return;
+    const { user } = getOrgAuthFromStorage();
+    if (isOrgManagerOrHr(user)) {
+      window.location.replace(appPath("/dashboard/manager/home"));
+    }
+  }, [isAuthenticated]);
 
   useEffect(() => {
     let cancelled = false;

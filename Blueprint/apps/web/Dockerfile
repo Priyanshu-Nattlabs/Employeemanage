@@ -8,6 +8,9 @@ RUN npm install
 
 COPY . .
 
+# Fail the image build if the manager portal route is missing (avoids shipping a 404-only image).
+RUN test -f app/dashboard/manager/home/page.tsx || (echo "ERROR: app/dashboard/manager/home/page.tsx missing from build context" && exit 1)
+
 # Used by next.config.js rewrite to reach the backend container
 ARG BACKEND_URL=http://127.0.0.1:8081
 ENV BACKEND_URL=$BACKEND_URL

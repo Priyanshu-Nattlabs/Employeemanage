@@ -40,6 +40,8 @@ services:
       timeout: 7s
       retries: 8
 
+  # After pulling new routes (e.g. /dashboard/manager/home/), rebuild without cache or you may still run an old bundle:
+  #   docker compose build --no-cache frontend && docker compose up -d frontend
   frontend:
     build:
       context: ./apps/web
