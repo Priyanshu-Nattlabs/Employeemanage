@@ -256,6 +256,17 @@ export class OrgAuthController {
     return this.service.listPublicDepartments(domain);
   }
 
+  /**
+   * Public: industries + departments-by-industry for signup (from org structure).
+   * Used with cascading Industry → Department selects after the user enters a company email.
+   */
+  @Get("public/signup-org-options")
+  async publicSignupOrgOptions(@Query("companyDomain") companyDomain?: string) {
+    const domain = String(companyDomain || "").trim().toLowerCase();
+    if (!domain) throw new BadRequestException("Missing companyDomain");
+    return this.service.listPublicSignupOrgOptions(domain);
+  }
+
   /** Manager / HR: upsert the company's org structure. */
   @Post("org-structure")
   async saveOrgStructure(@Headers("authorization") authorization?: string, @Body() body?: any) {
@@ -293,10 +304,12 @@ export class OrgAuthController {
     const domain = (me.companyDomain || "").trim().toLowerCase();
     const profile = await this.service.getProfileById(me?.sub);
     const department = (profile as any)?.department || "";
+    const industry = (profile as any)?.industry || "";
 
     return this.service.listRecommendableRolesForEmployee({
       companyDomain: domain,
       managerDepartment: department,
+      managerIndustry: industry,
       managerRole: me.currentRole,
       employeeId: String(employeeId || ""),
     });
@@ -315,6 +328,7 @@ export class OrgAuthController {
     const domain = (me.companyDomain || "").trim().toLowerCase();
     const profile = await this.service.getProfileById(me?.sub);
     const department = (profile as any)?.department || "";
+    const industry = (profile as any)?.industry || "";
 
     return this.service.createRecommendation({
       companyDomain: domain,
@@ -324,6 +338,7 @@ export class OrgAuthController {
         name: me.fullName,
         role: me.currentRole,
         department,
+        industry,
       },
       employeeId: String(body?.employeeId || ""),
       roleName: String(body?.roleName || ""),

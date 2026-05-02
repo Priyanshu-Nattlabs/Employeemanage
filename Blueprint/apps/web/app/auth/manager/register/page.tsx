@@ -1,10 +1,16 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
-import { orgRegisterEmployee, setOrgAuthInStorage, type OrgCurrentRole } from "@/lib/orgAuth";
+import { useEffect, useMemo, useState } from "react";
+import {
+  orgGetPublicSignupOrgOptions,
+  orgRegisterEmployee,
+  setOrgAuthInStorage,
+  type OrgCurrentRole,
+  type OrgSignupOptions,
+} from "@/lib/orgAuth";
 
-const DEPARTMENT_OPTIONS = [
+const FALLBACK_DEPARTMENT_OPTIONS = [
   "AI",
   "Cybersec",
   "DataScience",
@@ -14,7 +20,7 @@ const DEPARTMENT_OPTIONS = [
   "Finance",
 ];
 
-const INDUSTRY_OPTIONS = [
+const FALLBACK_INDUSTRY_OPTIONS = [
   "IT",
   "Healthcare",
   "Finance & Banking",
@@ -57,6 +63,56 @@ export default function ManagerRegisterPage() {
   const [mobileNo, setMobileNo] = useState("");
 
   const inferredDomain = useMemo(() => domainFromEmail(email), [email]);
+
+  const [signupOrg, setSignupOrg] = useState<OrgSignupOptions | null>(null);
+  const [signupOrgLoading, setSignupOrgLoading] = useState(false);
+  const useOrgCatalog = Boolean(signupOrg?.industries?.length);
+
+  const departmentSelectOptions = useMemo(() => {
+    if (useOrgCatalog) {
+      if (industryMode === "PICK" && industry.trim()) {
+        return signupOrg?.byIndustry[industry] ?? [];
+      }
+      if (industryMode === "OTHER") {
+        return FALLBACK_DEPARTMENT_OPTIONS;
+      }
+      return [];
+    }
+    return FALLBACK_DEPARTMENT_OPTIONS;
+  }, [useOrgCatalog, industryMode, industry, signupOrg]);
+
+  useEffect(() => {
+    setIndustry("");
+    setIndustryOther("");
+    setIndustryMode("PICK");
+    setDepartment("");
+    setDeptOther("");
+    setDeptMode("PICK");
+  }, [inferredDomain]);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      if (!inferredDomain) {
+        setSignupOrg(null);
+        setSignupOrgLoading(false);
+        return;
+      }
+      setSignupOrgLoading(true);
+      try {
+        const o = await orgGetPublicSignupOrgOptions(inferredDomain);
+        if (cancelled) return;
+        setSignupOrg(o);
+      } catch {
+        if (!cancelled) setSignupOrg(null);
+      } finally {
+        if (!cancelled) setSignupOrgLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [inferredDomain]);
 
   const isHR = accountKind === "HR";
 
@@ -154,9 +210,66 @@ export default function ManagerRegisterPage() {
             <div style={readOnlyBox}>Company-wide (all departments)</div>
           </Field>
         ) : (
+          <div />
+        )}
+
+        <Field label="Industry">
+          <div style={{ display: "grid", gap: 8 }}>
+            <select
+              value={industryMode === "OTHER" ? "__OTHER__" : (industry || "")}
+              onChange={(e) => {
+                const v = e.target.value;
+                if (v === "__OTHER__") {
+                  setIndustryMode("OTHER");
+                  setIndustry("");
+                } else {
+                  setIndustryMode("PICK");
+                  setIndustry(v);
+                  if (useOrgCatalog) {
+                    setDepartment("");
+                    setDeptOther("");
+                    setDeptMode("PICK");
+                  }
+                }
+              }}
+              required
+              style={inputStyle}
+              disabled={Boolean(inferredDomain) && signupOrgLoading}
+            >
+              <option value="" disabled>
+                {!inferredDomain ? "Enter company email first" : signupOrgLoading ? "Loading industries…" : "Select industry"}
+              </option>
+              {(useOrgCatalog ? signupOrg?.industries ?? [] : FALLBACK_INDUSTRY_OPTIONS).map((d) => (
+                <option key={d} value={d}>
+                  {d}
+                </option>
+              ))}
+              <option value="__OTHER__">Other (type…)</option>
+            </select>
+            {industryMode === "OTHER" ? (
+              <input
+                value={industryOther}
+                onChange={(e) => setIndustryOther(e.target.value)}
+                required
+                style={inputStyle}
+                placeholder="Type your industry"
+              />
+            ) : null}
+            <div style={hintStyle}>
+              {useOrgCatalog
+                ? "From your company org mapping. Managers: pick industry, then department."
+                : "No org mapping for this domain yet — default industry list."}
+            </div>
+          </div>
+        </Field>
+
+        {isHR ? (
+          <div />
+        ) : (
           <Field label="Department">
             <div style={{ display: "grid", gap: 8 }}>
               <select
+                key={`dept-${industryMode}-${industry || "none"}`}
                 value={deptMode === "OTHER" ? "__OTHER__" : (department || "")}
                 onChange={(e) => {
                   const v = e.target.value;
@@ -170,9 +283,16 @@ export default function ManagerRegisterPage() {
                 }}
                 required
                 style={inputStyle}
+                disabled={Boolean(useOrgCatalog && industryMode === "PICK" && !industry.trim())}
               >
-                <option value="" disabled>Select department</option>
-                {DEPARTMENT_OPTIONS.map((d) => (
+                <option value="" disabled>
+                  {useOrgCatalog && industryMode === "PICK" && !industry.trim()
+                    ? "Select industry first"
+                    : useOrgCatalog && industryMode === "PICK" && industry.trim() && !departmentSelectOptions.length
+                      ? "No departments for this industry"
+                      : "Select department"}
+                </option>
+                {departmentSelectOptions.map((d) => (
                   <option key={d} value={d}>
                     {d}
                   </option>
@@ -189,7 +309,9 @@ export default function ManagerRegisterPage() {
                 />
               ) : null}
               <div style={hintStyle}>
-                Choose from the list, or select <b>Other</b> to type a custom department.
+                {useOrgCatalog
+                  ? "Choose an industry first — only that industry’s departments appear here."
+                  : "Choose a department, or Other to type your own."}
               </div>
             </div>
           </Field>
@@ -201,43 +323,6 @@ export default function ManagerRegisterPage() {
         <Field label="Mobile no.">
           <input value={mobileNo} onChange={(e) => setMobileNo(e.target.value)} required style={inputStyle} placeholder="Mobile number" />
         </Field>
-        <Field label="Industry">
-          <div style={{ display: "grid", gap: 8 }}>
-            <select
-              value={industryMode === "OTHER" ? "__OTHER__" : (industry || "")}
-              onChange={(e) => {
-                const v = e.target.value;
-                if (v === "__OTHER__") {
-                  setIndustryMode("OTHER");
-                  setIndustry("");
-                } else {
-                  setIndustryMode("PICK");
-                  setIndustry(v);
-                }
-              }}
-              required
-              style={inputStyle}
-            >
-              <option value="" disabled>Select industry</option>
-              {INDUSTRY_OPTIONS.map((d) => (
-                <option key={d} value={d}>
-                  {d}
-                </option>
-              ))}
-              <option value="__OTHER__">Other (type…)</option>
-            </select>
-            {industryMode === "OTHER" ? (
-              <input
-                value={industryOther}
-                onChange={(e) => setIndustryOther(e.target.value)}
-                required
-                style={inputStyle}
-                placeholder="Type your industry"
-              />
-            ) : null}
-          </div>
-        </Field>
-        <div />
 
         {error ? (
           <div style={{ gridColumn: "1 / -1", padding: "10px 12px", borderRadius: 10, background: "#fef2f2", border: "1px solid #fecaca", color: "#991b1b", fontSize: 13 }}>

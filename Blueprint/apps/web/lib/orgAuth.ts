@@ -97,6 +97,19 @@ export async function orgGetDesignationOptions(q?: string) {
   return apiJson<string[]>(`/api/org-auth/designations${qs}`, { method: "GET" });
 }
 
+export type OrgSignupOptions = {
+  industries: string[];
+  byIndustry: Record<string, string[]>;
+  source: "merged" | "empty";
+  unscopedIndustryDefault: string;
+};
+
+/** Public: industries + departments for cascading signup (from company org structure). */
+export async function orgGetPublicSignupOrgOptions(companyDomain: string) {
+  const d = encodeURIComponent(companyDomain.trim().toLowerCase());
+  return apiJson<OrgSignupOptions>(`/api/org-auth/public/signup-org-options?companyDomain=${d}`, { method: "GET" });
+}
+
 export async function orgRegisterAdmin(body: { email: string; password: string; fullName: string; companyName: string; companyDomain?: string }) {
   return apiJson<OrgRegisterResponse>("/api/org-auth/register/admin", {
     method: "POST",
