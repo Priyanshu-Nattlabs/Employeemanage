@@ -5,17 +5,27 @@ import { useMemo, useState } from "react";
 import { orgRegisterEmployee, setOrgAuthInStorage, type OrgCurrentRole } from "@/lib/orgAuth";
 
 const DEPARTMENT_OPTIONS = [
-  "Technology",
-  "Management",
-  "Design & Creative",
-  "Finance & Accounting",
-  "Sales & Marketing",
+  "AI",
+  "Cybersec",
+  "DataScience",
+  "Software",
+  "Infra",
+  "Sales and Marketing",
+  "Finance",
+];
+
+const INDUSTRY_OPTIONS = [
+  "IT",
   "Healthcare",
-  "Education & Research",
-  "Operations & Logistics",
-  "Legal & Compliance",
-  "Human Resources",
-  "Analytics & Data",
+  "Finance & Banking",
+  "Manufacturing",
+  "Education",
+  "Media & Marketing",
+  "Construction & Real Estate",
+  "Retail & E-Commerce",
+  "Energy & Environment",
+  "Government & Public",
+  "Logistics & Transport",
 ];
 
 function domainFromEmail(email: string) {
@@ -40,12 +50,13 @@ export default function ManagerRegisterPage() {
   const [department, setDepartment] = useState("");
   const [deptMode, setDeptMode] = useState<"PICK" | "OTHER">("PICK");
   const [deptOther, setDeptOther] = useState("");
+  const [industry, setIndustry] = useState("");
+  const [industryMode, setIndustryMode] = useState<"PICK" | "OTHER">("PICK");
+  const [industryOther, setIndustryOther] = useState("");
   const [employeeId, setEmployeeId] = useState("");
   const [mobileNo, setMobileNo] = useState("");
-  const [reportingManagerEmail, setReportingManagerEmail] = useState("");
 
   const inferredDomain = useMemo(() => domainFromEmail(email), [email]);
-  const inferredMgrDomain = useMemo(() => domainFromEmail(reportingManagerEmail), [reportingManagerEmail]);
 
   const isHR = accountKind === "HR";
 
@@ -54,15 +65,19 @@ export default function ManagerRegisterPage() {
     return department.trim();
   }, [deptMode, deptOther, department]);
 
+  const effectiveIndustry = useMemo(() => {
+    if (industryMode === "OTHER") return industryOther.trim();
+    return industry.trim();
+  }, [industryMode, industryOther, industry]);
+
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
     setLoading(true);
     try {
       if (!inferredDomain) throw new Error("Please enter a valid company email");
-      if (!reportingManagerEmail.trim()) throw new Error("Reporting manager email is required");
-      if (inferredMgrDomain && inferredMgrDomain !== inferredDomain) throw new Error("Reporting manager email must be in the same company domain");
       if (!isHR && !effectiveDepartment) throw new Error("Department is required for managers");
+      if (!effectiveIndustry) throw new Error("Industry is required");
 
       const r = await orgRegisterEmployee({
         email,
@@ -70,11 +85,11 @@ export default function ManagerRegisterPage() {
         fullName,
         designation,
         department: isHR ? undefined : effectiveDepartment,
+        industry: effectiveIndustry,
         companyName,
         employeeId,
         currentRole: accountKind,
         mobileNo,
-        reportingManagerEmail,
         companyDomain: inferredDomain
       });
       if ("verificationRequired" in r && r.verificationRequired) {
@@ -186,12 +201,41 @@ export default function ManagerRegisterPage() {
         <Field label="Mobile no.">
           <input value={mobileNo} onChange={(e) => setMobileNo(e.target.value)} required style={inputStyle} placeholder="Mobile number" />
         </Field>
-
-        <Field label="Reporting manager email">
-          <input value={reportingManagerEmail} onChange={(e) => setReportingManagerEmail(e.target.value)} required type="email" style={inputStyle} placeholder="head@company.com" />
-          {reportingManagerEmail.trim() ? (
-            <div style={hintStyle}>Detected domain: <b>{inferredMgrDomain || "—"}</b></div>
-          ) : null}
+        <Field label="Industry">
+          <div style={{ display: "grid", gap: 8 }}>
+            <select
+              value={industryMode === "OTHER" ? "__OTHER__" : (industry || "")}
+              onChange={(e) => {
+                const v = e.target.value;
+                if (v === "__OTHER__") {
+                  setIndustryMode("OTHER");
+                  setIndustry("");
+                } else {
+                  setIndustryMode("PICK");
+                  setIndustry(v);
+                }
+              }}
+              required
+              style={inputStyle}
+            >
+              <option value="" disabled>Select industry</option>
+              {INDUSTRY_OPTIONS.map((d) => (
+                <option key={d} value={d}>
+                  {d}
+                </option>
+              ))}
+              <option value="__OTHER__">Other (type…)</option>
+            </select>
+            {industryMode === "OTHER" ? (
+              <input
+                value={industryOther}
+                onChange={(e) => setIndustryOther(e.target.value)}
+                required
+                style={inputStyle}
+                placeholder="Type your industry"
+              />
+            ) : null}
+          </div>
         </Field>
         <div />
 

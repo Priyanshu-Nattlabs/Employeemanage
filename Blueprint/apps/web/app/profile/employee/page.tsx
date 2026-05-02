@@ -54,7 +54,6 @@ export default function EmployeeProfilePage() {
         employeeId: profile?.employeeId || "",
         currentRole: profile?.currentRole || "EMPLOYEE",
         mobileNo: profile?.mobileNo || "",
-        reportingManagerEmail: profile?.reportingManagerEmail || ""
       } as any);
       setProfile(updated);
       if (user) setOrgAuthInStorage(token, { ...user, ...updated });
@@ -115,9 +114,6 @@ export default function EmployeeProfilePage() {
           </Field>
           <Field label="Mobile no.">
             <input value={profile?.mobileNo || ""} onChange={(e) => setProfile({ ...(profile || {}), mobileNo: e.target.value })} style={input} />
-          </Field>
-          <Field label="Reporting manager email">
-            <input value={profile?.reportingManagerEmail || ""} onChange={(e) => setProfile({ ...(profile || {}), reportingManagerEmail: e.target.value })} style={input} />
           </Field>
           <Field label="Company (locked)">
             <input value={`${user.companyName} (${user.companyDomain})`} readOnly style={{ ...input, background: "#f8fafc" }} />

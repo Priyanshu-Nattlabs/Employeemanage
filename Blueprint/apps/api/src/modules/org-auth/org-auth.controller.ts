@@ -88,6 +88,12 @@ export class OrgAuthController {
     return this.service.getProfileById(me?.sub);
   }
 
+  /** Public: designation dropdown options (sourced from blueprints role catalog). */
+  @Get("designations")
+  async designationOptions(@Query("q") q?: string) {
+    return this.service.listDesignationOptions(q);
+  }
+
   @Patch("me/profile")
   async updateMyProfile(@Headers("authorization") authorization?: string, @Body() body?: any) {
     const token = getBearerToken(authorization);
@@ -136,9 +142,7 @@ export class OrgAuthController {
     if (!domain) throw new UnauthorizedException("Missing companyDomain");
 
     if (isHR) return this.service.getEmployeesForManager(domain);
-    const profile = await this.service.getProfileById(me?.sub);
-    const department = (profile as any)?.department || "";
-    return this.service.getEmployeesForManager(domain, department);
+    return this.service.getEmployeesForManager(domain, undefined, me?.email);
   }
 
   /** Admin view: list employees for admin's company name + domain. */
@@ -186,9 +190,7 @@ export class OrgAuthController {
     if (!domain) throw new UnauthorizedException("Missing companyDomain");
 
     if (isHR) return this.service.getEmployeesActivityForManager(domain);
-    const profile = await this.service.getProfileById(me?.sub);
-    const department = (profile as any)?.department || "";
-    return this.service.getEmployeesActivityForManager(domain, department);
+    return this.service.getEmployeesActivityForManager(domain, undefined, me?.email);
   }
 
   /** Manager / HR view: employees + preparation/test summary. Manager is scoped to their department. */
@@ -206,9 +208,7 @@ export class OrgAuthController {
     if (!domain) throw new UnauthorizedException("Missing companyDomain");
 
     if (isHR) return this.service.getEmployeesPrepSummaryForManager(domain);
-    const profile = await this.service.getProfileById(me?.sub);
-    const department = (profile as any)?.department || "";
-    return this.service.getEmployeesPrepSummaryForManager(domain, department);
+    return this.service.getEmployeesPrepSummaryForManager(domain, undefined, me?.email);
   }
 
   /** Manager / HR view: aggregated hub analytics for the overview dashboard. */
@@ -225,9 +225,7 @@ export class OrgAuthController {
     if (!domain) throw new UnauthorizedException("Missing companyDomain");
 
     if (isHR) return this.service.getManagerHubAnalytics(domain);
-    const profile = await this.service.getProfileById(me?.sub);
-    const department = (profile as any)?.department || "";
-    return this.service.getManagerHubAnalytics(domain, department);
+    return this.service.getManagerHubAnalytics(domain, undefined, me?.email);
   }
 
   // ───────────────────── Organization structure ─────────────────────
