@@ -196,84 +196,84 @@ function RolesPageContent() {
 
       {/* ── LEFT SIDEBAR ─────────────────────────────────── */}
       {!isRecommendMode ? (
-        <aside style={{
-          width: 260, flexShrink: 0, background: "#F1F5F9",
-          borderRight: "1px solid #E2E8F0",
-          position: "sticky", top: 64, height: "calc(100vh - 64px)",
-          overflowY: "auto",
-        }}>
-          <div style={{ padding: "20px 0 24px" }}>
-            <div style={{ padding: "0 20px 14px", borderBottom: "1px solid #E2E8F0", marginBottom: 8 }}>
-              <div style={{ fontSize: 10, fontWeight: 800, color: "#94A3B8", textTransform: "uppercase", letterSpacing: "0.12em", marginBottom: 6 }}>
-                Browse by Domain
+      <aside style={{
+        width: 260, flexShrink: 0, background: "#F1F5F9",
+        borderRight: "1px solid #E2E8F0",
+        position: "sticky", top: 64, height: "calc(100vh - 64px)",
+        overflowY: "auto",
+      }}>
+        <div style={{ padding: "20px 0 24px" }}>
+          <div style={{ padding: "0 20px 14px", borderBottom: "1px solid #E2E8F0", marginBottom: 8 }}>
+            <div style={{ fontSize: 10, fontWeight: 800, color: "#94A3B8", textTransform: "uppercase", letterSpacing: "0.12em", marginBottom: 6 }}>
+              Browse by Domain
+            </div>
+          </div>
+
+          {ROLE_CATEGORIES.map((cat) => {
+            const count = cat.label === "All" ? visibleRoles.length : (categoryCounts[cat.label] || 0);
+            const isActive = activeCategory === cat.label;
+            return (
+              <button
+                key={cat.label}
+                onClick={() => setActiveCategory(cat.label)}
+                style={{
+                  width: isActive ? "calc(100% - 24px)" : "100%",
+                  margin: isActive ? "3px 12px" : "1px 0",
+                  textAlign: "left", padding: "10px 16px",
+                  display: "flex", alignItems: "center", justifyContent: "space-between",
+                  background: isActive ? "#3170A5" : "transparent",
+                  color: isActive ? "white" : "#434655",
+                  border: "none", cursor: "pointer",
+                  borderRadius: isActive ? 6 : 0,
+                  fontWeight: isActive ? 700 : 500, fontSize: 13,
+                  transition: "all 0.12s",
+                }}
+              >
+                <span style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0, overflow: "hidden" }}>
+                  <span style={{ fontSize: 15, flexShrink: 0 }}>{cat.icon}</span>
+                  <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{cat.label}</span>
+                </span>
+                {count > 0 && (
+                  <span style={{
+                    background: isActive ? "white" : "#E8F0FF",
+                    color: "#3170A5",
+                    borderRadius: 11, padding: "2px 7px",
+                    fontSize: 11, fontWeight: 700, minWidth: 22,
+                    textAlign: "center", flexShrink: 0, marginLeft: 6,
+                  }}>
+                    {count}
+                  </span>
+                )}
+              </button>
+            );
+          })}
+
+          {/* A-Z quick jump */}
+          {letters.length > 3 && (
+            <div style={{ margin: "16px 12px 0", borderTop: "1px solid #E2E8F0", paddingTop: 14 }}>
+              <div style={{ fontSize: 10, fontWeight: 800, color: "#94A3B8", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 8, paddingLeft: 4 }}>
+                Jump to A–Z
+              </div>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 4, padding: "0 4px" }}>
+                {letters.map(l => (
+                  <button
+                    key={l}
+                    onClick={() => scrollTo(l)}
+                    style={{
+                      width: 28, height: 28, borderRadius: 6,
+                      background: "white", border: "1px solid rgba(0,0,0,0.12)",
+                      color: "#3170A5", fontWeight: 700, fontSize: 12,
+                      cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
+                    }}
+                  >
+                    {l}
+                  </button>
+                ))}
               </div>
             </div>
-
-            {ROLE_CATEGORIES.map((cat) => {
-              const count = cat.label === "All" ? visibleRoles.length : (categoryCounts[cat.label] || 0);
-              const isActive = activeCategory === cat.label;
-              return (
-                <button
-                  key={cat.label}
-                  onClick={() => setActiveCategory(cat.label)}
-                  style={{
-                    width: isActive ? "calc(100% - 24px)" : "100%",
-                    margin: isActive ? "3px 12px" : "1px 0",
-                    textAlign: "left", padding: "10px 16px",
-                    display: "flex", alignItems: "center", justifyContent: "space-between",
-                    background: isActive ? "#3170A5" : "transparent",
-                    color: isActive ? "white" : "#434655",
-                    border: "none", cursor: "pointer",
-                    borderRadius: isActive ? 6 : 0,
-                    fontWeight: isActive ? 700 : 500, fontSize: 13,
-                    transition: "all 0.12s",
-                  }}
-                >
-                  <span style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0, overflow: "hidden" }}>
-                    <span style={{ fontSize: 15, flexShrink: 0 }}>{cat.icon}</span>
-                    <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{cat.label}</span>
-                  </span>
-                  {count > 0 && (
-                    <span style={{
-                      background: isActive ? "white" : "#E8F0FF",
-                      color: "#3170A5",
-                      borderRadius: 11, padding: "2px 7px",
-                      fontSize: 11, fontWeight: 700, minWidth: 22,
-                      textAlign: "center", flexShrink: 0, marginLeft: 6,
-                    }}>
-                      {count}
-                    </span>
-                  )}
-                </button>
-              );
-            })}
-
-            {/* A-Z quick jump */}
-            {letters.length > 3 && (
-              <div style={{ margin: "16px 12px 0", borderTop: "1px solid #E2E8F0", paddingTop: 14 }}>
-                <div style={{ fontSize: 10, fontWeight: 800, color: "#94A3B8", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 8, paddingLeft: 4 }}>
-                  Jump to A–Z
-                </div>
-                <div style={{ display: "flex", flexWrap: "wrap", gap: 4, padding: "0 4px" }}>
-                  {letters.map(l => (
-                    <button
-                      key={l}
-                      onClick={() => scrollTo(l)}
-                      style={{
-                        width: 28, height: 28, borderRadius: 6,
-                        background: "white", border: "1px solid rgba(0,0,0,0.12)",
-                        color: "#3170A5", fontWeight: 700, fontSize: 12,
-                        cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
-                      }}
-                    >
-                      {l}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-        </aside>
+          )}
+        </div>
+      </aside>
       ) : null}
 
       {/* ── MAIN CONTENT ─────────────────────────────────── */}

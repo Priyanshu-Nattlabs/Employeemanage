@@ -151,7 +151,14 @@ function ManagerDashboardContent() {
 
   const isHR = user?.currentRole === "HR";
   const myDepartment: string = (user?.department || "").trim();
-  const scopeLabel = isHR ? "All departments (HR)" : myDepartment ? `${myDepartment} department` : "Your department";
+  const myIndustry: string = (user?.industry || "").trim();
+  const scopeLabel = isHR
+    ? "All departments (HR)"
+    : myIndustry && myDepartment
+      ? `${myIndustry} — ${myDepartment}`
+      : myDepartment
+        ? `${myDepartment} department`
+        : "Your team";
 
   // ==== Aggregations / comparison stats ====
   const stats = useMemo(() => computeStats(rows), [rows]);
@@ -301,7 +308,7 @@ function ManagerDashboardContent() {
 
       {/* KPI cards */}
       <div className="manager-kpi-grid">
-        <KpiCard label="Employees"           value={String(stats.total)}                                hint={isHR ? "All departments" : myDepartment || "Your department"} icon="👥" accent="#3b82f6" />
+        <KpiCard label="Employees"           value={String(stats.total)}                                hint={isHR ? "All departments" : "Same industry & dept, or reports to you"} icon="👥" accent="#3b82f6" />
         <KpiCard label="Actively preparing"  value={`${stats.active}`}                                  hint={`${stats.activePct}% of team`}                                  icon="🔥" accent="#16a34a" />
         <KpiCard label="Average progress"    value={`${stats.avgProgress}%`}                            hint="Across active prep plans"                                       icon="📈" accent="#8b5cf6" />
         <KpiCard label="Avg. test score"     value={stats.avgScore == null ? "—" : `${stats.avgScore}%`} hint={`${stats.testCount} tests recorded`}                           icon="🎯" accent="#f97316" />
@@ -512,7 +519,7 @@ function ManagerDashboardContent() {
       <div className="manager-two-col">
         <div className="manager-dash-card" style={{ ...cardElevated, ...cardAccentTop("#db2777"), minWidth: 0, maxWidth: "100%" }}>
           <div style={cardTitle}><span style={titleIcon("#db2777")}>⚡</span>Live activity feed</div>
-          <div style={cardSub}>Latest preparation actions and test results across {isHR ? "the company" : "your department"}.</div>
+          <div style={cardSub}>Latest preparation actions and test results across {isHR ? "the company" : "your scoped team (industry & department peers, plus direct reports)."}</div>
           <ActivityFeed feed={activity?.activityFeed || []} />
         </div>
 

@@ -473,7 +473,9 @@ export class OrgAuthService {
       companyDomain: user.companyDomain,
       accountType: user.accountType,
       currentRole: user.currentRole,
-    };
+      department: (user as any).department,
+      industry: (user as any).industry,
+    } as const;
     const secret: jwt.Secret = JWT_SECRET;
     const expiresIn: jwt.SignOptions["expiresIn"] = JWT_EXPIRES_IN as any;
     return jwt.sign(payload, secret, { expiresIn });
@@ -489,6 +491,7 @@ export class OrgAuthService {
         fullName: user.fullName,
         designation: user.designation,
         department: (user as any).department,
+        industry: (user as any).industry,
         companyName: user.companyName,
         companyDomain: user.companyDomain,
         employeeId: user.employeeId,
@@ -516,6 +519,7 @@ export class OrgAuthService {
       fullName: u?.fullName,
       designation: u?.designation,
       department: u?.department,
+      industry: u?.industry,
       companyName: u?.companyName,
       companyDomain: u?.companyDomain,
       employeeId: u?.employeeId,
@@ -1017,30 +1021,60 @@ export class OrgAuthService {
    * Employees visible to Manager/HR dashboards: org accounts with `currentRole: EMPLOYEE`
    * (employee portal signups and invited line employees)—not peers with Manager/HR roles.
    *
-   * @param department - Legacy scoping (kept for compatibility): if passed and non-empty, filters by department.
-   * @param managerEmail - Preferred scoping: if passed and non-empty, filters by reportingManagerEmail (case-insensitive exact).
+   * @param department - Manager's department (and legacy: if alone with no managerEmail, filters by department only).
+   * @param managerEmail - When set with `managerIndustry` and non-empty `department`, returns peers in the same
+   *   industry + department (using `industryKeysAlign`) **or** anyone who lists this email as `reportingManagerEmail`.
+   *   When set but industry or department is missing, returns only direct reports.
+   * @param managerIndustry - Manager's industry; used with `department` for peer visibility.
    */
-  async getEmployeesForManager(companyDomain: string, department?: string, managerEmail?: string) {
+  async getEmployeesForManager(companyDomain: string, department?: string, managerEmail?: string, managerIndustry?: string) {
     const domain = normalizeDomain(companyDomain);
-    const filter: any = {
+    const base: any = {
       companyDomain: domain,
       accountType: "EMPLOYEE",
       currentRole: "EMPLOYEE",
     };
 
     const mgr = String(managerEmail || "").trim().toLowerCase();
-    if (mgr) {
-      filter.reportingManagerEmail = new RegExp(`^${mgr.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`, "i");
-    } else if (department !== undefined) {
-      const dept = String(department || "").trim();
-      if (!dept) {
-        return [];
+    const mgrInd = String(managerIndustry || "").trim();
+    const deptRaw = String(department || "").trim();
+
+    if (!mgr) {
+      if (department !== undefined) {
+        const dept = String(department || "").trim();
+        if (!dept) {
+          return [];
+        }
+        base.department = new RegExp(`^${dept.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`, "i");
       }
-      filter.department = new RegExp(`^${dept.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`, "i");
+      return this.companyUserModel.find(base).select("-passwordHash").sort({ createdAt: -1 }).lean();
+    }
+
+    const mgrEmailRegex = new RegExp(`^${mgr.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`, "i");
+
+    if (deptRaw && mgrInd) {
+      const deptRegex = new RegExp(`^${deptRaw.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`, "i");
+      const candidates = await this.companyUserModel
+        .find({
+          ...base,
+          $or: [{ reportingManagerEmail: mgrEmailRegex }, { department: deptRegex }],
+        })
+        .select("-passwordHash")
+        .sort({ createdAt: -1 })
+        .lean();
+
+      const deptKey = normalizeDepartmentKey(deptRaw);
+      return candidates.filter((e: any) => {
+        const rep = normalizeEmail(String(e.reportingManagerEmail || ""));
+        if (rep === mgr) return true;
+        const ed = normalizeDepartmentKey(String(e.department || ""));
+        if (ed !== deptKey) return false;
+        return industryKeysAlign(String(e.industry || ""), mgrInd);
+      });
     }
 
     return this.companyUserModel
-      .find(filter)
+      .find({ ...base, reportingManagerEmail: mgrEmailRegex })
       .select("-passwordHash")
       .sort({ createdAt: -1 })
       .lean();
@@ -1061,6 +1095,18 @@ export class OrgAuthService {
     const user = await this.companyUserModel.findById(id).select("-passwordHash").lean();
     if (!user) throw new NotFoundException("User not found");
     return user;
+  }
+
+  /** Email, department, and industry for manager dashboard / InterviewX employee scoping (lean read). */
+  async getManagerScopeFieldsByUserId(userId: string): Promise<{ email: string; department: string; industry: string }> {
+    if (!userId) throw new UnauthorizedException("Invalid token");
+    const u = await this.companyUserModel.findById(userId).select("email department industry").lean();
+    if (!u) throw new NotFoundException("User not found");
+    return {
+      email: normalizeEmail(String((u as any).email || "")),
+      department: String((u as any).department || "").trim(),
+      industry: String((u as any).industry || "").trim(),
+    };
   }
 
   async updateProfileById(id: string, patch: any) {
@@ -1144,8 +1190,8 @@ export class OrgAuthService {
     });
   }
 
-  async getEmployeesActivityForManager(companyDomain: string, department?: string, managerEmail?: string) {
-    const employees = await this.getEmployeesForManager(companyDomain, department, managerEmail);
+  async getEmployeesActivityForManager(companyDomain: string, department?: string, managerEmail?: string, managerIndustry?: string) {
+    const employees = await this.getEmployeesForManager(companyDomain, department, managerEmail, managerIndustry);
     const ids = employees.map((e: any) => String(e._id || e.id || "")).filter(Boolean);
     const empById = new Map<string, any>();
     for (const e of employees as any[]) empById.set(String(e._id || e.id || ""), e);
@@ -1331,8 +1377,8 @@ export class OrgAuthService {
     };
   }
 
-  async getEmployeesPrepSummaryForManager(companyDomain: string, department?: string, managerEmail?: string) {
-    const employees = await this.getEmployeesForManager(companyDomain, department, managerEmail);
+  async getEmployeesPrepSummaryForManager(companyDomain: string, department?: string, managerEmail?: string, managerIndustry?: string) {
+    const employees = await this.getEmployeesForManager(companyDomain, department, managerEmail, managerIndustry);
     const ids = employees.map((e: any) => String(e._id || e.id || "")).filter(Boolean);
     if (!ids.length) return [];
 
@@ -1371,8 +1417,8 @@ export class OrgAuthService {
     });
   }
 
-  async getManagerHubAnalytics(companyDomain: string, department?: string, managerEmail?: string) {
-    const summary = await this.getEmployeesPrepSummaryForManager(companyDomain, department, managerEmail);
+  async getManagerHubAnalytics(companyDomain: string, department?: string, managerEmail?: string, managerIndustry?: string) {
+    const summary = await this.getEmployeesPrepSummaryForManager(companyDomain, department, managerEmail, managerIndustry);
     const rows = Array.isArray(summary) ? summary : [];
 
     const totalEmployees = rows.length;

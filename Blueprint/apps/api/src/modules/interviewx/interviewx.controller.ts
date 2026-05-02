@@ -51,11 +51,21 @@ export class InterviewXController {
     const token = getBearerToken(authorization);
     if (!token) throw new UnauthorizedException("Missing token");
 
-    const me = this.orgAuth.verifyToken(token);
+    const meJwt = this.orgAuth.verifyToken(token);
     const isManagerOrHr =
-      me?.accountType === "EMPLOYEE" &&
-      (me?.currentRole === "MANAGER" || me?.currentRole === "HR");
+      meJwt?.accountType === "EMPLOYEE" &&
+      (meJwt?.currentRole === "MANAGER" || meJwt?.currentRole === "HR");
     if (!isManagerOrHr) throw new UnauthorizedException("Only managers or HR can open interviews");
+
+    const scope = await this.orgAuth.getManagerScopeFieldsByUserId(String(meJwt.sub || ""));
+    const me = {
+      companyDomain: meJwt.companyDomain,
+      accountType: meJwt.accountType,
+      currentRole: meJwt.currentRole,
+      department: scope.department,
+      industry: scope.industry,
+      email: scope.email,
+    };
 
     const employeeId = String(body?.employeeId || "").trim();
     if (!employeeId) throw new BadRequestException("Missing employeeId");

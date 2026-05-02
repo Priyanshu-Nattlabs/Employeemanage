@@ -11,6 +11,8 @@ import {
 type BlueprintMe = {
   companyDomain?: string;
   department?: string;
+  industry?: string;
+  email?: string;
   accountType?: string;
   currentRole?: string;
 };
@@ -181,10 +183,14 @@ export class InterviewXService {
     const companyDomain = String(input.me?.companyDomain || "").trim();
     if (!companyDomain) throw new BadRequestException("Invalid token: missing companyDomain");
 
-    // For managers, Blueprint uses department scoping to prevent leakage.
-    // OrgAuthService returns employees + their active prep summaries.
-    const scopedDepartment = input.me?.currentRole === "HR" ? undefined : input.me?.department;
-    const prepSummary = await this.orgAuth.getEmployeesPrepSummaryForManager(companyDomain, scopedDepartment);
+    // Managers: same industry + department as the manager, or employees who list them as reporting manager. HR: full domain.
+    const isHr = input.me?.currentRole === "HR";
+    const prepSummary = await this.orgAuth.getEmployeesPrepSummaryForManager(
+      companyDomain,
+      isHr ? undefined : input.me?.department,
+      isHr ? undefined : String(input.me?.email || "").trim() || undefined,
+      isHr ? undefined : String(input.me?.industry || "").trim() || undefined,
+    );
     const match = Array.isArray(prepSummary)
       ? prepSummary.find((x: any) => String(x?.employee?._id || x?.employee?.id || "") === input.employeeId)
       : null;
