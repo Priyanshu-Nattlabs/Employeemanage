@@ -59,6 +59,11 @@ function RolesPageContent() {
   const [recommendDeptLabel, setRecommendDeptLabel] = useState<string>("");
   const [recoResolved, setRecoResolved] = useState(false);
 
+  const recommendViewerIndustry = useMemo(
+    () => String((getOrgAuthFromStorage()?.user as { industry?: string } | null)?.industry || "").trim(),
+    [isRecommendMode, recoResolved],
+  );
+
   const recommendDeptEffective = useMemo(() => {
     return String(recommendDeptLabel || recommendDept || "").trim();
   }, [recommendDeptLabel, recommendDept]);
@@ -310,7 +315,15 @@ function RolesPageContent() {
                       )
                     ) : recommendDeptEffective ? (
                       <>
-                        for the manager&apos;s department (<b>{recommendDeptEffective}</b>; includes every industry that lists this department).
+                        {recommendViewerIndustry ? (
+                          <>
+                            mapped for your industry and department (<b>{recommendViewerIndustry}</b> · <b>{recommendDeptEffective}</b>).
+                          </>
+                        ) : (
+                          <>
+                            for your department (<b>{recommendDeptEffective}</b>) from the organization map.
+                          </>
+                        )}
                       </>
                     ) : (
                       <>from the organization map.</>

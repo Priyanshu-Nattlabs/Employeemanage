@@ -7,6 +7,7 @@ services:
     # If this DB was ever used with Mongo 7+, the data dir is incompatible: `docker compose down -v` once, then up again.
     image: mongo:4.4
     container_name: job-blueprint-v2-mongodb
+    # Host 27017 is often taken (local MongoDB / another stack). Backend still uses mongodb:27017 on the Docker network.
     ports:
       - "${BLUEPRINT_MONGO_HOST_PORT:-27027}:27017"
     volumes:
