@@ -9,6 +9,9 @@
     "dev:api": "npm --workspace apps/api run start:dev",
     "dev:web": "npm --workspace apps/web run dev",
     "seed": "npm --workspace apps/api run seed:xlsx",
+    "seed:org-structure": "npm --workspace apps/api run seed:org-structure:xlsx",
+    "seed:master-functions": "npm --workspace apps/api run seed:master-functions:csv",
+    "build:signup-catalog": "npm --workspace apps/api run build:signup-catalog",
     "seed:docker": "docker compose --profile seed run --rm seed"
   },
   "dependencies": {

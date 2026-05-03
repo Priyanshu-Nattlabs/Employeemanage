@@ -88,6 +88,12 @@ export class OrgAuthController {
     return this.service.getProfileById(me?.sub);
   }
 
+  /** Public: designation dropdown options (sourced from blueprints role catalog). */
+  @Get("designations")
+  async designationOptions(@Query("q") q?: string) {
+    return this.service.listDesignationOptions(q);
+  }
+
   @Patch("me/profile")
   async updateMyProfile(@Headers("authorization") authorization?: string, @Body() body?: any) {
     const token = getBearerToken(authorization);
@@ -136,9 +142,8 @@ export class OrgAuthController {
     if (!domain) throw new UnauthorizedException("Missing companyDomain");
 
     if (isHR) return this.service.getEmployeesForManager(domain);
-    const profile = await this.service.getProfileById(me?.sub);
-    const department = (profile as any)?.department || "";
-    return this.service.getEmployeesForManager(domain, department);
+    const scope = await this.service.getManagerScopeFieldsByUserId(String(me?.sub || ""));
+    return this.service.getEmployeesForManager(domain, scope.department, scope.email, scope.industry);
   }
 
   /** Admin view: list employees for admin's company name + domain. */
@@ -186,9 +191,8 @@ export class OrgAuthController {
     if (!domain) throw new UnauthorizedException("Missing companyDomain");
 
     if (isHR) return this.service.getEmployeesActivityForManager(domain);
-    const profile = await this.service.getProfileById(me?.sub);
-    const department = (profile as any)?.department || "";
-    return this.service.getEmployeesActivityForManager(domain, department);
+    const scope = await this.service.getManagerScopeFieldsByUserId(String(me?.sub || ""));
+    return this.service.getEmployeesActivityForManager(domain, scope.department, scope.email, scope.industry);
   }
 
   /** Manager / HR view: employees + preparation/test summary. Manager is scoped to their department. */
@@ -206,9 +210,8 @@ export class OrgAuthController {
     if (!domain) throw new UnauthorizedException("Missing companyDomain");
 
     if (isHR) return this.service.getEmployeesPrepSummaryForManager(domain);
-    const profile = await this.service.getProfileById(me?.sub);
-    const department = (profile as any)?.department || "";
-    return this.service.getEmployeesPrepSummaryForManager(domain, department);
+    const scope = await this.service.getManagerScopeFieldsByUserId(String(me?.sub || ""));
+    return this.service.getEmployeesPrepSummaryForManager(domain, scope.department, scope.email, scope.industry);
   }
 
   /** Manager / HR view: aggregated hub analytics for the overview dashboard. */
@@ -225,9 +228,8 @@ export class OrgAuthController {
     if (!domain) throw new UnauthorizedException("Missing companyDomain");
 
     if (isHR) return this.service.getManagerHubAnalytics(domain);
-    const profile = await this.service.getProfileById(me?.sub);
-    const department = (profile as any)?.department || "";
-    return this.service.getManagerHubAnalytics(domain, department);
+    const scope = await this.service.getManagerScopeFieldsByUserId(String(me?.sub || ""));
+    return this.service.getManagerHubAnalytics(domain, scope.department, scope.email, scope.industry);
   }
 
   // ───────────────────── Organization structure ─────────────────────
@@ -256,6 +258,17 @@ export class OrgAuthController {
     const domain = String(companyDomain || "").trim().toLowerCase();
     if (!domain) throw new BadRequestException("Missing companyDomain");
     return this.service.listPublicDepartments(domain);
+  }
+
+  /**
+   * Public: industries + departments-by-industry for signup (from org structure).
+   * Used with cascading Industry → Department selects after the user enters a company email.
+   */
+  @Get("public/signup-org-options")
+  async publicSignupOrgOptions(@Query("companyDomain") companyDomain?: string) {
+    const domain = String(companyDomain || "").trim().toLowerCase();
+    if (!domain) throw new BadRequestException("Missing companyDomain");
+    return this.service.listPublicSignupOrgOptions(domain);
   }
 
   /** Manager / HR: upsert the company's org structure. */
@@ -295,10 +308,12 @@ export class OrgAuthController {
     const domain = (me.companyDomain || "").trim().toLowerCase();
     const profile = await this.service.getProfileById(me?.sub);
     const department = (profile as any)?.department || "";
+    const industry = (profile as any)?.industry || "";
 
     return this.service.listRecommendableRolesForEmployee({
       companyDomain: domain,
       managerDepartment: department,
+      managerIndustry: industry,
       managerRole: me.currentRole,
       employeeId: String(employeeId || ""),
     });
@@ -317,6 +332,7 @@ export class OrgAuthController {
     const domain = (me.companyDomain || "").trim().toLowerCase();
     const profile = await this.service.getProfileById(me?.sub);
     const department = (profile as any)?.department || "";
+    const industry = (profile as any)?.industry || "";
 
     return this.service.createRecommendation({
       companyDomain: domain,
@@ -326,6 +342,7 @@ export class OrgAuthController {
         name: me.fullName,
         role: me.currentRole,
         department,
+        industry,
       },
       employeeId: String(body?.employeeId || ""),
       roleName: String(body?.roleName || ""),

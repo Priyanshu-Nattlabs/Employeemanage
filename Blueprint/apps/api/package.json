@@ -3,9 +3,15 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
+    "build": "tsc",
+    "start:prod": "node dist/main",
     "start:dev": "ts-node-dev --respawn --transpile-only src/main.ts",
     "import:old-blueprint": "ts-node-dev --transpile-only --exit-child src/scripts/import-old-blueprint.ts",
-    "seed:xlsx": "node src/scripts/seed-from-xlsx.mjs"
+    "seed:xlsx": "node src/scripts/seed-from-xlsx.mjs",
+    "seed:org-structure:xlsx": "node src/scripts/seed-org-structure-from-xlsx.mjs",
+    "seed:master-functions:csv": "node src/scripts/seed-master-functions-mapping-from-csv.mjs",
+    "build:signup-catalog": "node scripts/build-signup-org-catalog.mjs",
+    "migrate:tech-to-it": "node src/scripts/migrate-technology-to-it.mjs"
   },
   "dependencies": {
     "@nestjs/common": "^10.4.8",
@@ -27,6 +33,7 @@
     "zod": "^3.23.8"
   },
   "devDependencies": {
+    "@types/nodemailer": "^6.4.17",
     "@types/express": "^4.17.21",
     "@types/jsonwebtoken": "^9.0.10",
     "@types/multer": "^2.1.0",

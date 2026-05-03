@@ -1,22 +1,39 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { appPath } from "@/lib/apiBase";
-import { orgRegisterEmployee, setOrgAuthInStorage, type OrgCurrentRole } from "@/lib/orgAuth";
+import {
+  orgGetDesignationOptions,
+  orgGetPublicSignupOrgOptions,
+  orgRegisterEmployee,
+  setOrgAuthInStorage,
+  type OrgSignupOptions,
+} from "@/lib/orgAuth";
 
-const DEPARTMENT_OPTIONS = [
-  "Technology",
-  "Management",
-  "Design & Creative",
-  "Finance & Accounting",
-  "Sales & Marketing",
+/** Used when `company_org_structures` is not seeded for this domain yet. */
+const FALLBACK_DEPARTMENT_OPTIONS = [
+  "AI",
+  "Cybersec",
+  "DataScience",
+  "Software",
+  "Infra",
+  "Sales and Marketing",
+  "Finance",
+];
+
+const FALLBACK_INDUSTRY_OPTIONS = [
+  "IT",
   "Healthcare",
-  "Education & Research",
-  "Operations & Logistics",
-  "Legal & Compliance",
-  "Human Resources",
-  "Analytics & Data",
+  "Finance & Banking",
+  "Manufacturing",
+  "Education",
+  "Media & Marketing",
+  "Construction & Real Estate",
+  "Retail & E-Commerce",
+  "Energy & Environment",
+  "Government & Public",
+  "Logistics & Transport",
 ];
 
 function domainFromEmail(email: string) {
@@ -35,21 +52,104 @@ export default function EmployeeRegisterPage() {
   const [fullName, setFullName] = useState("");
   const [companyName, setCompanyName] = useState("");
   const [designation, setDesignation] = useState("");
+  const [designationMode, setDesignationMode] = useState<"PICK" | "OTHER">("PICK");
+  const [designationOther, setDesignationOther] = useState("");
+  const [designationOptions, setDesignationOptions] = useState<string[]>([]);
   const [department, setDepartment] = useState("");
   const [deptMode, setDeptMode] = useState<"PICK" | "OTHER">("PICK");
   const [deptOther, setDeptOther] = useState("");
-  const [employeeId, setEmployeeId] = useState("");
-  const [currentRole, setCurrentRole] = useState<OrgCurrentRole>("EMPLOYEE");
-  const [mobileNo, setMobileNo] = useState("");
+  const [industry, setIndustry] = useState("");
+  const [industryMode, setIndustryMode] = useState<"PICK" | "OTHER">("PICK");
+  const [industryOther, setIndustryOther] = useState("");
   const [reportingManagerEmail, setReportingManagerEmail] = useState("");
-
+  const [employeeId, setEmployeeId] = useState("");
+  const [mobileNo, setMobileNo] = useState("");
   const inferredDomain = useMemo(() => domainFromEmail(email), [email]);
-  const inferredMgrDomain = useMemo(() => domainFromEmail(reportingManagerEmail), [reportingManagerEmail]);
+
+  const [signupOrg, setSignupOrg] = useState<OrgSignupOptions | null>(null);
+  const [signupOrgLoading, setSignupOrgLoading] = useState(false);
+
+  const useOrgCatalog = Boolean(signupOrg?.industries?.length);
+
+  /** With org catalog: only departments for the selected industry (none until industry is chosen). */
+  const departmentSelectOptions = useMemo(() => {
+    if (useOrgCatalog) {
+      if (industryMode === "PICK" && industry.trim()) {
+        return signupOrg?.byIndustry[industry] ?? [];
+      }
+      if (industryMode === "OTHER") {
+        return FALLBACK_DEPARTMENT_OPTIONS;
+      }
+      return [];
+    }
+    return FALLBACK_DEPARTMENT_OPTIONS;
+  }, [useOrgCatalog, industryMode, industry, signupOrg]);
+
+  useEffect(() => {
+    setIndustry("");
+    setIndustryOther("");
+    setIndustryMode("PICK");
+    setDepartment("");
+    setDeptOther("");
+    setDeptMode("PICK");
+  }, [inferredDomain]);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        if (!inferredDomain) return;
+        const opts = await orgGetDesignationOptions();
+        if (cancelled) return;
+        setDesignationOptions(Array.isArray(opts) ? opts : []);
+      } catch {
+        if (cancelled) return;
+        setDesignationOptions([]);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [inferredDomain]);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      if (!inferredDomain) {
+        setSignupOrg(null);
+        setSignupOrgLoading(false);
+        return;
+      }
+      setSignupOrgLoading(true);
+      try {
+        const o = await orgGetPublicSignupOrgOptions(inferredDomain);
+        if (cancelled) return;
+        setSignupOrg(o);
+      } catch {
+        if (!cancelled) setSignupOrg(null);
+      } finally {
+        if (!cancelled) setSignupOrgLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [inferredDomain]);
+
+  const effectiveDesignation = useMemo(() => {
+    if (designationMode === "OTHER") return designationOther.trim();
+    return designation.trim();
+  }, [designationMode, designationOther, designation]);
 
   const effectiveDepartment = useMemo(() => {
     if (deptMode === "OTHER") return deptOther.trim();
     return department.trim();
   }, [deptMode, deptOther, department]);
+
+  const effectiveIndustry = useMemo(() => {
+    if (industryMode === "OTHER") return industryOther.trim();
+    return industry.trim();
+  }, [industryMode, industryOther, industry]);
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -57,32 +157,33 @@ export default function EmployeeRegisterPage() {
     setLoading(true);
     try {
       if (!inferredDomain) throw new Error("Please enter a valid company email");
-      if (!reportingManagerEmail.trim()) throw new Error("Reporting manager email is required");
-      if (inferredMgrDomain && inferredMgrDomain !== inferredDomain) throw new Error("Reporting manager email must be in the same company domain");
+      if (!effectiveDesignation) throw new Error("Designation is required");
       if (!effectiveDepartment) throw new Error("Department is required");
+      if (!effectiveIndustry) throw new Error("Industry is required");
 
       const r = await orgRegisterEmployee({
         email,
         password,
         fullName,
-        designation,
+        designation: effectiveDesignation,
         department: effectiveDepartment,
+        industry: effectiveIndustry,
         companyName,
         employeeId,
-        currentRole,
+        currentRole: "EMPLOYEE",
         mobileNo,
-        reportingManagerEmail,
-        companyDomain: inferredDomain
+        reportingManagerEmail: reportingManagerEmail.trim() || undefined,
+        companyDomain: inferredDomain,
       });
       if ("verificationRequired" in r && r.verificationRequired) {
-        const nextPath = currentRole === "MANAGER" ? appPath("/dashboard/manager/home") : appPath("/employee/");
+        const nextPath = appPath("/employee/");
         const debugOtpQuery = r.debugOtp ? `&debugOtp=${encodeURIComponent(r.debugOtp)}` : "";
         window.location.href = `${appPath("/auth/verify-otp")}?email=${encodeURIComponent(r.email)}&next=${encodeURIComponent(nextPath)}${debugOtpQuery}`;
         return;
       }
       if (!("token" in r) || !r.token || !r.user) throw new Error("Registration succeeded but login payload missing.");
       setOrgAuthInStorage(r.token, r.user);
-      window.location.href = currentRole === "MANAGER" ? appPath("/dashboard/manager/home") : appPath("/employee/");
+      window.location.href = appPath("/employee/");
     } catch (err: any) {
       setError(err?.message || "Registration failed");
     } finally {
@@ -114,11 +215,100 @@ export default function EmployeeRegisterPage() {
         </Field>
 
         <Field label="Designation">
-          <input value={designation} onChange={(e) => setDesignation(e.target.value)} required style={inputStyle} placeholder="e.g. Software Engineer" />
+          <div style={{ display: "grid", gap: 8 }}>
+            <select
+              value={designationMode === "OTHER" ? "__OTHER__" : (designation || "")}
+              onChange={(e) => {
+                const v = e.target.value;
+                if (v === "__OTHER__") {
+                  setDesignationMode("OTHER");
+                  setDesignation("");
+                } else {
+                  setDesignationMode("PICK");
+                  setDesignation(v);
+                }
+              }}
+              required
+              style={inputStyle}
+              disabled={!inferredDomain || !designationOptions.length}
+            >
+              <option value="" disabled>
+                {designationOptions.length ? "Select designation" : (inferredDomain ? "Loading designations…" : "Enter email to load designations")}
+              </option>
+              {designationOptions.map((d) => (
+                <option key={d} value={d}>
+                  {d}
+                </option>
+              ))}
+              <option value="__OTHER__">Other (type…)</option>
+            </select>
+
+            {designationMode === "OTHER" ? (
+              <input
+                value={designationOther}
+                onChange={(e) => setDesignationOther(e.target.value)}
+                required
+                style={inputStyle}
+                placeholder="Type your designation"
+              />
+            ) : null}
+
+            <div style={hintStyle}>Choose from the list, or select <b>Other</b> to type a custom designation.</div>
+          </div>
+        </Field>
+        <Field label="Industry">
+          <div style={{ display: "grid", gap: 8 }}>
+            <select
+              value={industryMode === "OTHER" ? "__OTHER__" : (industry || "")}
+              onChange={(e) => {
+                const v = e.target.value;
+                if (v === "__OTHER__") {
+                  setIndustryMode("OTHER");
+                  setIndustry("");
+                } else {
+                  setIndustryMode("PICK");
+                  setIndustry(v);
+                  if (useOrgCatalog) {
+                    setDepartment("");
+                    setDeptOther("");
+                    setDeptMode("PICK");
+                  }
+                }
+              }}
+              required
+              style={inputStyle}
+              disabled={Boolean(inferredDomain) && signupOrgLoading}
+            >
+              <option value="" disabled>
+                {!inferredDomain ? "Enter company email first" : signupOrgLoading ? "Loading industries…" : "Select industry"}
+              </option>
+              {(useOrgCatalog ? signupOrg?.industries ?? [] : FALLBACK_INDUSTRY_OPTIONS).map((d) => (
+                <option key={d} value={d}>
+                  {d}
+                </option>
+              ))}
+              <option value="__OTHER__">Other (type…)</option>
+            </select>
+            {industryMode === "OTHER" ? (
+              <input
+                value={industryOther}
+                onChange={(e) => setIndustryOther(e.target.value)}
+                required
+                style={inputStyle}
+                placeholder="Type your industry"
+              />
+            ) : null}
+            <div style={hintStyle}>
+              {useOrgCatalog
+                ? "Industries come from your company org mapping (seeded from the department/role files). Choose an industry, then pick a department below."
+                : "No org mapping found for this domain yet — using the default industry list."}
+            </div>
+          </div>
         </Field>
         <Field label="Department">
           <div style={{ display: "grid", gap: 8 }}>
             <select
+              key={`dept-${industryMode}-${industry || "none"}`}
               value={deptMode === "OTHER" ? "__OTHER__" : (department || "")}
               onChange={(e) => {
                 const v = e.target.value;
@@ -132,9 +322,16 @@ export default function EmployeeRegisterPage() {
               }}
               required
               style={inputStyle}
+              disabled={Boolean(useOrgCatalog && industryMode === "PICK" && !industry.trim())}
             >
-              <option value="" disabled>Select department</option>
-              {DEPARTMENT_OPTIONS.map((d) => (
+              <option value="" disabled>
+                {useOrgCatalog && industryMode === "PICK" && !industry.trim()
+                  ? "Select industry first"
+                  : useOrgCatalog && industryMode === "PICK" && industry.trim() && !departmentSelectOptions.length
+                    ? "No departments for this industry"
+                    : "Select department"}
+              </option>
+              {departmentSelectOptions.map((d) => (
                 <option key={d} value={d}>
                   {d}
                 </option>
@@ -151,7 +348,9 @@ export default function EmployeeRegisterPage() {
               />
             ) : null}
             <div style={hintStyle}>
-              Choose from the list, or select <b>Other</b> to type a custom department.
+              {useOrgCatalog
+                ? "Pick an industry first — then only departments under that industry appear here."
+                : "Choose from the list, or select Other to type a custom department."}
             </div>
           </div>
         </Field>
@@ -159,22 +358,24 @@ export default function EmployeeRegisterPage() {
           <input value={employeeId} onChange={(e) => setEmployeeId(e.target.value)} required style={inputStyle} placeholder="Employee ID" />
         </Field>
 
-        <Field label="Current role">
-          <select value={currentRole} onChange={(e) => setCurrentRole(e.target.value as OrgCurrentRole)} style={inputStyle}>
-            <option value="EMPLOYEE">Employee</option>
-            <option value="MANAGER">Manager</option>
-          </select>
+        <Field label="Reporting manager email (Gmail)">
+          <input
+            value={reportingManagerEmail}
+            onChange={(e) => setReportingManagerEmail(e.target.value)}
+            type="email"
+            style={inputStyle}
+            placeholder="manager@gmail.com"
+          />
+          <div style={hintStyle}>
+            Optional. If provided, your manager will see you in their employee database.
+          </div>
         </Field>
+
         <Field label="Mobile no.">
           <input value={mobileNo} onChange={(e) => setMobileNo(e.target.value)} required style={inputStyle} placeholder="Mobile number" />
         </Field>
 
-        <Field label="Reporting manager email">
-          <input value={reportingManagerEmail} onChange={(e) => setReportingManagerEmail(e.target.value)} required type="email" style={inputStyle} placeholder="manager@company.com" />
-          {reportingManagerEmail.trim() ? (
-            <div style={hintStyle}>Detected domain: <b>{inferredMgrDomain || "—"}</b></div>
-          ) : null}
-        </Field>
+        <div />
         <div />
 
         {error ? (

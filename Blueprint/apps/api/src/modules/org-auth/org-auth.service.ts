@@ -6,7 +6,10 @@ import * as jwt from "jsonwebtoken";
 import crypto from "crypto";
 import nodemailer from "nodemailer";
 import * as XLSX from "xlsx";
+import { mergeIndustryDeptIntoMap, readBundledSignupByIndustry } from "./signup-org-catalog.loader";
 import {
+  Blueprint,
+  type BlueprintDocument,
   CompanyOrgStructure,
   type CompanyOrgStructureDocument,
   CompanyUser,
@@ -54,10 +57,147 @@ function normalizeDepartmentKey(raw: string): string {
   return compact;
 }
 
+/** Split org-structure row titles like `Legal -  Corporate Law` or `BFSI -  Finance & Accounting`. */
+function parseIndustryDeptFromOrgName(name: string): { industry: string; department: string } | null {
+  const raw = String(name || "").trim();
+  if (!raw) return null;
+  const idx = raw.indexOf("-");
+  if (idx < 0) return null;
+  const left = raw.slice(0, idx).trim();
+  const right = raw.slice(idx + 1).trim();
+  if (!left || !right) return null;
+  return { industry: left, department: right };
+}
+
+/** Loose match between CSV industry segment and profile industry (e.g. Legal vs Legal & Compliance). */
+function industryKeysAlign(orgIndustryPart: string, managerIndustry: string): boolean {
+  const a = normalizeDepartmentKey(orgIndustryPart);
+  const b = normalizeDepartmentKey(managerIndustry);
+  if (!a || !b) return false;
+  if (a === b) return true;
+  const shorter = a.length <= b.length ? a : b;
+  const longer = a.length > b.length ? a : b;
+  if (shorter.length < 3) return false;
+  return longer.includes(shorter);
+}
+
+/**
+ * Collect roles from org-structure sections whose name matches the user's industry + department
+ * (same shape as Master_functions_mapping CSV: `Industry -  Department`, roles in column 2).
+ * Falls back to unparsed names: exact department bucket only (e.g. IT seed `AI`, `Software`).
+ */
+function collectOrgMappedRolesForIndustryAndDepartment(
+  all: Array<{ name: string; roles?: string[] }>,
+  industryRaw: string,
+  departmentRaw: string,
+): { roles: string[]; matchedSectionNames: string[] } {
+  const mgrInd = String(industryRaw || "").trim();
+  const mgrDept = String(departmentRaw || "").trim();
+  const indKey = normalizeDepartmentKey(mgrInd);
+  const deptKey = normalizeDepartmentKey(mgrDept);
+  const matched: Array<{ name: string; roles?: string[] }> = [];
+
+  for (const d of all || []) {
+    const rawName = String(d?.name || "").trim();
+    if (!rawName) continue;
+    const parsed = parseIndustryDeptFromOrgName(rawName);
+    const partDeptKey = parsed ? normalizeDepartmentKey(parsed.department) : "";
+    const fullKey = normalizeDepartmentKey(rawName);
+
+    if (parsed) {
+      if (indKey && deptKey) {
+        if (industryKeysAlign(parsed.industry, mgrInd) && (partDeptKey === deptKey || fullKey === deptKey)) {
+          matched.push(d);
+        }
+        continue;
+      }
+      if (indKey && !deptKey) {
+        if (industryKeysAlign(parsed.industry, mgrInd)) matched.push(d);
+        continue;
+      }
+      if (!indKey && deptKey) {
+        if (partDeptKey === deptKey || fullKey === deptKey) matched.push(d);
+      }
+      continue;
+    }
+
+    if (deptKey && fullKey === deptKey) {
+      matched.push(d);
+    }
+  }
+
+  const seen = new Set<string>();
+  const roles: string[] = [];
+  for (const x of matched) {
+    for (const r of x.roles || []) {
+      const n = String(r || "").trim();
+      if (!n) continue;
+      const k = n.toLowerCase();
+      if (seen.has(k)) continue;
+      seen.add(k);
+      roles.push(n);
+    }
+  }
+  roles.sort((a, b) => a.localeCompare(b));
+  return { roles, matchedSectionNames: matched.map((m) => String(m.name || "").trim()).filter(Boolean) };
+}
+
+/**
+ * Manager role recommendations: union roles from every org row whose **department segment**
+ * matches `departmentRaw`, ignoring industry (so the same department name under Healthcare,
+ * Education, etc. all contribute). Unparsed rows still match by full title (e.g. IT `AI`).
+ */
+function collectOrgMappedRolesForDepartmentAnyIndustry(
+  all: Array<{ name: string; roles?: string[] }>,
+  departmentRaw: string,
+): { roles: string[]; matchedSectionNames: string[] } {
+  const mgrDept = String(departmentRaw || "").trim();
+  const deptKey = normalizeDepartmentKey(mgrDept);
+  const matched: Array<{ name: string; roles?: string[] }> = [];
+
+  if (!deptKey) {
+    return { roles: [], matchedSectionNames: [] };
+  }
+
+  for (const d of all || []) {
+    const rawName = String(d?.name || "").trim();
+    if (!rawName) continue;
+    const parsed = parseIndustryDeptFromOrgName(rawName);
+    const partDeptKey = parsed ? normalizeDepartmentKey(parsed.department) : "";
+    const fullKey = normalizeDepartmentKey(rawName);
+
+    if (parsed) {
+      if (partDeptKey === deptKey || fullKey === deptKey) {
+        matched.push(d);
+      }
+      continue;
+    }
+
+    if (fullKey === deptKey) {
+      matched.push(d);
+    }
+  }
+
+  const seen = new Set<string>();
+  const roles: string[] = [];
+  for (const x of matched) {
+    for (const r of x.roles || []) {
+      const n = String(r || "").trim();
+      if (!n) continue;
+      const k = n.toLowerCase();
+      if (seen.has(k)) continue;
+      seen.add(k);
+      roles.push(n);
+    }
+  }
+  roles.sort((a, b) => a.localeCompare(b));
+  return { roles, matchedSectionNames: matched.map((m) => String(m.name || "").trim()).filter(Boolean) };
+}
+
 function domainBucketForRoleName(roleName: string): string {
   const n = " " + String(roleName || "").toLowerCase() + " ";
   const has = (list: string[]) => list.some((k) => n.includes(k));
-  if (has(["developer", "engineer", "programmer", "software", "web", "mobile", "devops", "cloud", "data", "ml ", "ai ", "security", "network", "it ", "system", "database", "frontend", "backend", "fullstack"])) return "Technology";
+  if (has(["developer", "engineer", "programmer", "software", "web", "mobile", "devops", "cloud", "data", "ml ", "ai ", "security", "network", "it ", "system", "database", "frontend", "backend", "fullstack"])) return "IT";
   if (has(["manager", "director", "head", "lead", "chief", "officer", "president", "vp ", "cto", "ceo", "cfo", "coo", "executive"])) return "Management";
   if (has(["design", "ux", "ui ", "graphic", "creative", "visual", "artist", "animator", "illustrat"])) return "Design & Creative";
   if (has(["finance", "account", "audit", "tax", "invest", "banking", "actuari", "financial analyst", "cfo"])) return "Finance & Accounting";
@@ -75,7 +215,7 @@ function isKnownDomainDepartment(rawDept: string): boolean {
   const d = String(rawDept || "").trim();
   if (!d) return false;
   return [
-    "Technology",
+    "IT",
     "Management",
     "Design & Creative",
     "Finance & Accounting",
@@ -133,7 +273,30 @@ export class OrgAuthService {
     @InjectModel(SkillTest.name) private readonly testModel: Model<SkillTestDocument>,
     @InjectModel(CompanyOrgStructure.name) private readonly orgStructureModel: Model<CompanyOrgStructureDocument>,
     @InjectModel(RoleRecommendation.name) private readonly recommendationModel: Model<RoleRecommendationDocument>,
+    @InjectModel(Blueprint.name) private readonly blueprintModel: Model<BlueprintDocument>,
   ) {}
+
+  async listDesignationOptions(q?: string): Promise<string[]> {
+    const needle = String(q || "").trim().toLowerCase();
+    const docs = await this.blueprintModel
+      .find({ type: { $regex: "^role$", $options: "i" } })
+      .select("name")
+      .lean();
+
+    const out: string[] = [];
+    const seen = new Set<string>();
+    for (const d of docs as any[]) {
+      const name = String(d?.name || "").trim();
+      if (!name) continue;
+      if (needle && !name.toLowerCase().includes(needle)) continue;
+      const key = name.toLowerCase();
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out.push(name);
+    }
+    out.sort((a, b) => a.localeCompare(b));
+    return out;
+  }
 
   private otpHash(email: string, otp: string): string {
     const h = crypto.createHash("sha256");
@@ -310,7 +473,9 @@ export class OrgAuthService {
       companyDomain: user.companyDomain,
       accountType: user.accountType,
       currentRole: user.currentRole,
-    };
+      department: (user as any).department,
+      industry: (user as any).industry,
+    } as const;
     const secret: jwt.Secret = JWT_SECRET;
     const expiresIn: jwt.SignOptions["expiresIn"] = JWT_EXPIRES_IN as any;
     return jwt.sign(payload, secret, { expiresIn });
@@ -326,6 +491,7 @@ export class OrgAuthService {
         fullName: user.fullName,
         designation: user.designation,
         department: (user as any).department,
+        industry: (user as any).industry,
         companyName: user.companyName,
         companyDomain: user.companyDomain,
         employeeId: user.employeeId,
@@ -353,6 +519,7 @@ export class OrgAuthService {
       fullName: u?.fullName,
       designation: u?.designation,
       department: u?.department,
+      industry: u?.industry,
       companyName: u?.companyName,
       companyDomain: u?.companyDomain,
       employeeId: u?.employeeId,
@@ -650,12 +817,13 @@ export class OrgAuthService {
     fullName: string;
     designation: string;
     department?: string;
+    industry?: string;
     companyName: string;
     companyDomain?: string;
     employeeId: string;
     currentRole: OrgCurrentRole;
     mobileNo: string;
-    reportingManagerEmail: string;
+    reportingManagerEmail?: string;
   }) {
     const email = normalizeEmail(input.email);
     const domainFromEmail = emailDomain(email);
@@ -666,17 +834,20 @@ export class OrgAuthService {
       throw new BadRequestException(`Email must use the company domain: ${companyDomain}`);
     }
 
-    const mgrEmail = normalizeEmail(input.reportingManagerEmail);
-    if (emailDomain(mgrEmail) !== companyDomain) {
+    const role = input.currentRole;
+    const mgrEmail = normalizeEmail(input.reportingManagerEmail || "");
+    if (mgrEmail && emailDomain(mgrEmail) !== companyDomain) {
       throw new BadRequestException("Reporting manager email must be in the same company domain");
     }
 
     // HR doesn't need a department. Everyone else (EMPLOYEE / MANAGER) does.
-    const isHR = input.currentRole === "HR";
+    const isHR = role === "HR";
     const department = (input.department || "").trim();
     if (!isHR && !department) {
       throw new BadRequestException("Department is required");
     }
+
+    const industry = String(input.industry || "").trim();
 
     const existing = await this.companyUserModel.findOne({ email }).lean();
     if (existing) throw new BadRequestException("An account with this email already exists");
@@ -688,13 +859,14 @@ export class OrgAuthService {
       fullName: input.fullName?.trim(),
       designation: input.designation?.trim(),
       department: isHR ? undefined : department,
+      industry: industry || undefined,
       companyName: input.companyName?.trim(),
       companyDomain,
       employeeId: input.employeeId?.trim(),
-      currentRole: input.currentRole,
+      currentRole: role,
       accountType: "EMPLOYEE" as OrgAccountType,
       mobileNo: input.mobileNo?.trim(),
-      reportingManagerEmail: mgrEmail,
+      reportingManagerEmail: mgrEmail || undefined,
       emailVerified: true,
     });
     const otpMeta = await this.setAndSendEmailOtp(created);
@@ -849,28 +1021,60 @@ export class OrgAuthService {
    * Employees visible to Manager/HR dashboards: org accounts with `currentRole: EMPLOYEE`
    * (employee portal signups and invited line employees)—not peers with Manager/HR roles.
    *
-   * @param department - If **omitted** (HR callers), lists all line employees for the domain.
-   *                     If **passed** (always for managers—even `""`), require a non-empty department
-   *                     to scope results; managers with no department get an empty roster (never whole-domain leakage).
+   * @param department - Manager's department (and legacy: if alone with no managerEmail, filters by department only).
+   * @param managerEmail - When set with `managerIndustry` and non-empty `department`, returns peers in the same
+   *   industry + department (using `industryKeysAlign`) **or** anyone who lists this email as `reportingManagerEmail`.
+   *   When set but industry or department is missing, returns only direct reports.
+   * @param managerIndustry - Manager's industry; used with `department` for peer visibility.
    */
-  async getEmployeesForManager(companyDomain: string, department?: string) {
+  async getEmployeesForManager(companyDomain: string, department?: string, managerEmail?: string, managerIndustry?: string) {
     const domain = normalizeDomain(companyDomain);
-    const filter: any = {
+    const base: any = {
       companyDomain: domain,
       accountType: "EMPLOYEE",
       currentRole: "EMPLOYEE",
     };
 
-    if (department !== undefined) {
-      const dept = String(department || "").trim();
-      if (!dept) {
-        return [];
+    const mgr = String(managerEmail || "").trim().toLowerCase();
+    const mgrInd = String(managerIndustry || "").trim();
+    const deptRaw = String(department || "").trim();
+
+    if (!mgr) {
+      if (department !== undefined) {
+        const dept = String(department || "").trim();
+        if (!dept) {
+          return [];
+        }
+        base.department = new RegExp(`^${dept.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`, "i");
       }
-      filter.department = new RegExp(`^${dept.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`, "i");
+      return this.companyUserModel.find(base).select("-passwordHash").sort({ createdAt: -1 }).lean();
+    }
+
+    const mgrEmailRegex = new RegExp(`^${mgr.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`, "i");
+
+    if (deptRaw && mgrInd) {
+      const deptRegex = new RegExp(`^${deptRaw.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`, "i");
+      const candidates = await this.companyUserModel
+        .find({
+          ...base,
+          $or: [{ reportingManagerEmail: mgrEmailRegex }, { department: deptRegex }],
+        })
+        .select("-passwordHash")
+        .sort({ createdAt: -1 })
+        .lean();
+
+      const deptKey = normalizeDepartmentKey(deptRaw);
+      return candidates.filter((e: any) => {
+        const rep = normalizeEmail(String(e.reportingManagerEmail || ""));
+        if (rep === mgr) return true;
+        const ed = normalizeDepartmentKey(String(e.department || ""));
+        if (ed !== deptKey) return false;
+        return industryKeysAlign(String(e.industry || ""), mgrInd);
+      });
     }
 
     return this.companyUserModel
-      .find(filter)
+      .find({ ...base, reportingManagerEmail: mgrEmailRegex })
       .select("-passwordHash")
       .sort({ createdAt: -1 })
       .lean();
@@ -891,6 +1095,18 @@ export class OrgAuthService {
     const user = await this.companyUserModel.findById(id).select("-passwordHash").lean();
     if (!user) throw new NotFoundException("User not found");
     return user;
+  }
+
+  /** Email, department, and industry for manager dashboard / InterviewX employee scoping (lean read). */
+  async getManagerScopeFieldsByUserId(userId: string): Promise<{ email: string; department: string; industry: string }> {
+    if (!userId) throw new UnauthorizedException("Invalid token");
+    const u = await this.companyUserModel.findById(userId).select("email department industry").lean();
+    if (!u) throw new NotFoundException("User not found");
+    return {
+      email: normalizeEmail(String((u as any).email || "")),
+      department: String((u as any).department || "").trim(),
+      industry: String((u as any).industry || "").trim(),
+    };
   }
 
   async updateProfileById(id: string, patch: any) {
@@ -974,8 +1190,8 @@ export class OrgAuthService {
     });
   }
 
-  async getEmployeesActivityForManager(companyDomain: string, department?: string) {
-    const employees = await this.getEmployeesForManager(companyDomain, department);
+  async getEmployeesActivityForManager(companyDomain: string, department?: string, managerEmail?: string, managerIndustry?: string) {
+    const employees = await this.getEmployeesForManager(companyDomain, department, managerEmail, managerIndustry);
     const ids = employees.map((e: any) => String(e._id || e.id || "")).filter(Boolean);
     const empById = new Map<string, any>();
     for (const e of employees as any[]) empById.set(String(e._id || e.id || ""), e);
@@ -1161,8 +1377,8 @@ export class OrgAuthService {
     };
   }
 
-  async getEmployeesPrepSummaryForManager(companyDomain: string, department?: string) {
-    const employees = await this.getEmployeesForManager(companyDomain, department);
+  async getEmployeesPrepSummaryForManager(companyDomain: string, department?: string, managerEmail?: string, managerIndustry?: string) {
+    const employees = await this.getEmployeesForManager(companyDomain, department, managerEmail, managerIndustry);
     const ids = employees.map((e: any) => String(e._id || e.id || "")).filter(Boolean);
     if (!ids.length) return [];
 
@@ -1201,8 +1417,8 @@ export class OrgAuthService {
     });
   }
 
-  async getManagerHubAnalytics(companyDomain: string, department?: string) {
-    const summary = await this.getEmployeesPrepSummaryForManager(companyDomain, department);
+  async getManagerHubAnalytics(companyDomain: string, department?: string, managerEmail?: string, managerIndustry?: string) {
+    const summary = await this.getEmployeesPrepSummaryForManager(companyDomain, department, managerEmail, managerIndustry);
     const rows = Array.isArray(summary) ? summary : [];
 
     const totalEmployees = rows.length;
@@ -1362,21 +1578,79 @@ export class OrgAuthService {
     if (!domain) return [];
     const structure = await this.orgStructureModel.findOne({ companyDomain: domain }).lean();
     const list = Array.isArray((structure as any)?.departments) ? (structure as any).departments : [];
-    const names = list
+    const names: string[] = list
       .map((d: any) => String(d?.name || "").trim())
-      .filter(Boolean);
+      .filter((n: string): n is string => n.length > 0);
     return Array.from(new Set(names)).sort((a, b) => a.localeCompare(b));
   }
 
   /**
-   * Roles a manager can recommend to the given employee. Looks up the employee's
-   * department, then returns roles tied to that department in the company's
-   * org-structure document. Falls back to the global role list (intersected with
-   * the structure when present).
+   * Public: industries + department segments for signup.
+   * Merges (1) bundled `signup-org-catalog.json` built from Master_functions CSV + Department role mapping xlsx
+   * with (2) `company_org_structures` for this domain so Docker and fresh DBs still list every industry/dept.
+   * DB rows `Industry -  Department` split for cascade; names without `-` merge under ORG_SIGNUP_UNSCOPED_DEPT_INDUSTRY.
+   */
+  async listPublicSignupOrgOptions(companyDomain: string): Promise<{
+    industries: string[];
+    byIndustry: Record<string, string[]>;
+    source: "merged" | "empty";
+    unscopedIndustryDefault: string;
+  }> {
+    const domain = normalizeDomain(companyDomain);
+    const defaultInd = String(process.env.ORG_SIGNUP_UNSCOPED_DEPT_INDUSTRY || "IT").trim() || "IT";
+    if (!domain) {
+      return { industries: [], byIndustry: {}, source: "empty", unscopedIndustryDefault: defaultInd };
+    }
+    const structure = await this.orgStructureModel.findOne({ companyDomain: domain }).lean();
+    const list = Array.isArray((structure as any)?.departments) ? (structure as any).departments : [];
+
+    const byMap = new Map<string, Set<string>>();
+    mergeIndustryDeptIntoMap(byMap, readBundledSignupByIndustry());
+
+    for (const row of list) {
+      const rawName = String((row as any)?.name || "").trim().replace(/\s+/g, " ");
+      if (!rawName) continue;
+      const parsed = parseIndustryDeptFromOrgName(rawName);
+      if (parsed) {
+        const ind = parsed.industry.replace(/\s+/g, " ").trim();
+        const dept = parsed.department.replace(/\s+/g, " ").trim();
+        if (!ind || !dept) continue;
+        if (!byMap.has(ind)) byMap.set(ind, new Set());
+        byMap.get(ind)!.add(dept);
+      } else {
+        if (!byMap.has(defaultInd)) byMap.set(defaultInd, new Set());
+        byMap.get(defaultInd)!.add(rawName);
+      }
+    }
+
+    if (!byMap.size) {
+      return { industries: [], byIndustry: {}, source: "empty", unscopedIndustryDefault: defaultInd };
+    }
+
+    const industries = Array.from(byMap.keys()).sort((a, b) => a.localeCompare(b));
+    const byIndustry: Record<string, string[]> = {};
+    for (const [ind, set] of byMap) {
+      byIndustry[ind] = Array.from(set).sort((a, b) => a.localeCompare(b));
+    }
+    return {
+      industries,
+      byIndustry,
+      source: "merged",
+      unscopedIndustryDefault: defaultInd,
+    };
+  }
+
+  /**
+   * Roles a manager can recommend to the given employee.
+   * - **Manager:** roles from every org-structure row whose **department** segment matches the
+   *   manager's `department` (any industry prefix). Plus legacy single-name buckets (e.g. `AI`).
+   * - **HR:** roles from rows matching the **employee's** industry + department segments.
+   * Manager path ignores `managerIndustry` for listing (industry may differ across mapped rows).
    */
   async listRecommendableRolesForEmployee(input: {
     companyDomain: string;
     managerDepartment?: string;
+    managerIndustry?: string;
     managerRole: OrgCurrentRole | string;
     employeeId: string;
   }) {
@@ -1408,13 +1682,44 @@ export class OrgAuthService {
     const structure = await this.orgStructureModel.findOne({ companyDomain: domain }).lean();
     const all = (structure?.departments || []) as Array<{ name: string; roles: string[]; description?: string }>;
 
-    // Role catalog scope:
-    // - Managers: recommend roles for their own department (the department they chose).
-    // - HR: recommend roles for the employee's department (can work across departments).
-    const targetDeptRaw =
-      input.managerRole === "MANAGER" ? String(input.managerDepartment || "").trim() : empDept;
-    const targetKey = normalizeDepartmentKey(targetDeptRaw);
-    const match = all.find((d) => normalizeDepartmentKey(String(d.name || "")) === targetKey);
+    let roles: string[] = [];
+    let departmentLabel: string | null = null;
+
+    if (input.managerRole === "MANAGER") {
+      const mgrDept = String(input.managerDepartment || "").trim();
+      const collected = collectOrgMappedRolesForDepartmentAnyIndustry(all, mgrDept);
+      roles = collected.roles;
+      const names = collected.matchedSectionNames;
+      if (!roles.length && mgrDept) {
+        const targetKey = normalizeDepartmentKey(mgrDept);
+        const match = all.find((d) => normalizeDepartmentKey(String(d.name || "")) === targetKey);
+        roles = ((match?.roles || []) as string[]).map((r) => String(r || "").trim()).filter(Boolean);
+        if (match?.name) {
+          departmentLabel = String(match.name);
+        }
+      } else if (names.length) {
+        departmentLabel =
+          names.slice(0, 2).join(" · ") + (names.length > 2 ? ` (+${names.length - 2} more)` : "");
+      } else {
+        departmentLabel = mgrDept || null;
+      }
+    } else {
+      const empIndustry = String((employee as any).industry || "").trim();
+      const collected = collectOrgMappedRolesForIndustryAndDepartment(all, empIndustry, empDept);
+      roles = collected.roles;
+      const names = collected.matchedSectionNames;
+      if (!roles.length && empDept) {
+        const targetKey = normalizeDepartmentKey(empDept);
+        const match = all.find((d) => normalizeDepartmentKey(String(d.name || "")) === targetKey);
+        roles = ((match?.roles || []) as string[]).map((r) => String(r || "").trim()).filter(Boolean);
+        departmentLabel = match?.name ? String(match.name) : empDept || null;
+      } else if (names.length) {
+        departmentLabel =
+          names.slice(0, 2).join(" · ") + (names.length > 2 ? ` (+${names.length - 2} more)` : "");
+      } else {
+        departmentLabel = empDept || null;
+      }
+    }
 
     return {
       employee: {
@@ -1425,8 +1730,8 @@ export class OrgAuthService {
         designation: (employee as any).designation || null,
       },
       hasStructure: Boolean(structure),
-      department: match?.name || targetDeptRaw || null,
-      roles: match?.roles || [],
+      department: departmentLabel,
+      roles,
       allDepartments: all,
     };
   }
@@ -1437,7 +1742,14 @@ export class OrgAuthService {
 
   async createRecommendation(input: {
     companyDomain: string;
-    manager: { id: string; email: string; name?: string; role: OrgCurrentRole | string; department?: string };
+    manager: {
+      id: string;
+      email: string;
+      name?: string;
+      role: OrgCurrentRole | string;
+      department?: string;
+      industry?: string;
+    };
     employeeId: string;
     roleName: string;
     note?: string;
@@ -1474,18 +1786,31 @@ export class OrgAuthService {
     // When no mapping is defined for that department we accept any role so the sender isn't blocked.
     const structure = await this.orgStructureModel.findOne({ companyDomain: domain }).lean();
     if (structure) {
-      const mappingDeptRaw =
-        input.manager.role === "MANAGER" ? String(input.manager.department || "").trim() : empDept;
-      const match = (structure.departments || []).find(
-        (d: any) => normalizeDepartmentKey(String(d.name || "")) === normalizeDepartmentKey(mappingDeptRaw),
-      );
-      const mappedRoles: string[] = (match?.roles || []) as string[];
+      const all = (structure.departments || []) as Array<{ name: string; roles?: string[] }>;
+      let mappedRoles: string[] = [];
+      if (input.manager.role === "MANAGER") {
+        const mgrDept = String(input.manager.department || "").trim();
+        mappedRoles = collectOrgMappedRolesForDepartmentAnyIndustry(all, mgrDept).roles;
+        if (!mappedRoles.length && mgrDept) {
+          const match = all.find(
+            (d: any) => normalizeDepartmentKey(String(d.name || "")) === normalizeDepartmentKey(mgrDept),
+          );
+          mappedRoles = ((match?.roles || []) as string[]).map((r) => String(r || "").trim()).filter(Boolean);
+        }
+      } else {
+        const empIndustry = String((employee as any).industry || "").trim();
+        mappedRoles = collectOrgMappedRolesForIndustryAndDepartment(all, empIndustry, empDept).roles;
+        if (!mappedRoles.length && empDept) {
+          const match = all.find(
+            (d: any) => normalizeDepartmentKey(String(d.name || "")) === normalizeDepartmentKey(empDept),
+          );
+          mappedRoles = ((match?.roles || []) as string[]).map((r) => String(r || "").trim()).filter(Boolean);
+        }
+      }
       if (mappedRoles.length > 0) {
         const ok = mappedRoles.some((r) => r.trim().toLowerCase() === role.toLowerCase());
         if (!ok) {
-          throw new BadRequestException(
-            `Role "${role}" is not part of the ${match?.name || mappingDeptRaw || "selected"} department`,
-          );
+          throw new BadRequestException(`Role "${role}" is not part of the allowed mapping for this scope`);
         }
       }
     }

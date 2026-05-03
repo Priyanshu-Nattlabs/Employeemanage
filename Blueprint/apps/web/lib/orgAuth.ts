@@ -13,6 +13,7 @@ export type OrgUser = {
   currentRole: OrgCurrentRole;
   designation?: string;
   department?: string;
+  industry?: string;
   employeeId?: string;
   mobileNo?: string;
   reportingManagerEmail?: string;
@@ -85,18 +86,37 @@ export async function orgRegisterEmployee(body: {
   fullName: string;
   designation: string;
   department?: string;
+  industry?: string;
   companyName: string;
   companyDomain?: string;
   employeeId: string;
   currentRole: OrgCurrentRole;
   mobileNo: string;
-  reportingManagerEmail: string;
+  reportingManagerEmail?: string;
 }) {
   return apiJson<OrgRegisterResponse>("/api/org-auth/register/employee", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body)
   });
+}
+
+export async function orgGetDesignationOptions(q?: string) {
+  const qs = q ? `?q=${encodeURIComponent(q)}` : "";
+  return apiJson<string[]>(`/api/org-auth/designations${qs}`, { method: "GET" });
+}
+
+export type OrgSignupOptions = {
+  industries: string[];
+  byIndustry: Record<string, string[]>;
+  source: "merged" | "empty";
+  unscopedIndustryDefault: string;
+};
+
+/** Public: industries + departments for cascading signup (from company org structure). */
+export async function orgGetPublicSignupOrgOptions(companyDomain: string) {
+  const d = encodeURIComponent(companyDomain.trim().toLowerCase());
+  return apiJson<OrgSignupOptions>(`/api/org-auth/public/signup-org-options?companyDomain=${d}`, { method: "GET" });
 }
 
 export async function orgRegisterAdmin(body: { email: string; password: string; fullName: string; companyName: string; companyDomain?: string }) {

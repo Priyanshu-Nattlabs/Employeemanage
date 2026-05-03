@@ -18,6 +18,11 @@ export class RegisterEmployeeDto {
   @IsString()
   department?: string;
 
+  @IsOptional()
+  @IsString()
+  @MinLength(2)
+  industry?: string;
+
   @IsString()
   companyName!: string;
 
@@ -35,8 +40,9 @@ export class RegisterEmployeeDto {
   @IsString()
   mobileNo!: string;
 
+  @IsOptional()
   @IsEmail()
-  reportingManagerEmail!: string;
+  reportingManagerEmail?: string;
 }
 
 export class RegisterAdminDto {
