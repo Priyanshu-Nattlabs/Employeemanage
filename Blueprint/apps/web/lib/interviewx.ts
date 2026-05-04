@@ -11,12 +11,35 @@ function clean(v?: string) {
   return String(v || "").trim();
 }
 
+function normalizeOrigin(raw: string): string {
+  return clean(raw).replace(/\/$/, "");
+}
+
+/**
+ * Public origin for the InterviewX web app (deep links, “Open InterviewX”, etc.).
+ * Order: explicit env → same public site as SaarthiX footer → browser origin on real hosts → local dev default.
+ * Next.js inlines `NEXT_PUBLIC_*` at build time; VPS should set `NEXT_PUBLIC_SAARTHIX_URL` or `NEXT_PUBLIC_INTERVIEWX_ORIGIN`.
+ */
 function interviewXBase(): string {
-  const raw = clean(
-    typeof process !== "undefined" && process.env.NEXT_PUBLIC_INTERVIEWX_ORIGIN ? process.env.NEXT_PUBLIC_INTERVIEWX_ORIGIN : ""
-  ).replace(/\/$/, "");
-  const origin = raw || "http://localhost:3300";
-  return origin.endsWith("/") ? origin.slice(0, -1) : origin;
+  const explicit = normalizeOrigin(
+    typeof process !== "undefined" ? process.env.NEXT_PUBLIC_INTERVIEWX_ORIGIN || "" : ""
+  );
+  if (explicit) return explicit;
+
+  const fromSaarthix = normalizeOrigin(
+    typeof process !== "undefined" ? process.env.NEXT_PUBLIC_SAARTHIX_URL || "" : ""
+  );
+  if (fromSaarthix) return fromSaarthix;
+
+  if (typeof window !== "undefined") {
+    const { hostname, protocol, port } = window.location;
+    if (hostname && hostname !== "localhost" && hostname !== "127.0.0.1") {
+      const p = port ? `:${port}` : "";
+      return normalizeOrigin(`${protocol}//${hostname}${p}`);
+    }
+  }
+
+  return "http://localhost:3300";
 }
 
 /**

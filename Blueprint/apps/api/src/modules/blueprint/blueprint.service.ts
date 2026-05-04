@@ -178,8 +178,8 @@ Rules:
     const isBaselineCompare = !!out.baselineRole;
     const fallbackItems = matchedCurrentSkills.map((skillName) => {
       const pair = matchedByCurrent.get(skillName)!;
-      const c = currentReqMap.get(skillName.toLowerCase()) || {};
-      const p = previousReqMap.get(String(pair.previousSkill || "").toLowerCase()) || {};
+      const c: any = currentReqMap.get(skillName.toLowerCase()) || {};
+      const p: any = previousReqMap.get(String(pair.previousSkill || "").toLowerCase()) || {};
       const cMonths = Math.max(1, Number(c?.timeRequiredMonths || 1));
       const pMonths = Math.max(1, Number(p?.timeRequiredMonths || 1));
       const monthDelta = Math.max(0, cMonths - pMonths);

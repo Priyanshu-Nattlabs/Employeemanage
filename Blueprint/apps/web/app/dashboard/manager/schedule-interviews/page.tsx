@@ -1,8 +1,7 @@
 import { redirect } from "next/navigation";
-import { getAssetPrefix } from "@/lib/apiBase";
 
 /** Legacy route — hub lives under `/dashboard/manager/interviews`. */
 export default function LegacyScheduleInterviewsRedirect() {
-  const base = getAssetPrefix().replace(/\/$/, "");
-  redirect(`${base}/dashboard/manager/interviews/`);
+  // Do not prepend getAssetPrefix(): with next.config `basePath`, Next would emit `/base/base/...` and 404.
+  redirect("/dashboard/manager/interviews/");
 }

@@ -4,7 +4,7 @@ import { createPortal } from "react-dom";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 
-import { getApiPrefix } from "@/lib/apiBase";
+import { appPath, getApiPrefix } from "@/lib/apiBase";
 import { buildInterviewXAiInterviewUrl } from "@/lib/interviewx";
 import { getOrgAuthFromStorage, orgCreateRecommendation } from "@/lib/orgAuth";
 import { flowQueryString, mergeRoleFlowParams, pickRoleFlowParams, writeRoleFlowParams } from "@/lib/roleFlowParams";
@@ -402,7 +402,7 @@ function RolePageContent() {
       const params = new URLSearchParams();
       params.set("recommended", roleName);
       if (recommendName) params.set("for", recommendName);
-      router.push(`/dashboard/manager?${params.toString()}`);
+      window.location.href = `${appPath("/dashboard/manager")}?${params.toString()}`;
     } catch (e: any) {
       setRecommendError(e?.message || "Could not send the recommendation. Please try again.");
       setRecommendSending(false);
@@ -970,7 +970,7 @@ function RolePageContent() {
     setStartingKnownSkillsTest(true);
     try {
       await saveKnownSkillsAndStart();
-      window.location.href = `/role/${enc(roleName)}/test/known-skills${roleFlowQs}`;
+      window.location.href = `${appPath(`/role/${enc(roleName)}/test/known-skills`)}${roleFlowQs}`;
     } finally {
       setStartingKnownSkillsTest(false);
     }

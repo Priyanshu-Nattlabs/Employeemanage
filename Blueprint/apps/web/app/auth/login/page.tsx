@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { orgLogin, setOrgAuthInStorage } from "@/lib/orgAuth";
+import { orgLogin, setOrgAuthInStorage, isOrgManagerOrHr } from "@/lib/orgAuth";
+import { appPath } from "@/lib/apiBase";
 
 export default function LoginPage() {
   // Deprecated route: keep for old links, redirect to employee login UI.
@@ -22,7 +23,7 @@ export default function LoginPage() {
       const r = await orgLogin({ email, password });
       setOrgAuthInStorage(r.token, r.user);
       if (r.user.accountType === "ADMIN") window.location.href = "/dashboard/admin";
-      else window.location.href = r.user.currentRole === "MANAGER" || r.user.currentRole === "HR" ? "/dashboard/manager/hub" : "/";
+      else window.location.href = isOrgManagerOrHr(r.user) ? appPath("/dashboard/manager/home") : "/";
     } catch (err: any) {
       setError(err?.message || "Login failed");
     } finally {

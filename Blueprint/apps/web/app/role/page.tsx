@@ -1,8 +1,8 @@
 "use client";
 import { Suspense, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
-import { getApiPrefix } from "@/lib/apiBase";
+import { useSearchParams } from "next/navigation";
+import { appPath, getApiPrefix } from "@/lib/apiBase";
 import { getOrgAuthFromStorage, orgListRecommendableRoles } from "@/lib/orgAuth";
 
 const API = getApiPrefix();
@@ -39,7 +39,6 @@ export default function RolesPage() {
 }
 
 function RolesPageContent() {
-  const router = useRouter();
   const searchParams = useSearchParams();
 
   // Manager → "recommend role" flow context (passed via querystring from /dashboard/manager).
@@ -344,7 +343,9 @@ function RolesPageContent() {
               </div>
             </div>
             <button
-              onClick={() => router.push("/dashboard/manager")}
+              onClick={() => {
+                window.location.href = appPath("/dashboard/manager");
+              }}
               style={{
                 background: "white", border: "1px solid rgba(124,58,237,0.4)",
                 color: "#5b21b6", fontWeight: 800, fontSize: 13,

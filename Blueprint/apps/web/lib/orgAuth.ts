@@ -53,6 +53,12 @@ export function clearOrgAuthInStorage() {
   window.dispatchEvent(new Event("jbv2-org-auth-changed"));
 }
 
+/** Manager/HR portal: employee accounts whose current role is MANAGER or HR (not plain employees or admins). */
+export function isOrgManagerOrHr(user: OrgUser | null | undefined): boolean {
+  if (!user) return false;
+  return user.accountType === "EMPLOYEE" && (user.currentRole === "MANAGER" || user.currentRole === "HR");
+}
+
 async function apiJson<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(apiUrl(path), init);
   const text = await res.text();

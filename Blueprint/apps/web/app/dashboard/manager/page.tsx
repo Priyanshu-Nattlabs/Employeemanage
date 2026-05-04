@@ -6,6 +6,7 @@ import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   getOrgAuthFromStorage,
+  isOrgManagerOrHr,
   orgGetEmployeesActivity,
   orgListEmployeesManagerSummary,
   orgManagerBulkInviteEmployees,
@@ -104,11 +105,7 @@ function ManagerDashboardContent() {
   // so we don't spam the API with unauthorized requests.
   useEffect(() => {
     if (!mounted || !token || !user) return;
-    const isManagerOrHr =
-      (user?.accountType === "EMPLOYEE" && (user?.currentRole === "MANAGER" || user?.currentRole === "HR")) ||
-      user?.currentRole === "MANAGER" ||
-      user?.currentRole === "HR";
-    if (!isManagerOrHr) {
+    if (!isOrgManagerOrHr(user)) {
       window.location.href = appPath("/target-role");
     }
   }, [mounted, token, user]);
@@ -116,11 +113,7 @@ function ManagerDashboardContent() {
   useEffect(() => {
     if (!token) return;
     // Guard: only Manager/HR should call manager endpoints.
-    const isManagerOrHr =
-      (user?.accountType === "EMPLOYEE" && (user?.currentRole === "MANAGER" || user?.currentRole === "HR")) ||
-      user?.currentRole === "MANAGER" ||
-      user?.currentRole === "HR";
-    if (!isManagerOrHr) return;
+    if (!isOrgManagerOrHr(user)) return;
 
     let cancelled = false;
     const fetchAll = async (silent = false) => {
@@ -267,7 +260,7 @@ function ManagerDashboardContent() {
             <div style={iconTile} title={user.fullName || user.email}>{initials}</div>
             <div style={{ minWidth: 0, overflow: "hidden" }}>
               <div style={breadcrumb}>
-                <a href={appPath("/dashboard/manager/hub")} style={{ color: "rgba(255,255,255,0.6)", textDecoration: "none", fontWeight: 700, fontSize: 12 }}>← Overview</a>
+                <a href={appPath("/dashboard/manager/home")} style={{ color: "rgba(255,255,255,0.6)", textDecoration: "none", fontWeight: 700, fontSize: 12 }}>← Portals</a>
                 <span style={crumbSep}>›</span>
                 <span style={crumbCur}>Dashboard</span>
                 <span style={crumbSep}>›</span>
