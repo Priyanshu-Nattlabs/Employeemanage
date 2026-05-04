@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { GetStartedRoleChoice } from "./GetStartedRoleChoice";
+import { publicAssetUrl } from "@/lib/apiBase";
 import "./InterviewXFooter.css";
 
 function sxBase(): string {
@@ -23,7 +24,7 @@ const COMPANY_LINKS_REST: Array<{ href: string; label: string }> = [
 
 export function InterviewXFooter() {
   const base = sxBase();
-  const logoSrc = "/brand/corporate-development.png";
+  const logoSrc = publicAssetUrl("/brand/sx-workforce.png");
   const ext = (path: string) => (path.startsWith("/") ? `${base}${path}` : `${base}/${path}`);
 
   return (
@@ -35,7 +36,7 @@ export function InterviewXFooter() {
               <div className="ix-site-footer__logo-row">
                 <img
                   src={logoSrc}
-                  alt="Corporate Development"
+                  alt="SX Workforce"
                   className="ix-site-footer__logo-img"
                   width={534}
                   height={80}
