@@ -18,6 +18,29 @@ services:
       timeout: 5s
       retries: 6
 
+  # Runs on every `docker compose up`: if `blueprints` is empty, seeds from Excel under repo root; otherwise exits immediately.
+  # Requires Docker Compose v2.20+ (service_completed_successfully). Excel files optional but at least one workbook must exist to seed.
+  seed-ensure:
+    image: node:22-bookworm-slim
+    working_dir: /app/apps/api
+    volumes:
+      - .:/app
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    environment:
+      MONGODB_URI: mongodb://mongodb:27017/job_blueprint_v2
+      # Faster first connect after mongo healthy (override if Mongo is slow to accept connections)
+      BLUEPRINT_AUTO_SEED_CONNECT_RETRIES: "8"
+      BLUEPRINT_AUTO_SEED_CONNECT_DELAY_MS: "1000"
+    restart: "no"
+    command:
+      [
+        "sh",
+        "-c",
+        "if [ ! -d node_modules/mongodb ]; then npm install; fi && node src/scripts/ensure-blueprint-seed.mjs",
+      ]
+
   backend:
     build:
       context: ./apps/api
@@ -29,6 +52,8 @@ services:
     depends_on:
       mongodb:
         condition: service_healthy
+      seed-ensure:
+        condition: service_completed_successfully
     env_file:
       - .env
     environment:
@@ -63,7 +88,7 @@ services:
       BACKEND_URL: http://backend:8081
     restart: unless-stopped
 
-  # One-shot DB seed from Excel (repo root mounted at /app). Does not start with `docker compose up`.
+  # Manual full re-seed from Excel (always runs seed-from-xlsx, does not check counts). Optional profile.
   # Run: docker compose --profile seed run --rm seed
   seed:
     profiles: ["seed"]
