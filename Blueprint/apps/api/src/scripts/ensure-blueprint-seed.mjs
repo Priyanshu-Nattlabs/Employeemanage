@@ -18,6 +18,8 @@
  *
  * Run from apps/api:  node src/scripts/ensure-blueprint-seed.mjs
  * Or:                 npm run seed:ensure
+ *
+ * Docker: `docker compose up` runs the `seed-ensure` service before `backend` (see docker-compose.yml).
  */
 import { existsSync } from "fs";
 import path from "path";
