@@ -56,6 +56,60 @@ export class InterviewXService {
     return v.endsWith("/") ? v.slice(0, -1) : v;
   }
 
+  private isLocalOrigin(origin: string) {
+    return /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i.test(origin);
+  }
+
+  /** Public InterviewX site origin (no trailing slash). Never localhost in production. */
+  private resolveInterviewXFrontendOrigin(): string {
+    const candidates = [
+      this.config.get<string>("NEXT_PUBLIC_INTERVIEWX_ORIGIN"),
+      this.config.get<string>("APP_FRONTEND_URL"),
+      this.config.get<string>("NEXT_PUBLIC_SAARTHIX_URL"),
+    ]
+      .map((v) => this.normalizeOrigin(v))
+      .filter(Boolean);
+    const origin =
+      candidates.find((v) => !this.isLocalOrigin(v)) ||
+      candidates[0] ||
+      "";
+    if (!origin || this.isLocalOrigin(origin)) {
+      throw new BadRequestException("Missing valid public InterviewX frontend origin");
+    }
+    return origin;
+  }
+
+  /**
+   * Interview path always starts with `/`.
+   * Older rows sometimes stored a full URL in `loginLink` or `loginUrl` — strip host so we can re-prefix with the current public origin.
+   */
+  private interviewPathFromStoredCredentials(loginLink: string, legacyFullLoginUrl?: string): string {
+    let path = String(loginLink || "").trim();
+    if (path.startsWith("http://") || path.startsWith("https://")) {
+      try {
+        const u = new URL(path);
+        path = `${u.pathname}${u.search}${u.hash}`;
+      } catch {
+        path = "";
+      }
+    }
+    if (!path) {
+      const legacy = String(legacyFullLoginUrl || "").trim();
+      if (legacy.startsWith("http://") || legacy.startsWith("https://")) {
+        try {
+          const u = new URL(legacy);
+          path = `${u.pathname}${u.search}${u.hash}`;
+        } catch {
+          path = "";
+        }
+      } else if (legacy.startsWith("/")) {
+        path = legacy;
+      }
+    }
+    if (!path.startsWith("/")) path = path ? `/${path}` : "/";
+    return path;
+  }
+
   private async requestJson<T>(url: string, init: RequestInit): Promise<T> {
     const res = await fetch(url, init);
     const text = await res.text();
@@ -222,12 +276,9 @@ export class InterviewXService {
         // `host.docker.internal` reaches the host machine where InterviewX is exposed.
         "http://host.docker.internal:8180",
     );
-    const interviewXFrontendOrigin = this.normalizeOrigin(
-      this.config.get<string>("NEXT_PUBLIC_INTERVIEWX_ORIGIN") || "http://localhost:3300",
-    );
+    const interviewXFrontendOrigin = this.resolveInterviewXFrontendOrigin();
 
     if (!interviewXBackendOrigin) throw new BadRequestException("Missing InterviewX backend origin");
-    if (!interviewXFrontendOrigin) throw new BadRequestException("Missing InterviewX frontend origin");
 
     const startISO =
       this.parseLocalDateTimeOrThrow("interviewStartDateTime", input.interviewStartDateTime) || this.localNowDateTimeString();
@@ -284,9 +335,9 @@ export class InterviewXService {
       },
     );
 
-    const loginLink = String(candidateCreated?.loginLink || "").trim();
+    const loginLink = this.interviewPathFromStoredCredentials(String(candidateCreated?.loginLink || ""), "");
     const password = String(candidateCreated?.password || "").trim();
-    if (!loginLink || !password) {
+    if (!loginLink || loginLink === "/" || !password) {
       throw new BadRequestException("InterviewX returned candidate but credentials are missing");
     }
 
@@ -335,14 +386,20 @@ export class InterviewXService {
       .exec();
     if (!doc) throw new NotFoundException("No InterviewX interview scheduled for this employee yet");
 
+    const origin = this.resolveInterviewXFrontendOrigin();
+    const rel = this.interviewPathFromStoredCredentials(
+      String((doc as any).loginLink || ""),
+      String((doc as any).loginUrl || ""),
+    );
+
     return {
       interviewConfigId: String((doc as any).interviewConfigId || ""),
       candidateId: (doc as any).candidateId ? String((doc as any).candidateId) : undefined,
       candidateName: String((doc as any).candidateName || ""),
       candidateEmail: String((doc as any).candidateEmail || ""),
-      loginLink: String((doc as any).loginLink || ""),
+      loginLink: rel,
       password: String((doc as any).password || ""),
-      loginUrl: String((doc as any).loginUrl || ""),
+      loginUrl: `${origin}${rel}`,
       interviewStartDateTime: (doc as any).interviewStartDateTime ? String((doc as any).interviewStartDateTime) : undefined,
       interviewEndDateTime: (doc as any).interviewEndDateTime ? String((doc as any).interviewEndDateTime) : undefined,
     };

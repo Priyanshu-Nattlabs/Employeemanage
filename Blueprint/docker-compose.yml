@@ -2,21 +2,46 @@ name: job-blueprint-v2
 
 services:
   mongodb:
-    # If mongod exits with "Wrong mongod version" / featureCompatibilityVersion 4.4 (etc.),
-    # this volume was created by an older MongoDB. Remove it and recreate: docker compose down -v
-    image: mongo:7
+    # Pinned to MongoDB 4.4.x per project requirement (shell is `mongo`, not `mongosh`).
+    # Host port defaults to 27027 so another Mongo on 27017 does not block startup.
+    # If this DB was ever used with Mongo 7+, the data dir is incompatible: `docker compose down -v` once, then up again.
+    image: mongo:4.4
     container_name: job-blueprint-v2-mongodb
     # Host 27017 is often taken (local MongoDB / another stack). Backend still uses mongodb:27017 on the Docker network.
     ports:
-      - "${MONGO_PUBLISH_PORT:-27018}:27017"
+      - "${BLUEPRINT_MONGO_HOST_PORT:-27027}:27017"
     volumes:
       - job-blueprint-v2-mongo-data:/data/db
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
-      interval: 10s
-      timeout: 5s
-      retries: 6
+      test: ["CMD", "mongo", "--quiet", "--eval", "db.adminCommand('ping')"]
+      interval: 5s
+      timeout: 10s
+      retries: 24
+      start_period: 60s
+
+  # Runs on every `docker compose up`: if `blueprints` is empty, seeds from Excel under repo root; otherwise exits immediately.
+  # Requires Docker Compose v2.20+ (service_completed_successfully). Excel files optional but at least one workbook must exist to seed.
+  seed-ensure:
+    image: node:22-bookworm-slim
+    working_dir: /app/apps/api
+    volumes:
+      - .:/app
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    environment:
+      MONGODB_URI: mongodb://mongodb:27017/job_blueprint_v2
+      # Faster first connect after mongo healthy (override if Mongo is slow to accept connections)
+      BLUEPRINT_AUTO_SEED_CONNECT_RETRIES: "8"
+      BLUEPRINT_AUTO_SEED_CONNECT_DELAY_MS: "1000"
+    restart: "no"
+    command:
+      [
+        "sh",
+        "-c",
+        "if [ ! -d node_modules/mongodb ]; then npm install; fi && node src/scripts/ensure-blueprint-seed.mjs",
+      ]
 
   backend:
     build:
@@ -29,6 +54,8 @@ services:
     depends_on:
       mongodb:
         condition: service_healthy
+      seed-ensure:
+        condition: service_completed_successfully
     env_file:
       - .env
     environment:
@@ -41,6 +68,8 @@ services:
       timeout: 7s
       retries: 8
 
+  # After pulling new routes (e.g. /dashboard/manager/home/), rebuild without cache or you may still run an old bundle:
+  #   docker compose build --no-cache frontend && docker compose up -d frontend
   frontend:
     build:
       context: ./apps/web
@@ -51,6 +80,7 @@ services:
         # Leave unset or empty for http://localhost:3002/dashboard/... Set DOCKER_NEXT_PUBLIC_BASE_PATH=/job-blueprint-v2 when behind nginx.
         NEXT_PUBLIC_BASE_PATH: ${DOCKER_NEXT_PUBLIC_BASE_PATH:-}
         NEXT_PUBLIC_SAARTHIX_URL: ${NEXT_PUBLIC_SAARTHIX_URL:-}
+        NEXT_PUBLIC_INTERVIEWX_ORIGIN: ${NEXT_PUBLIC_INTERVIEWX_ORIGIN:-}
     container_name: job-blueprint-v2-frontend
     # UI: http://localhost:3002/ (no path prefix unless DOCKER_NEXT_PUBLIC_BASE_PATH is set)
     ports:
@@ -63,7 +93,7 @@ services:
       BACKEND_URL: http://backend:8081
     restart: unless-stopped
 
-  # One-shot DB seed from Excel (repo root mounted at /app). Does not start with `docker compose up`.
+  # Manual full re-seed from Excel (always runs seed-from-xlsx, does not check counts). Optional profile.
   # Run: docker compose --profile seed run --rm seed
   seed:
     profiles: ["seed"]

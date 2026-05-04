@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { orgDefaultLandingPath, orgLogin, setOrgAuthInStorage } from "@/lib/orgAuth";
+import { orgLogin, setOrgAuthInStorage } from "@/lib/orgAuth";
 import { appPath } from "@/lib/apiBase";
 
 export default function EmployeeLoginPage() {
@@ -23,7 +23,7 @@ export default function EmployeeLoginPage() {
         window.location.href = appPath("/auth/employee/complete-profile");
         return;
       }
-      window.location.href = orgDefaultLandingPath(r.user);
+      window.location.href = appPath("/employee/");
     } catch (err: any) {
       setError(err?.message || "Login failed");
     } finally {

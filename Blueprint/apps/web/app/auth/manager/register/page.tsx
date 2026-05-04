@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
+import { appPath } from "@/lib/apiBase";
 import {
   orgGetPublicSignupOrgOptions,
   orgRegisterEmployee,
@@ -150,12 +151,12 @@ export default function ManagerRegisterPage() {
       });
       if ("verificationRequired" in r && r.verificationRequired) {
         const debugOtpQuery = r.debugOtp ? `&debugOtp=${encodeURIComponent(r.debugOtp)}` : "";
-        window.location.href = `/auth/verify-otp?email=${encodeURIComponent(r.email)}&next=${encodeURIComponent("/dashboard/manager/hub")}${debugOtpQuery}`;
+        window.location.href = `${appPath("/auth/verify-otp")}?email=${encodeURIComponent(r.email)}&next=${encodeURIComponent(appPath("/dashboard/manager/home"))}${debugOtpQuery}`;
         return;
       }
       if (!("token" in r) || !r.token || !r.user) throw new Error("Registration succeeded but login payload missing.");
       setOrgAuthInStorage(r.token, r.user);
-      window.location.href = "/dashboard/manager/hub";
+      window.location.href = appPath("/dashboard/manager/home");
     } catch (err: any) {
       setError(err?.message || "Registration failed");
     } finally {

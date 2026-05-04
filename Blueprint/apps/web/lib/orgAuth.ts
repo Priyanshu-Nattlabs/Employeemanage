@@ -1,4 +1,4 @@
-import { apiUrl, appPath } from "@/lib/apiBase";
+import { apiUrl } from "@/lib/apiBase";
 
 export type OrgAccountType = "EMPLOYEE" | "ADMIN";
 export type OrgCurrentRole = "EMPLOYEE" | "MANAGER" | "HR";
@@ -51,15 +51,6 @@ export function clearOrgAuthInStorage() {
   localStorage.removeItem(TOKEN_KEY);
   localStorage.removeItem(USER_KEY);
   window.dispatchEvent(new Event("jbv2-org-auth-changed"));
-}
-
-/** First screen after login: admin dashboard, manager/HR hub, or employee home. */
-export function orgDefaultLandingPath(user: Pick<OrgUser, "accountType" | "currentRole">): string {
-  if (user.accountType === "ADMIN") return appPath("/dashboard/admin");
-  if (user.accountType === "EMPLOYEE" && (user.currentRole === "MANAGER" || user.currentRole === "HR")) {
-    return appPath("/dashboard/manager/hub");
-  }
-  return appPath("/employee/");
 }
 
 async function apiJson<T>(path: string, init?: RequestInit): Promise<T> {

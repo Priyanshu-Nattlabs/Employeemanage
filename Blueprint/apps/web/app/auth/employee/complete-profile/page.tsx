@@ -1,14 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import {
-  orgCompleteInvite,
-  orgDefaultLandingPath,
-  orgGetMyProfile,
-  getOrgAuthFromStorage,
-  setOrgAuthInStorage,
-  type OrgUser,
-} from "@/lib/orgAuth";
+import { orgCompleteInvite, orgGetMyProfile, getOrgAuthFromStorage, setOrgAuthInStorage, type OrgUser } from "@/lib/orgAuth";
 import { appPath } from "@/lib/apiBase";
 
 export default function CompleteInviteProfilePage() {
@@ -42,10 +35,7 @@ export default function CompleteInviteProfilePage() {
         const needs = Boolean(raw.needsProfileCompletion);
         const mustPw = Boolean(raw.mustChangePassword);
         if (!needs && !mustPw) {
-          window.location.href = orgDefaultLandingPath({
-            accountType: raw.accountType as OrgUser["accountType"],
-            currentRole: raw.currentRole as OrgUser["currentRole"],
-          });
+          window.location.href = appPath("/employee/");
           return;
         }
         setOrgAuthInStorage(token, {
@@ -99,7 +89,7 @@ export default function CompleteInviteProfilePage() {
         employeeId: employeeId.trim() || undefined,
       });
       setOrgAuthInStorage(r.token, r.user);
-      window.location.href = orgDefaultLandingPath(r.user);
+      window.location.href = appPath("/employee/");
     } catch (err: any) {
       setError(err?.message || "Could not save your profile");
     } finally {
