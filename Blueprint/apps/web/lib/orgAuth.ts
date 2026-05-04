@@ -29,15 +29,6 @@ export type OrgRegisterResponse =
 const TOKEN_KEY = "jbv2_org_token";
 const USER_KEY = "jbv2_org_user";
 
-/** Manager/HR check tolerant of API casing and legacy payloads missing accountType. */
-export function isOrgManagerOrHr(user: OrgUser | Record<string, unknown> | null | undefined): boolean {
-  if (!user) return false;
-  const role = String((user as any).currentRole ?? "").toUpperCase();
-  if (role !== "MANAGER" && role !== "HR") return false;
-  const acct = String((user as any).accountType ?? "").toUpperCase();
-  return acct === "EMPLOYEE" || !acct;
-}
-
 export function getOrgAuthFromStorage(): { token: string; user: OrgUser | null } {
   if (typeof window === "undefined") return { token: "", user: null };
   const token = localStorage.getItem(TOKEN_KEY) || "";
@@ -60,6 +51,12 @@ export function clearOrgAuthInStorage() {
   localStorage.removeItem(TOKEN_KEY);
   localStorage.removeItem(USER_KEY);
   window.dispatchEvent(new Event("jbv2-org-auth-changed"));
+}
+
+/** Manager/HR portal: employee accounts whose current role is MANAGER or HR (not plain employees or admins). */
+export function isOrgManagerOrHr(user: OrgUser | null | undefined): boolean {
+  if (!user) return false;
+  return user.accountType === "EMPLOYEE" && (user.currentRole === "MANAGER" || user.currentRole === "HR");
 }
 
 async function apiJson<T>(path: string, init?: RequestInit): Promise<T> {

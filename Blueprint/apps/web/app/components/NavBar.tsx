@@ -1,12 +1,11 @@
 "use client";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { useEffect, useLayoutEffect, useState, type CSSProperties } from "react";
-import { appPath, publicAssetUrl } from "@/lib/apiBase";
+import { usePathname, useRouter } from "next/navigation";
+import { useEffect, useState, type CSSProperties } from "react";
+import { publicAssetUrl } from "@/lib/apiBase";
 import {
   clearOrgAuthInStorage,
   getOrgAuthFromStorage,
-  isOrgManagerOrHr,
   orgListMyRecommendations,
   orgUpdateRecommendationStatus,
   type RoleRecommendation,
@@ -18,6 +17,7 @@ const NOTIF_POLL_MS = 30_000;
 
 export function NavBar() {
   const pathname = usePathname();
+  const router = useRouter();
 
   const [orgAuth, setOrgAuth] = useState<{ token: string; user: any | null }>({ token: "", user: null });
   const [mounted, setMounted] = useState(false);
@@ -39,13 +39,15 @@ export function NavBar() {
 
   const logoutOrg = () => {
     clearOrgAuthInStorage();
-    window.location.href = appPath("/");
+    window.location.href = "/";
   };
 
   const user = orgAuth.user as any | null;
   const isLoggedIn = mounted && Boolean(orgAuth.token);
   const isAdmin = Boolean(user && user.accountType === "ADMIN");
-  const isManagerOrHR = isOrgManagerOrHr(user);
+  const isManager = Boolean(user && user.accountType === "EMPLOYEE" && user.currentRole === "MANAGER");
+  const isHR = Boolean(user && user.accountType === "EMPLOYEE" && user.currentRole === "HR");
+  const isManagerOrHR = isManager || isHR;
   const isEmployee = Boolean(user && user.accountType === "EMPLOYEE" && !isManagerOrHR);
 
   useEffect(() => {
@@ -104,29 +106,19 @@ export function NavBar() {
     await markStatus(rec._id, "SEEN");
     setNotifOpen(false);
     setPopupRec(null);
-    window.location.href = appPath(`/role/${encodeURIComponent(rec.roleName)}`);
+    router.push(`/role/${encodeURIComponent(rec.roleName)}`);
   };
 
   const dashboardHref = isAdmin ? "/dashboard/admin" : isManagerOrHR ? "/dashboard/manager" : "/";
   const profileHref = isAdmin ? "/profile/admin" : "/profile/employee";
   const profileLabel = isAdmin ? "Admin Profile" : "Employee Profile";
-  /** Employees → employee hub; managers/HR → portal chooser; others → marketing home. */
-  const brandHref = isLoggedIn && isEmployee ? "/employee/" : isLoggedIn && isManagerOrHR ? "/dashboard/manager/home/" : "/";
+  /** Individual contributors land on the employee hub; others keep home. */
+  const brandHref = isLoggedIn && isEmployee ? "/employee/" : "/";
 
   return (
     <header className="jb-nav">
       <div className="jb-nav__inner">
-        <Link
-          href={brandHref}
-          className="jb-nav__brand"
-          aria-label={
-            isLoggedIn && isEmployee
-              ? "Corporate Development — go to employee home"
-              : isLoggedIn && isManagerOrHR
-                ? "Corporate Development — manager and HR portal"
-                : "Corporate Development — home"
-          }
-        >
+        <Link href={brandHref} className="jb-nav__brand" aria-label="Corporate Development — go to employee home">
           <img
             src={publicAssetUrl("/brand/corporate-development.png")}
             alt="Corporate Development"
