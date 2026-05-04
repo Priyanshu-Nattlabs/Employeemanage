@@ -11,7 +11,8 @@
  *
  * Env:
  *   MONGODB_URI              — default mongodb://localhost:27017/job_blueprint_v2
- *   BLUEPRINT_SEED_SOURCES   — comma-separated list of absolute or relative xlsx paths (required)
+ *   BLUEPRINT_SEED_SOURCES   — comma-separated list of absolute or relative xlsx paths (optional if defaults exist)
+ *   BLUEPRINT_XLSX_FILE      — single workbook path (optional alternative to BLUEPRINT_SEED_SOURCES)
  *
  * Expected sheet layout per workbook (first matching sheet is used):
  *   Row 1: headers — must include "Role" and "Function" (case-insensitive).
@@ -20,6 +21,9 @@
  *
  * Documents are upserted into the `blueprints` collection keyed on
  * { role, function } (lower-cased for matching, stored as provided).
+ *
+ * Defaults (run from apps/api): ../../Job_Blueprint_Final_Phase13.xlsx then ../../NEW JD 123.xlsx (if missing, ../../NEW JD.xlsx).
+ * One-command NEW JD only: from Blueprint repo root run `npm run seed:new-jd` (see scripts/seed-new-jd-workbook.mjs).
  */
 
 import { readFileSync, existsSync } from "fs";
@@ -42,6 +46,24 @@ function resolvePath(raw) {
     if (existsSync(p)) return p;
   }
   return path.resolve(process.cwd(), r);
+}
+
+function getSeedFileList() {
+  const env = (process.env.BLUEPRINT_SEED_SOURCES || "").trim();
+  if (env) {
+    return env
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean)
+      .map(resolvePath);
+  }
+  const single = (process.env.BLUEPRINT_XLSX_FILE || "").trim();
+  if (single) return [resolvePath(single)];
+  const phase13 = resolvePath("../../Job_Blueprint_Final_Phase13.xlsx");
+  const jd123 = resolvePath("../../NEW JD 123.xlsx");
+  const jdLegacy = resolvePath("../../NEW JD.xlsx");
+  const newJd = existsSync(jd123) ? jd123 : jdLegacy;
+  return [phase13, newJd].filter(Boolean);
 }
 
 function parseBlueprints(wb) {
@@ -95,26 +117,26 @@ function parseBlueprints(wb) {
 }
 
 async function main() {
-  const sourcesEnv = (process.env.BLUEPRINT_SEED_SOURCES || "").trim();
-  if (!sourcesEnv) {
-    throw new Error(
-      "BLUEPRINT_SEED_SOURCES is not set.\n" +
-        "Provide a comma-separated list of xlsx paths, e.g.:\n" +
-        "  BLUEPRINT_SEED_SOURCES=/data/Job_Blueprint_Final_Phase13.xlsx,/data/NEW JD.xlsx"
-    );
+  const explicit =
+    !!(process.env.BLUEPRINT_SEED_SOURCES || "").trim() ||
+    !!(process.env.BLUEPRINT_XLSX_FILE || "").trim();
+
+  let sourcePaths = getSeedFileList();
+  if (!explicit) {
+    sourcePaths = sourcePaths.filter((p) => p && existsSync(p));
   }
 
-  const sourcePaths = sourcesEnv
-    .split(",")
-    .map((s) => s.trim())
-    .filter(Boolean)
-    .map((s) => resolvePath(s));
-
   const missing = sourcePaths.filter((p) => !p || !existsSync(p));
-  if (missing.length) {
+  if (explicit && missing.length) {
     throw new Error(
       `The following seed files were not found:\n${missing.map((p) => `  • ${p}`).join("\n")}\n` +
-        "Check BLUEPRINT_SEED_SOURCES and ensure the files are mounted / present."
+        "Check BLUEPRINT_SEED_SOURCES / BLUEPRINT_XLSX_FILE and ensure the files are mounted / present."
+    );
+  }
+  if (!explicit && !sourcePaths.length) {
+    throw new Error(
+      "No seed workbooks found.\n" +
+        "Set BLUEPRINT_SEED_SOURCES to a comma-separated list of xlsx paths, or place the default workbooks next to the repo (see script header)."
     );
   }
 

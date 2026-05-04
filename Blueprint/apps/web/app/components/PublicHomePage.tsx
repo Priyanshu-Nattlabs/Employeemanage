@@ -2,6 +2,7 @@
 
 import { motion } from "framer-motion";
 import { appPath, publicAssetUrl } from "@/lib/apiBase";
+import { GetStartedRoleChoice } from "./GetStartedRoleChoice";
 import { InterviewXFooter } from "./InterviewXFooter";
 
 const sectionIn = {
@@ -262,9 +263,7 @@ export function PublicHomePage() {
               </p>
             </div>
             <div className="public-btns">
-              <a href={appPath("/auth/employee/register")} className="btn-secondary">
-                Get Started
-              </a>
+              <GetStartedRoleChoice triggerClassName="btn-secondary" />
             </div>
           </motion.div>
 
