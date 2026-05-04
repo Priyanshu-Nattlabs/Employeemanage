@@ -45,7 +45,10 @@ export function getAssetPrefix(): string {
   return raw ? (raw.startsWith("/") ? raw : `/${raw}`) : "";
 }
 
-/** Client-side path including `basePath`, with trailing slash (matches next.config `trailingSlash`). */
+/**
+ * Client-side path including `basePath`, with trailing slash (matches next.config `trailingSlash`).
+ * For `next/link` and `useRouter` navigation, pass a pathname without the base prefix — Next prepends `basePath` itself.
+ */
 export function appPath(path: string): string {
   const base = getAssetPrefix().replace(/\/$/, "");
   const p = path.startsWith("/") ? path : `/${path}`;
