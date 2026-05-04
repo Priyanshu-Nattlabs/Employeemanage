@@ -4,7 +4,6 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { appPath } from "@/lib/apiBase";
 import {
-  orgGetDesignationOptions,
   orgGetPublicSignupOrgOptions,
   orgRegisterEmployee,
   setOrgAuthInStorage,
@@ -51,10 +50,7 @@ export default function EmployeeRegisterPage() {
   const [password, setPassword] = useState("");
   const [fullName, setFullName] = useState("");
   const [companyName, setCompanyName] = useState("");
-  const [designation, setDesignation] = useState("");
-  const [designationMode, setDesignationMode] = useState<"PICK" | "OTHER">("PICK");
-  const [designationOther, setDesignationOther] = useState("");
-  const [designationOptions, setDesignationOptions] = useState<string[]>([]);
+  const [designation, setDesignation] = useState("Employee");
   const [department, setDepartment] = useState("");
   const [deptMode, setDeptMode] = useState<"PICK" | "OTHER">("PICK");
   const [deptOther, setDeptOther] = useState("");
@@ -97,24 +93,6 @@ export default function EmployeeRegisterPage() {
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      try {
-        if (!inferredDomain) return;
-        const opts = await orgGetDesignationOptions();
-        if (cancelled) return;
-        setDesignationOptions(Array.isArray(opts) ? opts : []);
-      } catch {
-        if (cancelled) return;
-        setDesignationOptions([]);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [inferredDomain]);
-
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
       if (!inferredDomain) {
         setSignupOrg(null);
         setSignupOrgLoading(false);
@@ -136,11 +114,6 @@ export default function EmployeeRegisterPage() {
     };
   }, [inferredDomain]);
 
-  const effectiveDesignation = useMemo(() => {
-    if (designationMode === "OTHER") return designationOther.trim();
-    return designation.trim();
-  }, [designationMode, designationOther, designation]);
-
   const effectiveDepartment = useMemo(() => {
     if (deptMode === "OTHER") return deptOther.trim();
     return department.trim();
@@ -157,7 +130,8 @@ export default function EmployeeRegisterPage() {
     setLoading(true);
     try {
       if (!inferredDomain) throw new Error("Please enter a valid company email");
-      if (!effectiveDesignation) throw new Error("Designation is required");
+      const designationTrimmed = designation.trim();
+      if (!designationTrimmed) throw new Error("Designation is required");
       if (!effectiveDepartment) throw new Error("Department is required");
       if (!effectiveIndustry) throw new Error("Industry is required");
 
@@ -165,7 +139,7 @@ export default function EmployeeRegisterPage() {
         email,
         password,
         fullName,
-        designation: effectiveDesignation,
+        designation: designationTrimmed,
         department: effectiveDepartment,
         industry: effectiveIndustry,
         companyName,
@@ -215,46 +189,15 @@ export default function EmployeeRegisterPage() {
         </Field>
 
         <Field label="Designation">
-          <div style={{ display: "grid", gap: 8 }}>
-            <select
-              value={designationMode === "OTHER" ? "__OTHER__" : (designation || "")}
-              onChange={(e) => {
-                const v = e.target.value;
-                if (v === "__OTHER__") {
-                  setDesignationMode("OTHER");
-                  setDesignation("");
-                } else {
-                  setDesignationMode("PICK");
-                  setDesignation(v);
-                }
-              }}
-              required
-              style={inputStyle}
-              disabled={!inferredDomain || !designationOptions.length}
-            >
-              <option value="" disabled>
-                {designationOptions.length ? "Select designation" : (inferredDomain ? "Loading designations…" : "Enter email to load designations")}
-              </option>
-              {designationOptions.map((d) => (
-                <option key={d} value={d}>
-                  {d}
-                </option>
-              ))}
-              <option value="__OTHER__">Other (type…)</option>
-            </select>
-
-            {designationMode === "OTHER" ? (
-              <input
-                value={designationOther}
-                onChange={(e) => setDesignationOther(e.target.value)}
-                required
-                style={inputStyle}
-                placeholder="Type your designation"
-              />
-            ) : null}
-
-            <div style={hintStyle}>Choose from the list, or select <b>Other</b> to type a custom designation.</div>
-          </div>
+          <input
+            value={designation}
+            onChange={(e) => setDesignation(e.target.value)}
+            required
+            type="text"
+            style={inputStyle}
+            placeholder="e.g. Employee, Software Engineer"
+          />
+          <div style={hintStyle}>Defaults to <b>Employee</b>; change it to any job title you use.</div>
         </Field>
         <Field label="Industry">
           <div style={{ display: "grid", gap: 8 }}>
