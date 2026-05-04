@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { orgResendEmailOtp, orgVerifyEmailOtp, setOrgAuthInStorage } from "@/lib/orgAuth";
+import { orgDefaultLandingPath, orgResendEmailOtp, orgVerifyEmailOtp, setOrgAuthInStorage } from "@/lib/orgAuth";
 import { appPath } from "@/lib/apiBase";
 
 function domainFromEmail(email: string) {
@@ -44,7 +44,9 @@ export default function VerifyOtpPage() {
         window.location.href = appPath("/auth/employee/complete-profile");
         return;
       }
-      window.location.href = nextUrl || "/";
+      const trimmed = (nextUrl || "").trim();
+      const noSpecificNext = !trimmed || trimmed === "/";
+      window.location.href = noSpecificNext ? orgDefaultLandingPath(r.user) : trimmed;
     } catch (err: any) {
       setError(err?.message || "OTP verification failed");
     } finally {

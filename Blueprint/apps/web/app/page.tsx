@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { getApiPrefix, publicAssetUrl } from "@/lib/apiBase";
+import { appPath, getApiPrefix, publicAssetUrl } from "@/lib/apiBase";
 import { getOrgAuthFromStorage } from "@/lib/orgAuth";
 import { SiteFooter } from "@/app/components/SiteFooter";
 import { PublicHomePage } from "@/app/components/PublicHomePage";
@@ -111,6 +111,20 @@ export default function HomePage() {
       window.removeEventListener("jbv2-org-auth-changed", refreshAuth);
       window.removeEventListener("storage", refreshAuth);
     };
+  }, []);
+
+  /** Manager/HR (and admin) should not see the IC home at `/`; send them to their hub. */
+  useEffect(() => {
+    const auth = getOrgAuthFromStorage();
+    const u = auth.user as { accountType?: string; currentRole?: string } | null;
+    if (!auth?.token || !u) return;
+    if (u.accountType === "ADMIN") {
+      window.location.replace(appPath("/dashboard/admin"));
+      return;
+    }
+    if (u.accountType === "EMPLOYEE" && (u.currentRole === "MANAGER" || u.currentRole === "HR")) {
+      window.location.replace(appPath("/dashboard/manager/hub"));
+    }
   }, []);
 
   useEffect(() => {

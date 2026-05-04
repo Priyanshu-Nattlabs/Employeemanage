@@ -6,6 +6,7 @@ import { publicAssetUrl } from "@/lib/apiBase";
 import {
   clearOrgAuthInStorage,
   getOrgAuthFromStorage,
+  orgDefaultLandingPath,
   orgListMyRecommendations,
   orgUpdateRecommendationStatus,
   type RoleRecommendation,
@@ -112,13 +113,24 @@ export function NavBar() {
   const dashboardHref = isAdmin ? "/dashboard/admin" : isManagerOrHR ? "/dashboard/manager" : "/";
   const profileHref = isAdmin ? "/profile/admin" : "/profile/employee";
   const profileLabel = isAdmin ? "Admin Profile" : "Employee Profile";
-  /** Individual contributors land on the employee hub; others keep home. */
-  const brandHref = isLoggedIn && isEmployee ? "/employee/" : "/";
+  const brandHref =
+    isLoggedIn && user
+      ? orgDefaultLandingPath({
+          accountType: user.accountType,
+          currentRole: user.currentRole,
+        })
+      : "/";
+  const brandAria =
+    isLoggedIn && isManagerOrHR
+      ? "Corporate Development — go to manager and HR home"
+      : isLoggedIn && isAdmin
+        ? "Corporate Development — go to admin home"
+        : "Corporate Development — go to employee home";
 
   return (
     <header className="jb-nav">
       <div className="jb-nav__inner">
-        <Link href={brandHref} className="jb-nav__brand" aria-label="Corporate Development — go to employee home">
+        <Link href={brandHref} className="jb-nav__brand" aria-label={brandAria}>
           <img
             src={publicAssetUrl("/brand/corporate-development.png")}
             alt="Corporate Development"
