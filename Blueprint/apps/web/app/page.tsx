@@ -1,6 +1,5 @@
 "use client";
 import { useEffect, useLayoutEffect, useMemo, useState } from "react";
-import Link from "next/link";
 import { appPath, getApiPrefix, publicAssetUrl } from "@/lib/apiBase";
 import { getOrgAuthFromStorage, isOrgManagerOrHr } from "@/lib/orgAuth";
 import { SiteFooter } from "@/app/components/SiteFooter";
@@ -199,7 +198,7 @@ export default function HomePage() {
       const auth = getOrgAuthFromStorage();
       const userId = auth?.user?.id;
       if (!auth?.token || !userId) {
-        window.location.href = "/auth/employee/login";
+        window.location.href = appPath("/auth/employee/login");
         return;
       }
       const r = await fetch(`${getApiPrefix()}/api/role-preparation/ongoing?studentId=${encodeURIComponent(userId)}`);
@@ -213,18 +212,18 @@ export default function HomePage() {
             return (Number.isFinite(tb) ? tb : 0) - (Number.isFinite(ta) ? ta : 0);
           })[0];
         if (latest?.roleName) {
-          window.location.href = `/role/${encodeURIComponent(latest.roleName)}`;
+          window.location.href = appPath(`/role/${encodeURIComponent(latest.roleName)}`);
           return;
         }
       }
-      window.location.href = "/target-role";
+      window.location.href = appPath("/target-role");
     } finally {
       setResuming(false);
     }
   };
 
   const goToTargetNewRole = () => {
-    window.location.href = "/target-role";
+    window.location.href = appPath("/target-role");
   };
 
   if (!isAuthenticated) {
@@ -420,8 +419,8 @@ export default function HomePage() {
                 >
                   Target New Role
                 </button>
-                <Link
-                  href="/role/"
+                <a
+                  href={appPath("/role/")}
                   style={{
                     display: "inline-block",
                     padding: "7px 14px",
@@ -435,7 +434,7 @@ export default function HomePage() {
                   }}
                 >
                   Browse Roles
-                </Link>
+                </a>
               </div>
             </div>
 
@@ -632,8 +631,8 @@ export default function HomePage() {
             <p style={{ margin: "0 0 32px", fontSize: 15, color: "rgba(255,255,255,0.85)", maxWidth: 520, marginLeft: "auto", marginRight: "auto", lineHeight: 1.7 }}>
               Start structured employee development with role-based learning, assessments, and leadership-level tracking.
             </p>
-            <Link
-              href="/role/"
+            <a
+              href={appPath("/role/")}
               className="jb-cta-btn"
               style={{
                 display: "inline-block",
@@ -649,7 +648,7 @@ export default function HomePage() {
               }}
             >
               Start Employee Development
-            </Link>
+            </a>
             <button
               onClick={() => { void goToPreparation(); }}
               className="jb-cta-btn"

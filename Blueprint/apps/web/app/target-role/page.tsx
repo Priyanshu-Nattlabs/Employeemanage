@@ -1,8 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import Link from "next/link";
-import { getApiPrefix } from "@/lib/apiBase";
+import { appPath, getApiPrefix } from "@/lib/apiBase";
 import { getOrgAuthFromStorage } from "@/lib/orgAuth";
 
 const API = getApiPrefix();
@@ -61,7 +60,7 @@ export default function TargetRolePage() {
   useEffect(() => {
     const auth = getOrgAuthFromStorage();
     if (!auth?.token || !auth?.user || auth.user.accountType !== "EMPLOYEE") {
-      window.location.href = "/auth/employee/login";
+      window.location.href = appPath("/auth/employee/login");
       return;
     }
 
@@ -136,7 +135,7 @@ export default function TargetRolePage() {
   const selectRole = async (role: RoleOption) => {
     const auth = getOrgAuthFromStorage();
     if (!auth?.user?.id) {
-      window.location.href = "/auth/employee/login";
+      window.location.href = appPath("/auth/employee/login");
       return;
     }
     const durationMonths = Number(targetDurationMonths);
@@ -163,7 +162,7 @@ export default function TargetRolePage() {
       });
       const effectiveLevel = String(role.level || "").trim() || selectedLevel;
       if (effectiveLevel) q.set("employeeLevel", effectiveLevel);
-      window.location.href = `/role/${encodeURIComponent(roleName)}?${q.toString()}`;
+      window.location.href = `${appPath(`/role/${encodeURIComponent(roleName)}`)}?${q.toString()}`;
     } catch (e: any) {
       setError(e?.message || "Could not save target role.");
       setSavingRole("");
@@ -174,9 +173,9 @@ export default function TargetRolePage() {
     <div style={wrap}>
       <div style={card}>
         <p style={crumb}>
-          <Link href="/" style={link}>
+          <a href={appPath("/")} style={link}>
             Home
-          </Link>{" "}
+          </a>{" "}
           › Target Role
         </p>
         <h1 style={h1}>Choose your target role</h1>

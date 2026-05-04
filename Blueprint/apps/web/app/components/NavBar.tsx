@@ -1,8 +1,8 @@
 "use client";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import { useEffect, useLayoutEffect, useState, type CSSProperties } from "react";
-import { publicAssetUrl } from "@/lib/apiBase";
+import { appPath, publicAssetUrl } from "@/lib/apiBase";
 import {
   clearOrgAuthInStorage,
   getOrgAuthFromStorage,
@@ -18,7 +18,6 @@ const NOTIF_POLL_MS = 30_000;
 
 export function NavBar() {
   const pathname = usePathname();
-  const router = useRouter();
 
   const [orgAuth, setOrgAuth] = useState<{ token: string; user: any | null }>({ token: "", user: null });
   const [mounted, setMounted] = useState(false);
@@ -40,7 +39,7 @@ export function NavBar() {
 
   const logoutOrg = () => {
     clearOrgAuthInStorage();
-    window.location.href = "/";
+    window.location.href = appPath("/");
   };
 
   const user = orgAuth.user as any | null;
@@ -105,7 +104,7 @@ export function NavBar() {
     await markStatus(rec._id, "SEEN");
     setNotifOpen(false);
     setPopupRec(null);
-    router.push(`/role/${encodeURIComponent(rec.roleName)}`);
+    window.location.href = appPath(`/role/${encodeURIComponent(rec.roleName)}`);
   };
 
   const dashboardHref = isAdmin ? "/dashboard/admin" : isManagerOrHR ? "/dashboard/manager" : "/";

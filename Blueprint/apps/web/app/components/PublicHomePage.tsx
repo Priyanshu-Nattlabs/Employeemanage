@@ -1,7 +1,7 @@
 "use client";
 
-import Link from "next/link";
 import { motion } from "framer-motion";
+import { appPath, publicAssetUrl } from "@/lib/apiBase";
 import { InterviewXFooter } from "./InterviewXFooter";
 
 const sectionIn = {
@@ -262,7 +262,9 @@ export function PublicHomePage() {
               </p>
             </div>
             <div className="public-btns">
-              <Link href="/auth/employee/register" className="btn-secondary">Get Started</Link>
+              <a href={appPath("/auth/employee/register")} className="btn-secondary">
+                Get Started
+              </a>
             </div>
           </motion.div>
 
@@ -298,7 +300,7 @@ export function PublicHomePage() {
               <div className="hero-shotRow">
                 <img
                   className="hero-shot"
-                  src="/ui-images/corporate-career-ladder.png"
+                  src={publicAssetUrl("/ui-images/corporate-career-ladder.png")}
                   alt="Career progression from entry level through executive, aligned with role development and readiness"
                   loading="eager"
                 />
@@ -333,8 +335,12 @@ export function PublicHomePage() {
               <span className="tag">Assessments</span>
             </div>
             <div className="module-cta">
-              <Link href="/role/" className="module-link primary">Explore Blueprints <span aria-hidden>→</span></Link>
-              <Link href="/target-role" className="module-link">Start a plan <span aria-hidden>→</span></Link>
+              <a href={appPath("/role/")} className="module-link primary">
+                Explore Blueprints <span aria-hidden>→</span>
+              </a>
+              <a href={appPath("/target-role")} className="module-link">
+                Start a plan <span aria-hidden>→</span>
+              </a>
             </div>
           </motion.div>
 
@@ -356,8 +362,12 @@ export function PublicHomePage() {
               <span className="tag alt">Proctoring</span>
             </div>
             <div className="module-cta">
-              <Link href="/auth/manager/login" className="module-link primary">Manager / HR access <span aria-hidden>→</span></Link>
-              <Link href="/dashboard/manager/schedule-interviews" className="module-link">Open schedule hub <span aria-hidden>→</span></Link>
+              <a href={appPath("/auth/manager/login")} className="module-link primary">
+                Manager / HR access <span aria-hidden>→</span>
+              </a>
+              <a href={appPath("/dashboard/manager/schedule-interviews")} className="module-link">
+                Open schedule hub <span aria-hidden>→</span>
+              </a>
             </div>
           </motion.div>
 
@@ -379,8 +389,12 @@ export function PublicHomePage() {
               <span className="tag">Mentors</span>
             </div>
             <div className="module-cta">
-              <Link href="/auth/employee/login" className="module-link primary">Employee login <span aria-hidden>→</span></Link>
-              <Link href="/auth/employee/register" className="module-link">Create account <span aria-hidden>→</span></Link>
+              <a href={appPath("/auth/employee/login")} className="module-link primary">
+                Employee login <span aria-hidden>→</span>
+              </a>
+              <a href={appPath("/auth/employee/register")} className="module-link">
+                Create account <span aria-hidden>→</span>
+              </a>
             </div>
           </motion.div>
 
@@ -402,8 +416,12 @@ export function PublicHomePage() {
               <span className="tag alt">Tracking</span>
             </div>
             <div className="module-cta">
-              <Link href="/auth/manager/login" className="module-link primary">Open dashboard <span aria-hidden>→</span></Link>
-              <Link href="/dashboard/manager" className="module-link">Manager view <span aria-hidden>→</span></Link>
+              <a href={appPath("/auth/manager/login")} className="module-link primary">
+                Open dashboard <span aria-hidden>→</span>
+              </a>
+              <a href={appPath("/dashboard/manager")} className="module-link">
+                Manager view <span aria-hidden>→</span>
+              </a>
             </div>
           </motion.div>
         </div>

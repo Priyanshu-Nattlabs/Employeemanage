@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { appPath } from "@/lib/apiBase";
 import {
@@ -333,9 +332,9 @@ export default function EmployeeRegisterPage() {
           </button>
           <div style={{ fontSize: 13, color: "#475569" }}>
             Already have an account?{" "}
-            <Link href="/auth/employee/login" style={{ color: "#2563eb", fontWeight: 900, textDecoration: "none" }}>
+            <a href={appPath("/auth/employee/login")} style={{ color: "#2563eb", fontWeight: 900, textDecoration: "none" }}>
               Login
-            </Link>
+            </a>
           </div>
         </div>
       </form>
