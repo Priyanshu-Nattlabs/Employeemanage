@@ -124,6 +124,15 @@
   color: var(--ix-footer-accent, #054a90);
 }
 
+button.ix-site-footer__link--button {
+  cursor: pointer;
+  background: none;
+  border: 0;
+  padding: 0;
+  font: inherit;
+  text-align: left;
+}
+
 .ix-site-footer__contact {
   list-style: none;
   margin: 0;
