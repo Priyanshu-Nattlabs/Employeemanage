@@ -53,21 +53,27 @@ function getSeedFileList() {
   return [phase13, newJd];
 }
 
+function rowLooksLikeNewJdHeader(cells) {
+  const hdr = (cells || []).map(normalizeHeaderCell);
+  const hasRole = hdr.includes("role") || hdr.includes("function");
+  const hasLevel = hdr.includes("level");
+  const hasBody =
+    hdr.includes("job description") ||
+    hdr.includes("description") ||
+    hdr.includes("technical skills") ||
+    hdr.includes("technical skill");
+  return hasRole && hasLevel && hasBody;
+}
+
 function detectWorkbookFormat(wb) {
   const lower = wb.SheetNames.map((n) => String(n).trim().toLowerCase());
   if (lower.includes("roles") && lower.includes("skills")) return "phase13";
 
-  const sh0 = wb.Sheets[wb.SheetNames[0]];
-  const firstRows = utils.sheet_to_json(sh0, { header: 1, defval: "" });
-  const firstHeader = (firstRows[0] || []).map((x) => String(x || "").trim().toLowerCase());
-  const looksLikeNewJd =
-    firstHeader.includes("role") &&
-    firstHeader.includes("level") &&
-    (firstHeader.includes("technical skills") || firstHeader.includes("job description"));
-  if (looksLikeNewJd) return "newjd";
-
-  if (wb.SheetNames.length === 1 && /sheet1/i.test(wb.SheetNames[0])) {
-    if (firstHeader.includes("role") && firstHeader.includes("job description")) return "newjd";
+  for (const name of wb.SheetNames) {
+    const rows = utils.sheet_to_json(wb.Sheets[name], { header: 1, defval: "" });
+    for (let i = 0; i < Math.min(rows.length, 15); i++) {
+      if (rowLooksLikeNewJdHeader(rows[i])) return "newjd";
+    }
   }
 
   return "phase13";
@@ -85,18 +91,44 @@ const toImportance = (v) => importanceMap[v] || v || "Important";
 const toType = (v) => (String(v || "").toLowerCase() === "soft" ? "non-technical" : "technical");
 const toMonths = (v) => Math.max(1, Number(v) || 1);
 
+/** Excel often puts BOM on A1; NBSP appears in pasted headers — normalize for reliable column lookup. */
+const normalizeHeaderCell = (s) =>
+  String(s ?? "")
+    .replace(/^\uFEFF/, "")
+    .replace(/\u00A0/g, " ")
+    .trim()
+    .toLowerCase();
+
 const headerIndexMap = (row = []) => {
   const m = new Map();
-  row.forEach((h, i) => m.set(String(h || "").trim().toLowerCase(), i));
+  row.forEach((h, i) => {
+    const key = normalizeHeaderCell(h);
+    if (!key) return;
+    m.set(key, i);
+    const simple = key.replace(/\s*\([^)]*\)\s*$/, "").trim();
+    if (simple && simple !== key) m.set(simple, i);
+  });
   return m;
 };
+
+const col =
+  (idx) =>
+  (...names) => {
+    for (const n of names) {
+      const j = idx.get(n);
+      if (j !== undefined) return j;
+    }
+    return undefined;
+  };
 
 // ── parse Skills sheet ─────────────────────────────────────────────────────
 function parseSkills(wb) {
   const rows = utils.sheet_to_json(wb.Sheets["Skills"], { header: 1, defval: "" });
   const byRole = {};
   for (const r of rows.slice(1)) {
-    const roleName = String(r[0] || "").trim();
+    const roleName = String(r[0] || "")
+      .replace(/^\uFEFF/, "")
+      .trim();
     if (!roleName) continue;
     if (!byRole[roleName]) byRole[roleName] = [];
     byRole[roleName].push({
@@ -114,11 +146,92 @@ function parseSkills(wb) {
 }
 
 // ── parse Roles sheet ──────────────────────────────────────────────────────
+const stripDataCell = (v) => String(v ?? "").replace(/^\uFEFF/, "").trim();
+
 function parseRoles(wb, skillsByRole) {
   const rows = utils.sheet_to_json(wb.Sheets["Roles"], { header: 1, defval: "" });
+  if (!rows.length) return [];
+
+  let headerRow = -1;
+  let idx = null;
+  for (let i = 0; i < Math.min(rows.length, 10); i++) {
+    const m = headerIndexMap(rows[i]);
+    const get = col(m);
+    const iName = get("name", "role", "function");
+    if (iName === undefined) continue;
+    let score = 1;
+    if (get("description", "summary") !== undefined) score++;
+    if (get("category", "type") !== undefined) score++;
+    if (get("key responsibilities", "responsibilities", "industries", "isactive") !== undefined) score++;
+    if (score >= 2) {
+      headerRow = i;
+      idx = m;
+      break;
+    }
+  }
+
+  if (headerRow >= 0 && idx) {
+    const get = col(idx);
+    const iName = get("name", "role", "function");
+    const iDesc = get("description", "summary");
+    const iCategory = get("category");
+    const iActive = get("isactive", "active");
+    const iSalary = get("expected salary", "expected sallary", "expected_salary");
+    const iResp = get("key responsibilities", "responsibilities");
+    const iInd = get("industries", "industry");
+    const iEdu = get("educations", "education");
+    const iSpec = get("specializations", "specialization");
+
+    const docs = [];
+    for (const r of rows.slice(headerRow + 1)) {
+      const name = stripDataCell(r[iName]);
+      if (!name || /^role$/i.test(name) || /^function$/i.test(name)) continue;
+
+      const responsibilities = split(iResp !== undefined ? r[iResp] : "");
+      const industries = split(iInd !== undefined ? r[iInd] : "");
+      const educations = split(iEdu !== undefined ? r[iEdu] : "");
+      const specializations = split(iSpec !== undefined ? r[iSpec] : "");
+
+      const descText = iDesc !== undefined ? stripDataCell(r[iDesc]) : "";
+      const categoryStr = iCategory !== undefined ? stripDataCell(r[iCategory]) : "Role";
+      const isActiveVal =
+        iActive !== undefined ? String(r[iActive]).toLowerCase() !== "false" : true;
+
+      const jobDescription = {
+        summary: descText,
+        industry: industries[0] || "",
+        responsibilities: responsibilities.length ? responsibilities.join("; ") : descText,
+        requirements: `Relevant education in ${educations.join(", ") || "applicable field"}`,
+        expectedSalary: iSalary !== undefined ? stripDataCell(r[iSalary]) : "",
+      };
+
+      const skillRequirements = (skillsByRole[name] || []).filter((s) => s.skillName);
+
+      docs.push({
+        type: "role",
+        name,
+        level: "",
+        description: descText,
+        category: categoryStr || "Role",
+        isActive: isActiveVal,
+        jobDescription,
+        industries,
+        educations,
+        specializations,
+        skillRequirements,
+        skills: {
+          technical: skillRequirements.filter((s) => s.skillType === "technical").map((s) => s.skillName),
+          soft: skillRequirements.filter((s) => s.skillType === "non-technical").map((s) => s.skillName),
+        },
+      });
+    }
+    return docs;
+  }
+
+  // Legacy Phase13 layout: two leading rows, then fixed columns (name, …, responsibilities…).
   const docs = [];
   for (const r of rows.slice(2)) {
-    const name = String(r[0] || "").trim();
+    const name = stripDataCell(r[0]);
     if (!name || name === "Role") continue;
 
     const responsibilities = split(r[6]);
@@ -139,7 +252,6 @@ function parseRoles(wb, skillsByRole) {
     docs.push({
       type: "role",
       name,
-      /** Align with NEW JD upserts: unique index { type, name, level } */
       level: "",
       description: String(r[2] || "").trim(),
       category: String(r[3] || "Role").trim(),
@@ -159,27 +271,39 @@ function parseRoles(wb, skillsByRole) {
 }
 
 // ── parse NEW JD one-sheet format ───────────────────────────────────────────
+function findNewJdHeaderContext(wb) {
+  for (const sheetName of wb.SheetNames) {
+    const rows = utils.sheet_to_json(wb.Sheets[sheetName], { header: 1, defval: "" });
+    for (let i = 0; i < Math.min(rows.length, 25); i++) {
+      if (rowLooksLikeNewJdHeader(rows[i])) return { sheetName, rows, headerRow: i };
+    }
+  }
+  return null;
+}
+
 function parseRolesFromNewJdSheet(wb) {
-  const sheetName = wb.SheetNames[0];
-  const rows = utils.sheet_to_json(wb.Sheets[sheetName], { header: 1, defval: "" });
-  if (!rows.length) return [];
-  const idx = headerIndexMap(rows[0]);
-  const iRole = idx.get("role");
-  const iLevel = idx.get("level");
-  const iDesc = idx.get("job description");
-  const iSalary = idx.get("expected sallary") ?? idx.get("expected salary");
-  const iTech = idx.get("technical skills");
-  const iSoft = idx.get("soft skills");
-  if (iRole === undefined || iDesc === undefined) return [];
+  const ctx = findNewJdHeaderContext(wb);
+  if (!ctx) return [];
+  const { rows, headerRow, sheetName } = ctx;
+  console.log(`      NEW JD: sheet "${sheetName}", header row ${headerRow + 1}`);
+  const idx = headerIndexMap(rows[headerRow]);
+  const get = col(idx);
+  const iRole = get("role", "function");
+  const iLevel = get("level");
+  const iDesc = get("job description", "description", "jd", "job summary");
+  const iSalary = get("expected sallary", "expected salary", "expected_salary");
+  const iTech = get("technical skills", "technical skill", "hard skills");
+  const iSoft = get("soft skills", "soft skill", "behavioral skills");
+  if (iRole === undefined) return [];
 
   const docs = [];
-  for (const r of rows.slice(1)) {
-    const name = String(r[iRole] || "").trim();
+  for (const r of rows.slice(headerRow + 1)) {
+    const name = stripDataCell(r[iRole]);
     if (!name) continue;
-    const levelRaw = iLevel !== undefined ? String(r[iLevel] ?? "").trim() : "";
+    const levelRaw = iLevel !== undefined ? stripDataCell(r[iLevel]) : "";
     // Normalize empty/blank level to empty string so unique index key stays stable.
     const level = levelRaw ? String(levelRaw) : "";
-    const desc = String(r[iDesc] || "").trim();
+    const desc = iDesc !== undefined ? stripDataCell(r[iDesc]) : "";
     const tech = split(iTech !== undefined ? r[iTech] : "");
     const soft = split(iSoft !== undefined ? r[iSoft] : "");
     const allSkills = [
