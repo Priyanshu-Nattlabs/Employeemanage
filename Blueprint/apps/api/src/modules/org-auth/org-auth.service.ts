@@ -1578,9 +1578,9 @@ export class OrgAuthService {
     if (!domain) return [];
     const structure = await this.orgStructureModel.findOne({ companyDomain: domain }).lean();
     const list = Array.isArray((structure as any)?.departments) ? (structure as any).departments : [];
-    const names = list
+    const names: string[] = list
       .map((d: any) => String(d?.name || "").trim())
-      .filter(Boolean);
+      .filter((n: string): n is string => n.length > 0);
     return Array.from(new Set(names)).sort((a, b) => a.localeCompare(b));
   }
 

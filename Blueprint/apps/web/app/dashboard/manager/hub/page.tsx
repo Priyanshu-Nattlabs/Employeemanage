@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, useCallback } from "react";
-import { getOrgAuthFromStorage, clearOrgAuthInStorage } from "@/lib/orgAuth";
+import { getOrgAuthFromStorage, clearOrgAuthInStorage, isOrgManagerOrHr } from "@/lib/orgAuth";
 import { apiUrl, appPath } from "@/lib/apiBase";
 import { buildInterviewXIndustryOpenUrl } from "@/lib/interviewx";
 
@@ -280,7 +280,7 @@ export default function ManagerHubPage() {
   useEffect(() => {
     const { token: tok, user: u } = getOrgAuthFromStorage();
     if (!tok || !u) { window.location.href = appPath("/auth/manager/login"); return; }
-    if (!(u.accountType === "EMPLOYEE" && (u.currentRole === "MANAGER" || u.currentRole === "HR"))) {
+    if (!isOrgManagerOrHr(u)) {
       window.location.href = appPath("/auth/manager/login"); return;
     }
     setUser(u); setToken(tok); loadData(tok);
@@ -325,6 +325,8 @@ export default function ManagerHubPage() {
         {/* Top nav */}
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 24px", borderBottom: "1px solid rgba(255,255,255,0.08)" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+            <a href={appPath("/dashboard/manager/home")} style={{ fontSize: 12, fontWeight: 800, color: "rgba(255,255,255,0.55)", textDecoration: "none", letterSpacing: 0.3 }}>← Portals</a>
+            <span style={{ color: "rgba(255,255,255,0.2)" }}>•</span>
             <span style={{ fontSize: 13, fontWeight: 700, color: "rgba(255,255,255,0.5)", letterSpacing: 0.5 }}>OVERVIEW HUB</span>
             <span style={{ color: "rgba(255,255,255,0.2)" }}>•</span>
             <span style={{ fontSize: 13, color: "rgba(255,255,255,0.7)", fontWeight: 600 }}>{user?.companyName || "—"}</span>
