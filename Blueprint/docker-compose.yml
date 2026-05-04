@@ -2,10 +2,9 @@ name: job-blueprint-v2
 
 services:
   mongodb:
-    # Use MongoDB 6+ so existing volumes created by newer mongod (WiredTiger index format) still start.
-    # If you must stay on 4.4-only data, pin mongo:4.4 and run `docker compose down -v` once to reset the volume.
-    # Host port defaults to 27027 so another Mongo on 27017 does not block startup.
-    image: mongo:7
+    # mongo:5+ often requires CPU AVX; common VPS hosts fail healthchecks. Pin 4.4 for reliable deploys.
+    # If this volume was created by Mongo 7+, run once: docker compose down && docker volume rm job-blueprint-v2_job-blueprint-v2-mongo-data (data loss).
+    image: mongo:4.4
     container_name: job-blueprint-v2-mongodb
     # Host 27017 is often taken (local MongoDB / another stack). Backend still uses mongodb:27017 on the Docker network.
     ports:
@@ -14,7 +13,7 @@ services:
       - job-blueprint-v2-mongo-data:/data/db
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping')"]
+      test: ["CMD", "mongo", "--quiet", "--eval", "db.adminCommand('ping')"]
       interval: 5s
       timeout: 10s
       retries: 24
@@ -106,8 +105,35 @@ services:
         condition: service_healthy
     environment:
       MONGODB_URI: mongodb://mongodb:27017/job_blueprint_v2
-      BLUEPRINT_SEED_SOURCES: "/app/Job_Blueprint_Final_Phase13.xlsx,/app/NEW JD.xlsx"
+      # Prefer NEW JD 123.xlsx (current workbook); falls back if you only keep NEW JD.xlsx at repo root.
+      BLUEPRINT_SEED_SOURCES: "/app/Job_Blueprint_Final_Phase13.xlsx,/app/NEW JD 123.xlsx"
     command: ["sh", "-c", "npm install && node src/scripts/seed-from-xlsx.mjs"]
+
+  # Non-destructive upsert from NEW JD 123.xlsx only (no Phase13 catalog wipe). Used by VPS deploy after stack is up
+  # so Excel updates apply even when blueprints is already populated (ensure-blueprint-seed skips in that case).
+  # Run manually: docker compose run --rm seed-new-jd
+  seed-new-jd:
+    image: node:22-bookworm-slim
+    working_dir: /app/apps/api
+    volumes:
+      - .:/app
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    environment:
+      MONGODB_URI: mongodb://mongodb:27017/job_blueprint_v2
+      BLUEPRINT_SEED_SOURCES: "/app/NEW JD 123.xlsx"
+    restart: "no"
+    command:
+      - sh
+      - -c
+      - |
+        if [ ! -f "/app/NEW JD 123.xlsx" ]; then
+          echo "ℹ️  NEW JD 123.xlsx not found at Blueprint repo root — skipping NEW JD upsert."
+          exit 0
+        fi
+        if [ ! -d node_modules/mongodb ]; then npm install; fi
+        node src/scripts/seed-from-xlsx.mjs
 
 volumes:
   job-blueprint-v2-mongo-data:

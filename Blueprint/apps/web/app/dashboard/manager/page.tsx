@@ -489,7 +489,7 @@ function ManagerDashboardContent() {
           </div>
           <div style={{ marginTop: 18, display: "flex", flexWrap: "wrap", gap: 10, alignItems: "center" }}>
             <Link
-              href="/dashboard/manager/schedule-interviews/"
+              href="/dashboard/manager/interviews/"
               className="manager-cta-link"
               style={{
                 ...btnScheduleHub,

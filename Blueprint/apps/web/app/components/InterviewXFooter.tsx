@@ -12,7 +12,7 @@ const PLATFORM_LINKS: Array<{ href: string; label: string }> = [
   { href: "/", label: "Home" },
   { href: "/role/", label: "Role Blueprints" },
   { href: "/dashboard/manager", label: "Monitoring" },
-  { href: "/dashboard/manager/schedule-interviews", label: "AI Interviews" },
+  { href: "/dashboard/manager/interviews", label: "AI Interviews" },
 ];
 
 const COMPANY_LINKS_TOP: Array<{ href: string; label: string }> = [{ href: "/auth/manager/login", label: "Request Demo" }];

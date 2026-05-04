@@ -2,6 +2,7 @@
 
 import { motion } from "framer-motion";
 import { appPath, publicAssetUrl } from "@/lib/apiBase";
+import { buildInterviewXAiInterviewUrl, buildInterviewXIndustryOpenUrl } from "@/lib/interviewx";
 import { GetStartedRoleChoice } from "./GetStartedRoleChoice";
 import { InterviewXFooter } from "./InterviewXFooter";
 
@@ -361,11 +362,11 @@ export function PublicHomePage() {
               <span className="tag alt">Proctoring</span>
             </div>
             <div className="module-cta">
-              <a href={appPath("/auth/manager/login")} className="module-link primary">
-                Manager / HR access <span aria-hidden>→</span>
+              <a href={buildInterviewXAiInterviewUrl({})} className="module-link primary">
+                Open InterviewX (managers) <span aria-hidden>→</span>
               </a>
-              <a href={appPath("/dashboard/manager/schedule-interviews")} className="module-link">
-                Open schedule hub <span aria-hidden>→</span>
+              <a href={buildInterviewXIndustryOpenUrl()} className="module-link">
+                Interview dashboard <span aria-hidden>→</span>
               </a>
             </div>
           </motion.div>

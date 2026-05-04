@@ -1,4 +1,4 @@
-# VPS / reverse-proxy subpath: build Next with basePath /job-blueprint-v2 and public InterviewX URL.
+# VPS: Blueprint at site root; InterviewX entry is /interviewx on the same host (see deploy/vps/nginx-edge*.conf).
 # Usage (from this directory):
 #   export VPS_PUBLIC_URL=https://saarthiworkforce.com
 #   docker compose -f docker-compose.yml -f docker-compose.vps.yml up -d --build
@@ -6,6 +6,6 @@ services:
   frontend:
     build:
       args:
-        NEXT_PUBLIC_BASE_PATH: /job-blueprint-v2
+        NEXT_PUBLIC_BASE_PATH: ""
         NEXT_PUBLIC_SAARTHIX_URL: ${VPS_PUBLIC_URL:-http://127.0.0.1}
-        NEXT_PUBLIC_INTERVIEWX_ORIGIN: ${VPS_PUBLIC_URL:-http://127.0.0.1}
+        NEXT_PUBLIC_INTERVIEWX_ORIGIN: ${VPS_PUBLIC_URL:-http://127.0.0.1}/interviewx

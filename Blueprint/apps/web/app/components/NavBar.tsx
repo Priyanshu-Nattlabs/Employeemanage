@@ -109,16 +109,23 @@ export function NavBar() {
     router.push(`/role/${encodeURIComponent(rec.roleName)}`);
   };
 
-  const dashboardHref = isAdmin ? "/dashboard/admin" : isManagerOrHR ? "/dashboard/manager" : "/";
+  const dashboardHref = isAdmin ? "/dashboard/admin" : isManagerOrHR ? "/dashboard/manager/home" : "/";
   const profileHref = isAdmin ? "/profile/admin" : "/profile/employee";
   const profileLabel = isAdmin ? "Admin Profile" : "Employee Profile";
-  /** Individual contributors land on the employee hub; others keep home. */
-  const brandHref = isLoggedIn && isEmployee ? "/employee/" : "/";
+  /** Employees → employee hub; Manager/HR → manager portal home; others → marketing home. */
+  const brandHref =
+    isLoggedIn && isEmployee ? "/employee/" : isLoggedIn && isManagerOrHR ? "/dashboard/manager/home" : "/";
+  const brandAriaLabel =
+    isLoggedIn && isEmployee
+      ? "Corporate Development — go to employee home"
+      : isLoggedIn && isManagerOrHR
+        ? "Corporate Development — go to manager home"
+        : "Corporate Development — home";
 
   return (
     <header className="jb-nav">
       <div className="jb-nav__inner">
-        <Link href={brandHref} className="jb-nav__brand" aria-label="Corporate Development — go to employee home">
+        <Link href={brandHref} className="jb-nav__brand" aria-label={brandAriaLabel}>
           <img
             src={publicAssetUrl("/brand/corporate-development.png")}
             alt="Corporate Development"
