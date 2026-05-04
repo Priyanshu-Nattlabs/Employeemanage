@@ -118,16 +118,18 @@ export function NavBar() {
   return (
     <header className="jb-nav">
       <div className="jb-nav__inner">
-        <Link href={brandHref} className="jb-nav__brand" aria-label="Corporate Development — go to employee home">
-          <img
-            src={publicAssetUrl("/brand/corporate-development.png")}
-            alt="Corporate Development"
-            width={534}
-            height={80}
-            className="jb-nav__logo"
-            decoding="async"
-            fetchPriority="high"
-          />
+        <Link href={brandHref} className="jb-nav__brand" aria-label="SX Workforce — go to home">
+          <span className="jb-nav__logoWrap">
+            <img
+              src={publicAssetUrl("/brand/sx-workforce-transparent.png")}
+              alt="SX Workforce"
+              width={640}
+              height={200}
+              className="jb-nav__logo"
+              decoding="async"
+              fetchPriority="high"
+            />
+          </span>
         </Link>
 
         <div style={{ flex: 1, minWidth: 0 }} />
