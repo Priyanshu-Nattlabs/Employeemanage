@@ -6,9 +6,11 @@
     "apps/web"
   ],
   "scripts": {
-    "dev:api": "npm --workspace apps/api run start:dev",
+    "dev:api": "npm run seed:ensure && npm --workspace apps/api run start:dev",
+    "dev:api:only": "npm --workspace apps/api run start:dev",
     "dev:web": "npm --workspace apps/web run dev",
     "seed": "npm --workspace apps/api run seed:xlsx",
+    "seed:ensure": "npm --workspace apps/api run seed:ensure",
     "seed:new-jd": "node scripts/seed-new-jd-workbook.mjs",
     "seed:org-structure": "npm --workspace apps/api run seed:org-structure:xlsx",
     "seed:master-functions": "npm --workspace apps/api run seed:master-functions:csv",
