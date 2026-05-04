@@ -2,10 +2,10 @@ name: job-blueprint-v2
 
 services:
   mongodb:
-    # Pinned to MongoDB 4.4.x per project requirement (shell is `mongo`, not `mongosh`).
+    # Use MongoDB 6+ so existing volumes created by newer mongod (WiredTiger index format) still start.
+    # If you must stay on 4.4-only data, pin mongo:4.4 and run `docker compose down -v` once to reset the volume.
     # Host port defaults to 27027 so another Mongo on 27017 does not block startup.
-    # If this DB was ever used with Mongo 7+, the data dir is incompatible: `docker compose down -v` once, then up again.
-    image: mongo:4.4
+    image: mongo:7
     container_name: job-blueprint-v2-mongodb
     # Host 27017 is often taken (local MongoDB / another stack). Backend still uses mongodb:27017 on the Docker network.
     ports:
@@ -14,7 +14,7 @@ services:
       - job-blueprint-v2-mongo-data:/data/db
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "mongo", "--quiet", "--eval", "db.adminCommand('ping')"]
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping')"]
       interval: 5s
       timeout: 10s
       retries: 24
