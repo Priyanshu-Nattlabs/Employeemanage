@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { GetStartedRoleChoice } from "./GetStartedRoleChoice";
 import "./InterviewXFooter.css";
 
 function sxBase(): string {
@@ -14,9 +15,8 @@ const PLATFORM_LINKS: Array<{ href: string; label: string }> = [
   { href: "/dashboard/manager/schedule-interviews", label: "AI Interviews" },
 ];
 
-const COMPANY_LINKS: Array<{ href: string; label: string; external?: boolean }> = [
-  { href: "/auth/manager/login", label: "Request Demo" },
-  { href: "/auth/employee/register", label: "Get Started" },
+const COMPANY_LINKS_TOP: Array<{ href: string; label: string }> = [{ href: "/auth/manager/login", label: "Request Demo" }];
+const COMPANY_LINKS_REST: Array<{ href: string; label: string }> = [
   { href: "/industry", label: "Industries" },
   { href: "/education", label: "Education" },
 ];
@@ -124,7 +124,17 @@ export function InterviewXFooter() {
             <div className="ix-site-footer__col">
               <p className="ix-site-footer__heading">Explore</p>
               <ul className="ix-site-footer__links">
-                {COMPANY_LINKS.map((l) => (
+                {COMPANY_LINKS_TOP.map((l) => (
+                  <li key={l.href}>
+                    <Link href={l.href} className="ix-site-footer__link">
+                      {l.label}
+                    </Link>
+                  </li>
+                ))}
+                <li>
+                  <GetStartedRoleChoice triggerClassName="ix-site-footer__link ix-site-footer__link--button" />
+                </li>
+                {COMPANY_LINKS_REST.map((l) => (
                   <li key={l.href}>
                     <Link href={l.href} className="ix-site-footer__link">
                       {l.label}

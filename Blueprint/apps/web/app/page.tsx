@@ -365,7 +365,7 @@ export default function HomePage() {
                 className="jb-hero-ref-title"
                 style={{
                   margin: "0 0 9px",
-                  fontSize: "clamp(20px, 3.02vw, 40px)",
+                  fontSize: "clamp(24px, 3.624vw, 48px)",
                   fontWeight: 800,
                   lineHeight: 1.12,
                   letterSpacing: "-0.03em",
@@ -375,7 +375,7 @@ export default function HomePage() {
                 <br />
                 Clearly Tracked
               </h1>
-              <p className="jb-fade2" style={{ margin: "0 0 16px", fontSize: 11, color: "rgba(71,84,103,0.92)", lineHeight: 1.68, maxWidth: 446 }}>
+              <p className="jb-fade2" style={{ margin: "0 0 16px", fontSize: 13.2, color: "rgba(71,84,103,0.92)", lineHeight: 1.68, maxWidth: 446 }}>
                 This platform helps every employee plan their next role, learn required skills, complete assessments, and track progress with clear visibility for both employee and company authority.
               </p>
               <div className="jb-fade3" style={{ marginTop: 8, display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "center" }}>
@@ -388,7 +388,7 @@ export default function HomePage() {
                     border: "2px solid #4f46e5",
                     background: "linear-gradient(90deg,#4f46e5 0%,#054a90 55%,#00bfa6 100%)",
                     color: "#fff",
-                    fontSize: 11,
+                    fontSize: 13.2,
                     fontWeight: 700,
                     cursor: "pointer",
                   }}
@@ -404,7 +404,7 @@ export default function HomePage() {
                     border: "2px solid #054a90",
                     background: "#054a90",
                     color: "#fff",
-                    fontSize: 11,
+                    fontSize: 13.2,
                     fontWeight: 700,
                     cursor: "pointer",
                   }}
@@ -420,7 +420,7 @@ export default function HomePage() {
                     border: "2px solid #4f46e5",
                     background: "#fff",
                     color: "#4f46e5",
-                    fontSize: 11,
+                    fontSize: 13.2,
                     fontWeight: 700,
                     textDecoration: "none",
                   }}

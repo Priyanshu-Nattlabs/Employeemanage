@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { motion } from "framer-motion";
+import { GetStartedRoleChoice } from "./GetStartedRoleChoice";
 import { InterviewXFooter } from "./InterviewXFooter";
 
 const sectionIn = {
@@ -262,7 +263,7 @@ export function PublicHomePage() {
               </p>
             </div>
             <div className="public-btns">
-              <Link href="/auth/employee/register" className="btn-secondary">Get Started</Link>
+              <GetStartedRoleChoice triggerClassName="btn-secondary" />
             </div>
           </motion.div>
 

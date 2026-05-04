@@ -9,7 +9,8 @@
  *   BLUEPRINT_SEED_SOURCES   — comma-separated paths (first wins Phase13 full seed; NEW JD files upsert). Docker: /app/...
  *   BLUEPRINT_XLSX_FILE      — single file (backward compatible)
  *
- * Defaults (run from apps/api): ../../Job_Blueprint_Final_Phase13.xlsx then ../../NEW JD.xlsx
+ * Defaults (run from apps/api): ../../Job_Blueprint_Final_Phase13.xlsx then ../../NEW JD 123.xlsx (if missing, ../../NEW JD.xlsx).
+ * One-command NEW JD only: from Blueprint repo root run `npm run seed:new-jd` (see scripts/seed-new-jd-workbook.mjs).
  */
 import { readFileSync, existsSync } from "fs";
 import path from "path";
@@ -45,10 +46,11 @@ function getSeedFileList() {
   }
   const single = (process.env.BLUEPRINT_XLSX_FILE || "").trim();
   if (single) return [resolveSeedPath(single)];
-  return [
-    resolveSeedPath("../../Job_Blueprint_Final_Phase13.xlsx"),
-    resolveSeedPath("../../NEW JD.xlsx"),
-  ];
+  const phase13 = resolveSeedPath("../../Job_Blueprint_Final_Phase13.xlsx");
+  const jd123 = resolveSeedPath("../../NEW JD 123.xlsx");
+  const jdLegacy = resolveSeedPath("../../NEW JD.xlsx");
+  const newJd = existsSync(jd123) ? jd123 : jdLegacy;
+  return [phase13, newJd];
 }
 
 function detectWorkbookFormat(wb) {

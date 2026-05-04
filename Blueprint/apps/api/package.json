@@ -6,6 +6,7 @@
     "start:dev": "ts-node-dev --respawn --transpile-only src/main.ts",
     "import:old-blueprint": "ts-node-dev --transpile-only --exit-child src/scripts/import-old-blueprint.ts",
     "seed:xlsx": "node src/scripts/seed-from-xlsx.mjs",
+    "seed:new-jd": "node ../../scripts/seed-new-jd-workbook.mjs",
     "seed:org-structure:xlsx": "node src/scripts/seed-org-structure-from-xlsx.mjs",
     "seed:master-functions:csv": "node src/scripts/seed-master-functions-mapping-from-csv.mjs",
     "build:signup-catalog": "node scripts/build-signup-org-catalog.mjs",
