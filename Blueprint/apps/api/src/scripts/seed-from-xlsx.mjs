@@ -328,10 +328,15 @@ function parseRolesFromNewJdSheet(wb) {
         isOptional: false,
       })),
     ];
+    const roleLower = name.trim().toLowerCase();
+    const levelLc = level.trim().toLowerCase();
     docs.push({
       type: "role",
       name,
       level,
+      /** Align with legacy Mongo unique index + lookups (avoid duplicate null,null). */
+      roleLower,
+      functionLower: levelLc || roleLower,
       description: desc,
       category: "Role",
       isActive: true,
@@ -436,14 +441,24 @@ async function seedNewJdUpsert(wb, col) {
   } catch {
     /* legacy */
   }
+  try {
+    await col.dropIndex("roleLower_1_functionLower_1");
+  } catch {
+    /* legacy / absent */
+  }
 
   const roles = parseRolesFromNewJdSheet(wb);
   console.log(`      Roles parsed: ${roles.length}`);
   let upserts = 0;
   for (const roleDoc of roles) {
     const roleLevelKey = String(roleDoc.level ?? "").trim();
+    const filter = {
+      type: "role",
+      name: roleDoc.name,
+      level: roleLevelKey,
+    };
     const r = await col.updateOne(
-      { type: "role", name: roleDoc.name, level: roleLevelKey },
+      filter,
       { $set: roleDoc },
       { upsert: true },
     );

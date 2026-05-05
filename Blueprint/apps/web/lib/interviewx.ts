@@ -35,11 +35,14 @@ function interviewXBase(): string {
     const { hostname, protocol, port } = window.location;
     if (hostname && hostname !== "localhost" && hostname !== "127.0.0.1") {
       const p = port ? `:${port}` : "";
-      return normalizeOrigin(`${protocol}//${hostname}${p}`);
+      let o = normalizeOrigin(`${protocol}//${hostname}${p}`);
+      // InterviewX is mounted at /interviewx on the public host; path-only fallbacks must include it.
+      if (o && !o.endsWith("/interviewx")) o = `${o}/interviewx`;
+      return o;
     }
   }
 
-  return "http://localhost:3300";
+  return "http://localhost:3300/interviewx";
 }
 
 /**
