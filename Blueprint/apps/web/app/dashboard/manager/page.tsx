@@ -50,6 +50,9 @@ function ManagerDashboardContent() {
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<"ALL" | "ACTIVE" | "NOT_STARTED">("ALL");
   const [sortKey, setSortKey] = useState<"NAME" | "PROGRESS_DESC" | "PROGRESS_ASC" | "RECENT_TEST">("PROGRESS_DESC");
+  const [industryFilter, setIndustryFilter] = useState<string>("ALL");
+  const [departmentFilter, setDepartmentFilter] = useState<string>("ALL");
+  const [staffRoleFilter, setStaffRoleFilter] = useState<"ALL" | "EMPLOYEE" | "MANAGER" | "HR">("ALL");
 
   const [inviteFile, setInviteFile] = useState<File | null>(null);
   const inviteFileInputRef = useRef<HTMLInputElement>(null);
@@ -156,6 +159,22 @@ function ManagerDashboardContent() {
   // ==== Aggregations / comparison stats ====
   const stats = useMemo(() => computeStats(rows), [rows]);
 
+  const filterOptions = useMemo(() => {
+    const industries = new Set<string>();
+    const departments = new Set<string>();
+    for (const r of rows) {
+      const e = r.employee || {};
+      const ind = String(e.industry || "").trim();
+      const dept = String(e.department || "").trim();
+      if (ind) industries.add(ind);
+      if (dept) departments.add(dept);
+    }
+    return {
+      industries: Array.from(industries).sort((a, b) => a.localeCompare(b)),
+      departments: Array.from(departments).sort((a, b) => a.localeCompare(b)),
+    };
+  }, [rows]);
+
   const filteredRows = useMemo(() => {
     const q = query.trim().toLowerCase();
     let out = rows.filter((r) => {
@@ -163,6 +182,11 @@ function ManagerDashboardContent() {
       const ongoing = Array.isArray(r.ongoing) ? r.ongoing : [];
       if (statusFilter === "ACTIVE" && ongoing.length === 0) return false;
       if (statusFilter === "NOT_STARTED" && ongoing.length > 0) return false;
+      if (isHR) {
+        if (industryFilter !== "ALL" && String(e.industry || "").trim() !== industryFilter) return false;
+        if (departmentFilter !== "ALL" && String(e.department || "").trim() !== departmentFilter) return false;
+        if (staffRoleFilter !== "ALL" && String(e.currentRole || "").toUpperCase() !== staffRoleFilter) return false;
+      }
       if (!q) return true;
       const hay = [e.fullName, e.email, e.designation, e.department, e.employeeId]
         .map((x) => String(x || "").toLowerCase())
@@ -188,7 +212,7 @@ function ManagerDashboardContent() {
     });
 
     return out;
-  }, [rows, query, statusFilter, sortKey]);
+  }, [rows, query, statusFilter, sortKey, isHR, industryFilter, departmentFilter, staffRoleFilter]);
 
   const visibleEmployeeRows = useMemo(() => {
     if (employeeTableExpanded) return filteredRows;
@@ -272,7 +296,7 @@ function ManagerDashboardContent() {
                 {greeting}, <span style={{ color: "#fef3c7" }}>{firstName}</span> <span style={{ marginLeft: 4 }}>👋</span>
               </h1>
               <div style={bannerSub}>
-                {isHR ? "HR view · " : "Manager view · "}
+                Monitoring dashboard · {isHR ? "HR view · " : "Manager view · "}
                 Viewing <b style={{ color: "#fff" }}>{scopeLabel}</b>
                 <span style={{ opacity: 0.6 }}> · {stats.total} employees · {stats.active} actively preparing</span>
               </div>
@@ -568,6 +592,52 @@ function ManagerDashboardContent() {
               placeholder="Search name, email, designation…"
               style={{ ...inputStyle, width: "100%", minWidth: 0 }}
             />
+            {isHR ? (
+              <select
+                className="manager-toolbar-field"
+                value={industryFilter}
+                onChange={(e) => setIndustryFilter(e.target.value)}
+                style={{ ...inputStyle, width: "100%", minWidth: 0 }}
+                title="Filter by industry"
+              >
+                <option value="ALL">All industries</option>
+                {filterOptions.industries.map((x) => (
+                  <option key={x} value={x}>
+                    {x}
+                  </option>
+                ))}
+              </select>
+            ) : null}
+            {isHR ? (
+              <select
+                className="manager-toolbar-field"
+                value={departmentFilter}
+                onChange={(e) => setDepartmentFilter(e.target.value)}
+                style={{ ...inputStyle, width: "100%", minWidth: 0 }}
+                title="Filter by department"
+              >
+                <option value="ALL">All departments</option>
+                {filterOptions.departments.map((x) => (
+                  <option key={x} value={x}>
+                    {x}
+                  </option>
+                ))}
+              </select>
+            ) : null}
+            {isHR ? (
+              <select
+                className="manager-toolbar-field"
+                value={staffRoleFilter}
+                onChange={(e) => setStaffRoleFilter(e.target.value as any)}
+                style={{ ...inputStyle, width: "100%", minWidth: 0 }}
+                title="Filter by staff role"
+              >
+                <option value="ALL">Employee + Manager</option>
+                <option value="EMPLOYEE">Employees only</option>
+                <option value="MANAGER">Managers only</option>
+                <option value="HR">HR only</option>
+              </select>
+            ) : null}
             <select
               className="manager-toolbar-field"
               value={statusFilter}

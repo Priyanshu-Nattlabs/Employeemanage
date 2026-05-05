@@ -1094,6 +1094,20 @@ export class OrgAuthService {
       .lean();
   }
 
+  /**
+   * HR visibility: list *all* staff accounts in the company domain.
+   * Includes EMPLOYEE, MANAGER, HR (all are accountType EMPLOYEE).
+   */
+  async getEmployeesForHr(companyDomain: string) {
+    const domain = normalizeDomain(companyDomain);
+    const base: any = {
+      companyDomain: domain,
+      accountType: "EMPLOYEE",
+      currentRole: { $in: ["EMPLOYEE", "MANAGER", "HR"] },
+    };
+    return this.companyUserModel.find(base).select("-passwordHash").sort({ createdAt: -1 }).lean();
+  }
+
   async getEmployeesForAdmin(companyDomain: string, companyName: string) {
     const domain = normalizeDomain(companyDomain);
     const name = (companyName || "").trim();
@@ -1206,8 +1220,16 @@ export class OrgAuthService {
     });
   }
 
-  async getEmployeesActivityForManager(companyDomain: string, department?: string, managerEmail?: string, managerIndustry?: string) {
-    const employees = await this.getEmployeesForManager(companyDomain, department, managerEmail, managerIndustry);
+  async getEmployeesActivityForManager(
+    companyDomain: string,
+    department?: string,
+    managerEmail?: string,
+    managerIndustry?: string,
+    includeAllStaff = false,
+  ) {
+    const employees = includeAllStaff
+      ? await this.getEmployeesForHr(companyDomain)
+      : await this.getEmployeesForManager(companyDomain, department, managerEmail, managerIndustry);
     const ids = employees.map((e: any) => String(e._id || e.id || "")).filter(Boolean);
     const empById = new Map<string, any>();
     for (const e of employees as any[]) empById.set(String(e._id || e.id || ""), e);
@@ -1393,8 +1415,16 @@ export class OrgAuthService {
     };
   }
 
-  async getEmployeesPrepSummaryForManager(companyDomain: string, department?: string, managerEmail?: string, managerIndustry?: string) {
-    const employees = await this.getEmployeesForManager(companyDomain, department, managerEmail, managerIndustry);
+  async getEmployeesPrepSummaryForManager(
+    companyDomain: string,
+    department?: string,
+    managerEmail?: string,
+    managerIndustry?: string,
+    includeAllStaff = false,
+  ) {
+    const employees = includeAllStaff
+      ? await this.getEmployeesForHr(companyDomain)
+      : await this.getEmployeesForManager(companyDomain, department, managerEmail, managerIndustry);
     const ids = employees.map((e: any) => String(e._id || e.id || "")).filter(Boolean);
     if (!ids.length) return [];
 
@@ -1433,8 +1463,20 @@ export class OrgAuthService {
     });
   }
 
-  async getManagerHubAnalytics(companyDomain: string, department?: string, managerEmail?: string, managerIndustry?: string) {
-    const summary = await this.getEmployeesPrepSummaryForManager(companyDomain, department, managerEmail, managerIndustry);
+  async getManagerHubAnalytics(
+    companyDomain: string,
+    department?: string,
+    managerEmail?: string,
+    managerIndustry?: string,
+    includeAllStaff = false,
+  ) {
+    const summary = await this.getEmployeesPrepSummaryForManager(
+      companyDomain,
+      department,
+      managerEmail,
+      managerIndustry,
+      includeAllStaff,
+    );
     const rows = Array.isArray(summary) ? summary : [];
 
     const totalEmployees = rows.length;

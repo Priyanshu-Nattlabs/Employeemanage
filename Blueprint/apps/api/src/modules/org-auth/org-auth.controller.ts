@@ -141,7 +141,7 @@ export class OrgAuthController {
     const domain = (companyDomain || me.companyDomain || "").trim().toLowerCase();
     if (!domain) throw new UnauthorizedException("Missing companyDomain");
 
-    if (isHR) return this.service.getEmployeesForManager(domain);
+    if (isHR) return this.service.getEmployeesForHr(domain);
     const scope = await this.service.getManagerScopeFieldsByUserId(String(me?.sub || ""));
     return this.service.getEmployeesForManager(domain, scope.department, scope.email, scope.industry);
   }
@@ -190,7 +190,7 @@ export class OrgAuthController {
     const domain = (me.companyDomain || "").trim().toLowerCase();
     if (!domain) throw new UnauthorizedException("Missing companyDomain");
 
-    if (isHR) return this.service.getEmployeesActivityForManager(domain);
+    if (isHR) return this.service.getEmployeesActivityForManager(domain, undefined, undefined, undefined, true);
     const scope = await this.service.getManagerScopeFieldsByUserId(String(me?.sub || ""));
     return this.service.getEmployeesActivityForManager(domain, scope.department, scope.email, scope.industry);
   }
@@ -209,7 +209,7 @@ export class OrgAuthController {
     const domain = (me.companyDomain || "").trim().toLowerCase();
     if (!domain) throw new UnauthorizedException("Missing companyDomain");
 
-    if (isHR) return this.service.getEmployeesPrepSummaryForManager(domain);
+    if (isHR) return this.service.getEmployeesPrepSummaryForManager(domain, undefined, undefined, undefined, true);
     const scope = await this.service.getManagerScopeFieldsByUserId(String(me?.sub || ""));
     return this.service.getEmployeesPrepSummaryForManager(domain, scope.department, scope.email, scope.industry);
   }
@@ -227,7 +227,7 @@ export class OrgAuthController {
     const domain = (me.companyDomain || "").trim().toLowerCase();
     if (!domain) throw new UnauthorizedException("Missing companyDomain");
 
-    if (isHR) return this.service.getManagerHubAnalytics(domain);
+    if (isHR) return this.service.getManagerHubAnalytics(domain, undefined, undefined, undefined, true);
     const scope = await this.service.getManagerScopeFieldsByUserId(String(me?.sub || ""));
     return this.service.getManagerHubAnalytics(domain, scope.department, scope.email, scope.industry);
   }
