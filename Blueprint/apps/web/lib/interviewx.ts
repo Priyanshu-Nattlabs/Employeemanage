@@ -149,6 +149,14 @@ export function buildInterviewXIndustryOpenUrl(): string {
   return `${base}/industry/ai-interview/dashboard`;
 }
 
+/**
+ * AI Interview homepage for industry/manager users.
+ * Used as the post-login redirect for Manager/HR accounts.
+ */
+export function buildInterviewXManagerLandingUrl(): string {
+  return `${interviewXBase()}/industry/ai-interview`;
+}
+
 export function buildInterviewXCandidatesUrl(interviewConfigId: string): string {
   const base = interviewXBase();
   const id = clean(interviewConfigId);
@@ -156,13 +164,24 @@ export function buildInterviewXCandidatesUrl(interviewConfigId: string): string 
   return `${base}/industry/ai-interview/${encodeURIComponent(id)}/candidates`;
 }
 
-/** Student InterviewX app: preparation hub (technical / HR / labs). Set `NEXT_PUBLIC_INTERVIEWX_ORIGIN` in production. */
-export function buildInterviewXStudentPrepHomeUrl(opts?: { email?: string; name?: string }): string {
+/**
+ * Student InterviewX app: preparation hub (technical / HR / labs).
+ * When a role is provided, lands directly on the Technical Round form pre-filled
+ * with that role so the user doesn't have to type it in again.
+ * Set `NEXT_PUBLIC_INTERVIEWX_ORIGIN` in production.
+ */
+export function buildInterviewXStudentPrepHomeUrl(opts?: { email?: string; name?: string; role?: string }): string {
   const base = interviewXBase();
-  const u = new URL(`${base}/students/interview-preparation`);
+  const role = clean(opts?.role);
+  // Go straight to the technical form when a role is known; otherwise land on the hub.
+  const path = role
+    ? `${base}/students/interview-preparation/technical`
+    : `${base}/students/interview-preparation`;
+  const u = new URL(path);
   const email = clean(opts?.email);
   const name = clean(opts?.name);
   if (email) u.searchParams.set("email", email);
   if (name) u.searchParams.set("name", name);
+  if (role) u.searchParams.set("role", role);
   return u.toString();
 }

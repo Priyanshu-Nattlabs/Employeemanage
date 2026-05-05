@@ -5,7 +5,7 @@ import { useParams, useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 
 import { appPath, getApiPrefix } from "@/lib/apiBase";
-import { buildInterviewXAiInterviewUrl } from "@/lib/interviewx";
+import { buildInterviewXStudentPrepHomeUrl } from "@/lib/interviewx";
 import { getOrgAuthFromStorage, orgCreateRecommendation } from "@/lib/orgAuth";
 import { flowQueryString, mergeRoleFlowParams, pickRoleFlowParams, writeRoleFlowParams } from "@/lib/roleFlowParams";
 
@@ -477,15 +477,14 @@ function RolePageContent() {
 
   const mockInterviewHref = useMemo(() => {
     if (typeof window === "undefined") {
-      return buildInterviewXAiInterviewUrl({ prefillRole: roleName });
+      return buildInterviewXStudentPrepHomeUrl({ role: roleName });
     }
     const auth = getOrgAuthFromStorage();
     const u = auth.user;
-    return buildInterviewXAiInterviewUrl({
-      prefillRole: roleName,
-      candidateEmail: u?.email || undefined,
-      candidateName: u?.fullName || undefined,
-      employeeId: u?.id || undefined,
+    return buildInterviewXStudentPrepHomeUrl({
+      role: roleName,
+      email: u?.email || undefined,
+      name: u?.fullName || undefined,
     });
   }, [roleName]);
 
