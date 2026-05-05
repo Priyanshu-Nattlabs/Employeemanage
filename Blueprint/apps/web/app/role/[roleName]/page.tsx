@@ -1359,13 +1359,6 @@ function RolePageContent() {
             </div>
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
               <button
-                onClick={saveKnownSkillsAndStart}
-                disabled={savingKnownSkills || startingKnownSkillsTest}
-                style={{ ...btn("white", "#3170A5", "#3170A5"), border: "none" as any }}
-              >
-                {savingKnownSkills ? "Saving..." : "Save Selected Skills"}
-              </button>
-              <button
                 onClick={startCombinedTestForSelectedSkills}
                 disabled={!canTakeTests || savingKnownSkills || startingKnownSkillsTest}
                 title={!canTakeTests ? "Only employees can take tests" : "Save selected skills and start combined test"}
@@ -1754,13 +1747,6 @@ function RolePageContent() {
             })}
           </div>
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-            <button
-              onClick={saveKnownSkillsAndStart}
-              disabled={savingKnownSkills || startingKnownSkillsTest}
-              style={{ ...btn("white", "#3170A5", "#3170A5"), border: "none" as any }}
-            >
-              {savingKnownSkills ? "Saving..." : "Save Selected Skills"}
-            </button>
             <button
               onClick={startCombinedTestForSelectedSkills}
               disabled={!canTakeTests || savingKnownSkills || startingKnownSkillsTest}

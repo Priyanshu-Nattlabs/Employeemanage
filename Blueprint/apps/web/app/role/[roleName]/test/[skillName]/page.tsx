@@ -21,6 +21,10 @@ type TestType = {
 
 /* ── helpers ───────────────────────────────────────────── */
 const getTestId = (t: TestType) => (t as any)._id || t.id || "";
+const cleanQuestionText = (raw: string) =>
+  String(raw || "")
+    .replace(/^\s*(?:\[\s*)?(easy|medium|tough|hard|difficult)(?:\s*\])?\s*[:\-|]?\s*/i, "")
+    .trim();
 
 const card: React.CSSProperties = {
   background: "white", borderRadius: 18, border: "1px solid #e2e8f0",
@@ -818,7 +822,9 @@ export default function SkillTestPage() {
                 )}
               </div>
               <p style={{ fontSize:20, color:"#cbd5e1", margin:"0 0 1px", fontWeight:800 }}>{q.questionNumber}</p>
-              <p style={{ fontSize:18, fontWeight:800, color:"#0f172a", lineHeight:1.24, margin:"0 0 8px" }}>{q.questionText}</p>
+              <p style={{ fontSize:18, fontWeight:800, color:"#0f172a", lineHeight:1.24, margin:"0 0 8px" }}>
+                {cleanQuestionText(q.questionText)}
+              </p>
               <div style={{ display:"grid", gap:6 }}>
                 {q.options.map((opt, oi) => {
                   const sel = selectedAnswer === opt;
@@ -880,16 +886,6 @@ export default function SkillTestPage() {
             Answered: {answered}/{questionCount}
           </p>
           {error && <p style={{ margin:"8px 0 0", fontSize:12, color:"#dc2626" }}>{error}</p>}
-          <button
-            style={{ ...btn("white", "#16a34a"), marginTop:12, width:"100%", justifyContent:"center", opacity: submitting ? .7 : 1 }}
-            onClick={submit}
-            disabled={submitting}
-          >
-            {submitting
-              ? <><span style={{ width:13, height:13, border:"2px solid rgba(255,255,255,.4)", borderTop:"2px solid white", borderRadius:"50%", animation:"spin 1s linear infinite", display:"inline-block" }}/>Submitting…</>
-              : `✅ Submit`
-            }
-          </button>
         </div>
       </div>
 
