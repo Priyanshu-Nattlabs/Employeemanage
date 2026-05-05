@@ -7,5 +7,6 @@ services:
     build:
       args:
         NEXT_PUBLIC_BASE_PATH: ""
-        NEXT_PUBLIC_SAARTHIX_URL: ${VPS_PUBLIC_URL:-http://127.0.0.1}
-        NEXT_PUBLIC_INTERVIEWX_ORIGIN: ${VPS_PUBLIC_URL:-http://127.0.0.1}/interviewx
+        # Safe default for production builds even if VPS_PUBLIC_URL is missing in shell.
+        NEXT_PUBLIC_SAARTHIX_URL: ${VPS_PUBLIC_URL:-https://saarthiworkforce.com}
+        NEXT_PUBLIC_INTERVIEWX_ORIGIN: ${VPS_PUBLIC_URL:-https://saarthiworkforce.com}/interviewx
