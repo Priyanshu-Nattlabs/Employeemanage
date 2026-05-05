@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { appPath } from "@/lib/apiBase";
 import {
   orgGetPublicSignupOrgOptions,
+  orgGetDesignationOptions,
   orgRegisterEmployee,
   setOrgAuthInStorage,
   type OrgSignupOptions,
@@ -49,7 +50,7 @@ export default function EmployeeRegisterPage() {
   const [password, setPassword] = useState("");
   const [fullName, setFullName] = useState("");
   const [companyName, setCompanyName] = useState("");
-  const [designation, setDesignation] = useState("Employee");
+  const [designation, setDesignation] = useState("");
   const [department, setDepartment] = useState("");
   const [deptMode, setDeptMode] = useState<"PICK" | "OTHER">("PICK");
   const [deptOther, setDeptOther] = useState("");
@@ -65,6 +66,9 @@ export default function EmployeeRegisterPage() {
   const [signupOrgLoading, setSignupOrgLoading] = useState(false);
 
   const useOrgCatalog = Boolean(signupOrg?.industries?.length);
+
+  const [designationOptions, setDesignationOptions] = useState<string[]>([]);
+  const [designationOptionsLoading, setDesignationOptionsLoading] = useState(false);
 
   /** With org catalog: only departments for the selected industry (none until industry is chosen). */
   const departmentSelectOptions = useMemo(() => {
@@ -113,6 +117,32 @@ export default function EmployeeRegisterPage() {
     };
   }, [inferredDomain]);
 
+  useEffect(() => {
+    let cancelled = false;
+    const q = designation.trim();
+    const t = window.setTimeout(async () => {
+      if (!q) {
+        setDesignationOptions([]);
+        setDesignationOptionsLoading(false);
+        return;
+      }
+      setDesignationOptionsLoading(true);
+      try {
+        const list = await orgGetDesignationOptions(q);
+        if (cancelled) return;
+        setDesignationOptions(Array.isArray(list) ? list.slice(0, 30) : []);
+      } catch {
+        if (!cancelled) setDesignationOptions([]);
+      } finally {
+        if (!cancelled) setDesignationOptionsLoading(false);
+      }
+    }, 250);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(t);
+    };
+  }, [designation]);
+
   const effectiveDepartment = useMemo(() => {
     if (deptMode === "OTHER") return deptOther.trim();
     return department.trim();
@@ -149,14 +179,14 @@ export default function EmployeeRegisterPage() {
         companyDomain: inferredDomain,
       });
       if ("verificationRequired" in r && r.verificationRequired) {
-        const nextPath = appPath("/employee/");
+        const nextPath = appPath("/employee/?new=1");
         const debugOtpQuery = r.debugOtp ? `&debugOtp=${encodeURIComponent(r.debugOtp)}` : "";
         window.location.href = `${appPath("/auth/verify-otp")}?email=${encodeURIComponent(r.email)}&next=${encodeURIComponent(nextPath)}${debugOtpQuery}`;
         return;
       }
       if (!("token" in r) || !r.token || !r.user) throw new Error("Registration succeeded but login payload missing.");
       setOrgAuthInStorage(r.token, r.user);
-      window.location.href = appPath("/employee/");
+      window.location.href = appPath("/employee/?new=1");
     } catch (err: any) {
       setError(err?.message || "Registration failed");
     } finally {
@@ -194,9 +224,17 @@ export default function EmployeeRegisterPage() {
             required
             type="text"
             style={inputStyle}
-            placeholder="e.g. Employee, Software Engineer"
+            placeholder="Employee"
+            list="designation-options"
           />
-          <div style={hintStyle}>Defaults to <b>Employee</b>; change it to any job title you use.</div>
+          <datalist id="designation-options">
+            {designationOptions.map((d) => (
+              <option key={d} value={d} />
+            ))}
+          </datalist>
+          <div style={hintStyle}>
+            Start typing to see role suggestions{designationOptionsLoading ? "…" : ""}.
+          </div>
         </Field>
         <Field label="Industry">
           <div style={{ display: "grid", gap: 8 }}>
@@ -300,13 +338,13 @@ export default function EmployeeRegisterPage() {
           <input value={employeeId} onChange={(e) => setEmployeeId(e.target.value)} required style={inputStyle} placeholder="Employee ID" />
         </Field>
 
-        <Field label="Reporting manager email (Gmail)">
+        <Field label="Reporting manager email">
           <input
             value={reportingManagerEmail}
             onChange={(e) => setReportingManagerEmail(e.target.value)}
             type="email"
             style={inputStyle}
-            placeholder="manager@gmail.com"
+            placeholder="manager@company.com"
           />
           <div style={hintStyle}>
             Optional. If provided, your manager will see you in their employee database.

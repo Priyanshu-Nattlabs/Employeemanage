@@ -12,8 +12,10 @@
     "seed": "npm --workspace apps/api run seed:xlsx",
     "seed:ensure": "npm --workspace apps/api run seed:ensure",
     "seed:new-jd": "node scripts/seed-new-jd-workbook.mjs",
+    "seed:new-jd:temp": "BLUEPRINT_XLSX_FILE=\"~$NEW JD 123.xlsx\" node scripts/seed-new-jd-workbook.mjs",
     "seed:org-structure": "npm --workspace apps/api run seed:org-structure:xlsx",
     "seed:master-functions": "npm --workspace apps/api run seed:master-functions:csv",
+    "seed:org-maps": "npm run seed:org-structure && npm run seed:master-functions",
     "build:signup-catalog": "npm --workspace apps/api run build:signup-catalog",
     "seed:docker": "docker compose --profile seed run --rm seed"
   },

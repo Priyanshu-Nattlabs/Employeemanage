@@ -33,10 +33,12 @@ export class AllExceptionsFilter implements ExceptionFilter {
           ? exception.message
           : "Internal server error";
 
-    this.logger.error(
-      `Unhandled exception [${status}] ${request.method} ${request.url}: ${message}`,
-      exception instanceof Error ? exception.stack : undefined,
-    );
+    // Avoid spamming ERROR logs for expected client-side conditions (expired sessions, not found, etc).
+    const logLine = `Unhandled exception [${status}] ${request.method} ${request.url}: ${message}`;
+    const stack = exception instanceof Error ? exception.stack : undefined;
+    if (status >= 500) this.logger.error(logLine, stack);
+    else if (status >= 400) this.logger.warn(logLine);
+    else this.logger.log(logLine);
 
     response.status(status).json({
       statusCode: status,

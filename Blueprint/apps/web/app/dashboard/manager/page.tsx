@@ -14,7 +14,7 @@ import {
   type OrgManagerActivity,
 } from "@/lib/orgAuth";
 import { SiteFooter } from "@/app/components/SiteFooter";
-import { appPath } from "@/lib/apiBase";
+import { appPath, publicAssetUrl } from "@/lib/apiBase";
 
 type EmployeeRow = {
   employee: any;
@@ -356,6 +356,28 @@ function ManagerDashboardContent() {
               <> New accounts are created in <b>{myDepartment || "your"}</b> department and report to you.</>
             )}{" "}
             Each person receives an email with a temporary password and must complete their profile after first login.
+          </div>
+          <div style={{ marginTop: 10 }}>
+            <a
+              href={publicAssetUrl("/templates/Employee_Invite_Template.xlsx")}
+              download
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 8,
+                padding: "9px 12px",
+                borderRadius: 12,
+                border: "1px solid #d1fae5",
+                background: "#ecfdf5",
+                color: "#065f46",
+                fontWeight: 900,
+                fontSize: 13,
+                textDecoration: "none",
+              }}
+            >
+              <span style={{ fontSize: 16, lineHeight: 1 }}>⬇️</span>
+              Download template
+            </a>
           </div>
           <div style={{ marginTop: 16, display: "flex", flexDirection: "column", gap: 12 }}>
             <label
