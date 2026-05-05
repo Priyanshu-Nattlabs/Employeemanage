@@ -1093,7 +1093,8 @@ export class OrgAuthService {
   async getProfileById(id: string) {
     if (!id) throw new UnauthorizedException("Invalid token");
     const user = await this.companyUserModel.findById(id).select("-passwordHash").lean();
-    if (!user) throw new NotFoundException("User not found");
+    // If the user no longer exists (e.g., DB reset) treat as expired session so clients re-auth.
+    if (!user) throw new UnauthorizedException("Session expired");
     return user;
   }
 
@@ -1101,7 +1102,8 @@ export class OrgAuthService {
   async getManagerScopeFieldsByUserId(userId: string): Promise<{ email: string; department: string; industry: string }> {
     if (!userId) throw new UnauthorizedException("Invalid token");
     const u = await this.companyUserModel.findById(userId).select("email department industry").lean();
-    if (!u) throw new NotFoundException("User not found");
+    // If the user no longer exists (e.g., DB reset) treat as expired session so clients re-auth.
+    if (!u) throw new UnauthorizedException("Session expired");
     return {
       email: normalizeEmail(String((u as any).email || "")),
       department: String((u as any).department || "").trim(),

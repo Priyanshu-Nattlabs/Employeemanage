@@ -71,6 +71,10 @@ async function apiJson<T>(path: string, init?: RequestInit): Promise<T> {
     }
   }
   if (!res.ok) {
+    // If DB was reset or token expired, force re-login instead of leaving the UI in a broken loop.
+    if (res.status === 401 && typeof window !== "undefined") {
+      clearOrgAuthInStorage();
+    }
     const msg = data?.message || data?.error || `Request failed (${res.status})`;
     throw new Error(Array.isArray(msg) ? msg.join(", ") : String(msg));
   }

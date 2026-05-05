@@ -1,6 +1,9 @@
 /**
  * Re-seed blueprints from your NEW JD Excel workbook (default: Blueprint/NEW JD 123.xlsx).
  *
+ * Note: Excel lock/temp files like `~$NEW JD 123.xlsx` are NOT valid workbooks.
+ * If you pass a `~$...` path, we automatically switch to the real workbook name.
+ *
  * Usage (from Employeemanage/Blueprint):
  *   npm run seed:new-jd
  *
@@ -25,6 +28,13 @@ const defaultWorkbook = path.join(blueprintRoot, "NEW JD 123.xlsx");
 function resolveWorkbookPath(raw) {
   const r = String(raw || "").trim();
   if (!r) return null;
+  // Excel creates `~$<file>.xlsx` lock files. They are tiny and not readable by seed script.
+  // If a user points to that path, switch to the real workbook in the same folder.
+  const base = path.basename(r);
+  if (base.startsWith("~$")) {
+    const fixed = path.join(path.dirname(r), base.replace(/^~\$/, ""));
+    return path.isAbsolute(fixed) ? path.normalize(fixed) : path.resolve(blueprintRoot, fixed);
+  }
   if (path.isAbsolute(r)) return path.normalize(r);
   return path.resolve(blueprintRoot, r);
 }

@@ -76,7 +76,15 @@ function progressColor(p: number) {
 async function fetchJson<T>(path: string, token: string): Promise<T> {
   const url = path.startsWith("http") ? path : apiUrl(path);
   const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  if (!res.ok) {
+    if (res.status === 401) {
+      clearOrgAuthInStorage();
+      if (typeof window !== "undefined") {
+        window.location.href = appPath("/auth/manager/login");
+      }
+    }
+    throw new Error(`HTTP ${res.status}`);
+  }
   return res.json() as Promise<T>;
 }
 
