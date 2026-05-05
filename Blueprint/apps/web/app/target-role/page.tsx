@@ -212,6 +212,34 @@ export default function TargetRolePage() {
             />
           </section>
 
+          <div style={list}>
+            {loading ? (
+              <div style={muted}>Loading roles...</div>
+            ) : !hasSearchInput ? (
+              <div style={muted}>Type in search box to see role suggestions.</div>
+            ) : filteredRoles.length === 0 ? (
+              <div style={muted}>No matching roles found.</div>
+            ) : (
+              filteredRoles.map((role) => (
+                <button
+                  key={`${role.name}|${role.level || ""}`}
+                  onClick={() => selectRole(role)}
+                  disabled={!!savingRole && savingRole === roleRowKey(role)}
+                  style={roleBtn}
+                  title={`Set ${role.name}${role.level ? ` (Level ${role.level})` : ""} as target role`}
+                >
+                  <span style={{ fontWeight: 700, color: "#0f172a", textAlign: "left" }}>
+                    {role.name}
+                    {role.level ? ` (Level ${role.level})` : ""}
+                  </span>
+                  <span style={{ fontSize: 12, color: "#2563eb", fontWeight: 700 }}>
+                    {savingRole === roleRowKey(role) ? "Opening..." : "Open"}
+                  </span>
+                </button>
+              ))
+            )}
+          </div>
+
           <section style={fieldCard}>
             <h2 style={fieldHeading}>Level (optional)</h2>
             <label style={dateField}>
@@ -226,33 +254,6 @@ export default function TargetRolePage() {
         </div>
 
         {error ? <div style={err}>{error}</div> : null}
-
-        <div style={list}>
-          {loading ? (
-            <div style={muted}>Loading roles...</div>
-          ) : !hasSearchInput ? (
-            <div style={muted}>Type in search box to see role suggestions.</div>
-          ) : filteredRoles.length === 0 ? (
-            <div style={muted}>No matching roles found.</div>
-          ) : (
-            filteredRoles.map((role) => (
-              <button
-                key={`${role.name}|${role.level || ""}`}
-                onClick={() => selectRole(role)}
-                disabled={!!savingRole && savingRole === roleRowKey(role)}
-                style={roleBtn}
-                title={`Set ${role.name}${role.level ? ` (Level ${role.level})` : ""} as target role`}
-              >
-                <span style={{ fontWeight: 700, color: "#0f172a", textAlign: "left" }}>
-                  {role.name}{role.level ? ` (Level ${role.level})` : ""}
-                </span>
-                <span style={{ fontSize: 12, color: "#2563eb", fontWeight: 700 }}>
-                  {savingRole === roleRowKey(role) ? "Opening..." : "Open Blueprint"}
-                </span>
-              </button>
-            ))
-          )}
-        </div>
       </div>
     </div>
   );

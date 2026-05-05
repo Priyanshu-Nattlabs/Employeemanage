@@ -39,7 +39,7 @@ services:
       [
         "sh",
         "-c",
-        "if [ ! -d node_modules/mongodb ]; then npm install; fi && node src/scripts/ensure-blueprint-seed.mjs",
+        "if [ ! -d node_modules/mongodb ]; then npm install --workspaces=false; fi && node src/scripts/ensure-blueprint-seed.mjs",
       ]
 
   backend:
@@ -132,7 +132,7 @@ services:
           echo "ℹ️  NEW JD 123.xlsx not found at Blueprint repo root — skipping NEW JD upsert."
           exit 0
         fi
-        if [ ! -d node_modules/mongodb ]; then npm install; fi
+        if [ ! -d node_modules/mongodb ]; then npm install --workspaces=false; fi
         node src/scripts/seed-from-xlsx.mjs
 
 volumes:
