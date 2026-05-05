@@ -57,6 +57,20 @@ function normalizeDepartmentKey(raw: string): string {
   return compact;
 }
 
+/**
+ * Normalizes role names for resilient matching:
+ * - case-insensitive
+ * - ignores commas/special characters/extra whitespace
+ * Examples:
+ * - "SDE, Backend" -> "sdebackend"
+ * - "Data Scientist (GenAI)" -> "datascientistgenai"
+ */
+function normalizeRoleKey(raw: string): string {
+  const s = String(raw || "").trim().toLowerCase();
+  if (!s) return "";
+  return s.replace(/[^a-z0-9]+/g, "");
+}
+
 /** Split org-structure row titles like `Legal -  Corporate Law` or `BFSI -  Finance & Accounting`. */
 function parseIndustryDeptFromOrgName(name: string): { industry: string; department: string } | null {
   const raw = String(name || "").trim();
@@ -1742,6 +1756,46 @@ export class OrgAuthService {
       }
     }
 
+    // ── Make role matching resilient + prefer NEW JD roles when available ──
+    // After seeding, the same role may appear with punctuation/case differences between:
+    // - org-structure mapping (Excel/CSV)
+    // - blueprint role catalog (Phase13)
+    // - NEW JD upserts (roleLower/functionLower fields)
+    //
+    // We:
+    // 1) de-dupe mapped roles by normalized key
+    // 2) if NEW JD role docs exist for this DB, intersect to prefer those roles (fallback to mapped list otherwise)
+    const dedupByKey = (list: string[]) => {
+      const seen = new Set<string>();
+      const out: string[] = [];
+      for (const r of list || []) {
+        const name = String(r || "").trim();
+        if (!name) continue;
+        const k = normalizeRoleKey(name);
+        if (!k || seen.has(k)) continue;
+        seen.add(k);
+        out.push(name);
+      }
+      return out;
+    };
+    roles = dedupByKey(roles);
+
+    // NEW JD docs can be detected by `roleLower` (set by seed-from-xlsx newjd upsert).
+    // If the NEW JD set is non-empty, prefer mapped roles that exist in NEW JD.
+    const newJdDocs = await this.blueprintModel
+      .find({ type: "role", roleLower: { $exists: true } } as any)
+      .select("name")
+      .lean();
+    const newJdRoleKeys = new Set<string>(
+      (newJdDocs || [])
+        .map((d: any) => normalizeRoleKey(String(d?.name || "")))
+        .filter(Boolean),
+    );
+    if (newJdRoleKeys.size) {
+      const preferred = roles.filter((r) => newJdRoleKeys.has(normalizeRoleKey(r)));
+      if (preferred.length) roles = preferred;
+    }
+
     return {
       employee: {
         id: String((employee as any)._id || ""),
@@ -1834,7 +1888,8 @@ export class OrgAuthService {
         }
       }
       if (mappedRoles.length > 0) {
-        const ok = mappedRoles.some((r) => r.trim().toLowerCase() === role.toLowerCase());
+        const roleKey = normalizeRoleKey(role);
+        const ok = mappedRoles.some((r) => normalizeRoleKey(r) === roleKey);
         if (!ok) {
           throw new BadRequestException(`Role "${role}" is not part of the allowed mapping for this scope`);
         }
