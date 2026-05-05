@@ -362,10 +362,10 @@ export function PublicHomePage() {
             </div>
             <div className="module-cta">
               <a href={appPath("/auth/manager/login")} className="module-link primary">
-                Manager / HR access <span aria-hidden>→</span>
+                Open InterviewX (managers) <span aria-hidden>→</span>
               </a>
-              <a href={appPath("/dashboard/manager/schedule-interviews")} className="module-link">
-                Open schedule hub <span aria-hidden>→</span>
+              <a href={appPath("/auth/manager/login")} className="module-link">
+                Interview dashboard <span aria-hidden>→</span>
               </a>
             </div>
           </motion.div>

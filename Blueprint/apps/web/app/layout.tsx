@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { NavBar } from "./components/NavBar";
 
 export const metadata: Metadata = {
-  title: "Job Blueprint",
+  title: "Workspace",
   description: "Career roadmap and learning plan"
 };
 

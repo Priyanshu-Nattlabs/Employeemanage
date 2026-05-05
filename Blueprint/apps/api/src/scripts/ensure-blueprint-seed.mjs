@@ -156,13 +156,12 @@ async function main() {
   } else {
     const parts = defaultSeedSourcesFromDisk();
     if (!parts.length) {
-      console.error(
-        "❌  No Excel seed files found. Place at least one of:\n" +
-          "     • Job_Blueprint_Final_Phase13.xlsx\n" +
-          "     • NEW JD 123.xlsx or NEW JD.xlsx\n" +
-          "   next to the Blueprint repo root, or set BLUEPRINT_SEED_SOURCES / BLUEPRINT_XLSX_FILE.",
+      console.warn(
+        "⚠️  Empty database but no Excel seed files on disk. Skipping auto-seed (exit 0) so services can start.\n" +
+          "   Add Job_Blueprint_Final_Phase13.xlsx / NEW JD*.xlsx at Blueprint repo root, set BLUEPRINT_SEED_SOURCES,\n" +
+          "   or run: docker compose --profile seed run --rm seed",
       );
-      process.exit(1);
+      return;
     }
     extraEnv.BLUEPRINT_SEED_SOURCES = parts.join(",");
     console.log("📄  Using workbooks:", parts.join("\n      "));

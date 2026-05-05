@@ -68,7 +68,7 @@ function ManagerDashboardContent() {
     if (recommendedRole) {
       setRecoBanner({ role: recommendedRole, employee: recommendedFor });
       // Clear query string so the banner doesn't re-appear on refresh.
-      router.replace(appPath("/dashboard/manager"));
+      router.replace("/dashboard/manager/");
       const t = window.setTimeout(() => setRecoBanner(null), 8000);
       return () => window.clearTimeout(t);
     }
@@ -86,7 +86,7 @@ function ManagerDashboardContent() {
     } else if (myDepartment) {
       params.set("recommendDept", String(myDepartment));
     }
-    router.push(`${appPath("/role")}?${params.toString()}`);
+    router.push(`/role/?${params.toString()}`);
   };
 
   useEffect(() => {
@@ -489,7 +489,7 @@ function ManagerDashboardContent() {
           </div>
           <div style={{ marginTop: 18, display: "flex", flexWrap: "wrap", gap: 10, alignItems: "center" }}>
             <Link
-              href={appPath("/dashboard/manager/schedule-interviews")}
+              href="/dashboard/manager/interviews/"
               className="manager-cta-link"
               style={{
                 ...btnScheduleHub,
@@ -568,7 +568,7 @@ function ManagerDashboardContent() {
               <option value="RECENT_TEST">Sort: recent test</option>
             </select>
             <Link
-              href={appPath("/dashboard/manager/employees")}
+              href="/dashboard/manager/employees/"
               style={{
                 ...btnOutline,
                 display: "inline-flex",
