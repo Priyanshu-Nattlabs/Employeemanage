@@ -1,10 +1,10 @@
 /**
- * Re-seed blueprints from your NEW JD Excel workbook (default: Blueprint/NEW JD 123.xlsx).
+ * Re-seed TalentX blueprints from your NEW JD Excel workbook (default: TalentX/NEW JD 123.xlsx).
  *
  * Note: Excel lock/temp files like `~$NEW JD 123.xlsx` are NOT valid workbooks.
  * If you pass a `~$...` path, we automatically switch to the real workbook name.
  *
- * Usage (from Employeemanage/Blueprint):
+ * Usage (from Employeemanage/TalentX):
  *   npm run seed:new-jd
  *
  * Override path or MongoDB:
@@ -55,7 +55,7 @@ function main() {
     const one = resolveWorkbookPath(sources);
     if (!existsSync(one)) {
       console.error(`Excel file not found:\n  ${one}`);
-      console.error("\nPut your workbook at Blueprint/NEW JD 123.xlsx or set BLUEPRINT_XLSX_FILE / BLUEPRINT_SEED_SOURCES.");
+      console.error("\nPut your workbook at TalentX/NEW JD 123.xlsx or set BLUEPRINT_XLSX_FILE / BLUEPRINT_SEED_SOURCES.");
       process.exit(1);
     }
     sources = one;

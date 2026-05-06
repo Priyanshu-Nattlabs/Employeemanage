@@ -89,7 +89,7 @@ export default function ProfilePage() {
       <h1>Your profile</h1>
       <p>
         When you sign in from SomethingX, your name, graduation date, and education are synced automatically. You can
-        adjust values below; they are stored for Job Blueprint charts and preparation.
+        adjust values below; they are stored for TalentX charts and preparation.
       </p>
       <div style={{ display: "grid", gap: 10 }}>
         <label>User ID <input value={userId} onChange={(e) => setUserId(e.target.value)} /></label>

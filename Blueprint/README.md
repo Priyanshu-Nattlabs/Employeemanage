@@ -1,6 +1,6 @@
-# Job Blueprint V2
+# TalentX
 
-Full rebuild of the Job Blueprint subsystem using:
+Full rebuild of the TalentX subsystem using:
 
 - Backend: NestJS + TypeScript + MongoDB (Mongoose)
 - Frontend: Next.js + TypeScript
@@ -13,7 +13,7 @@ Full rebuild of the Job Blueprint subsystem using:
 
 ## Features Ported
 
-- Blueprint discovery and mappings
+- TalentX discovery and mappings
 - Role details and Gantt generation
 - Skill topics generation
 - Skill test lifecycle (start, answer, submit, result)
@@ -29,7 +29,7 @@ npm run dev:web
 
 ## Docker (Full Stack)
 
-Run the full Blueprint stack (MongoDB + API + Web) with one command:
+Run the full TalentX stack (MongoDB + API + Web) with one command:
 
 ```bash
 docker compose up --build -d

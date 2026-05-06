@@ -403,7 +403,7 @@ function ScheduleInterviewsInner() {
     const latestTestScore =
       typeof ltScore === "number" && !Number.isNaN(ltScore) ? ltScore : null;
 
-    // New flow: Blueprint calls its backend, which creates InterviewX interview + candidate
+    // New flow: TalentX calls its backend, which creates InterviewX interview + candidate
     // and returns credentials to display on this page.
     // (We still open InterviewX candidates view for the created interview.)
     if (!token || !id) return;
@@ -913,7 +913,7 @@ function ScheduleInterviewsInner() {
           </div>
           <h1 style={{ margin: "10px 0 4px", fontSize: 22, fontWeight: 900, color: "#0f172a" }}>Schedule interview</h1>
           <p style={{ margin: 0, fontSize: 13, color: "#64748b", maxWidth: 760 }}>
-            Compare preparation scores and review your team’s department, target role, and email. Blueprint does not store interview slots or
+            Compare preparation scores and review your team’s department, target role, and email. TalentX does not store interview slots or
             report URLs — use <b>Schedule Interview</b> to auto-create the AI interview + candidate and show the generated credentials below.
           </p>
         </div>

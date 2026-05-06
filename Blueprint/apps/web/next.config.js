@@ -10,7 +10,7 @@ const isNextDev =
 const rawBaseEnv = (process.env.NEXT_PUBLIC_BASE_PATH || "").replace(/\/$/, "");
 const rawBase = isNextDev ? "" : rawBaseEnv;
 
-// Production / explicit opt-in: nginx-style deploy prefix (e.g. /job-blueprint-v2).
+// Production / explicit opt-in: nginx-style deploy prefix (e.g. /talentx).
 const applyBasePath =
   !!rawBase &&
   (process.env.NODE_ENV === "production" || process.env.NEXT_PUBLIC_DEV_WITH_BASE_PATH === "1");

@@ -57,7 +57,7 @@ function resolveSeedPath(raw) {
   return path.resolve(process.cwd(), r);
 }
 
-/** When env does not set sources, use any workbooks that exist under Blueprint repo root (../../ from apps/api). */
+/** When env does not set sources, use any workbooks that exist under TalentX repo root (../../ from apps/api). */
 function defaultSeedSourcesFromDisk() {
   const phase13 = resolveSeedPath("../../Job_Blueprint_Final_Phase13.xlsx");
   const jd123 = resolveSeedPath("../../NEW JD 123.xlsx");
@@ -158,7 +158,7 @@ async function main() {
     if (!parts.length) {
       console.warn(
         "⚠️  Empty database but no Excel seed files on disk. Skipping auto-seed (exit 0) so services can start.\n" +
-          "   Add Job_Blueprint_Final_Phase13.xlsx / NEW JD*.xlsx at Blueprint repo root, set BLUEPRINT_SEED_SOURCES,\n" +
+          "   Add Job_Blueprint_Final_Phase13.xlsx / NEW JD*.xlsx at TalentX repo root, set BLUEPRINT_SEED_SOURCES,\n" +
           "   or run: docker compose --profile seed run --rm seed",
       );
       return;

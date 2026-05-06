@@ -11,7 +11,7 @@ function sxBase(): string {
 
 const PLATFORM_LINKS: Array<{ href: string; label: string }> = [
   { href: "/", label: "Home" },
-  { href: "/role/", label: "Role Blueprints" },
+  { href: "/role/", label: "TalentX Roles" },
   { href: "/dashboard/manager", label: "Monitoring" },
   { href: "/dashboard/manager/interviews", label: "AI Interviews" },
 ];

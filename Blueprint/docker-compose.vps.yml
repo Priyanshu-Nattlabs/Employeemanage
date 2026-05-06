@@ -1,4 +1,4 @@
-# VPS: Blueprint at site root; InterviewX entry is /interviewx on the same host (see deploy/vps/nginx-edge*.conf).
+# VPS: TalentX at site root; InterviewX entry is /interviewx on the same host (see deploy/vps/nginx-edge*.conf).
 # Usage (from this directory):
 #   export VPS_PUBLIC_URL=https://saarthiworkforce.com
 #   docker compose -f docker-compose.yml -f docker-compose.vps.yml up -d --build

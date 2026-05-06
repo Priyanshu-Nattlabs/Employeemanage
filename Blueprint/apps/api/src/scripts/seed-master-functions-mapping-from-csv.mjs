@@ -174,7 +174,7 @@ async function main() {
   const defaultCsv = "../../Master_functions_mapping(Legal Functions Mapping (2)).csv";
   const csvPath = resolveSeedPath(process.env.MASTER_FUNCTIONS_CSV_FILE || defaultCsv);
   if (!csvPath || !existsSync(csvPath)) {
-    throw new Error(`CSV not found: ${csvPath}\nSet MASTER_FUNCTIONS_CSV_FILE or place the file under Blueprint/.`);
+    throw new Error(`CSV not found: ${csvPath}\nSet MASTER_FUNCTIONS_CSV_FILE or place the file under TalentX/.`);
   }
 
   const merge = String(process.env.MASTER_FUNCTIONS_MERGE ?? "true").trim().toLowerCase() !== "false";

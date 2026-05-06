@@ -77,7 +77,7 @@ function PassBadge({ skillName, roleName, score, date }: { skillName: string; ro
       {/* header row */}
       <div style={{ padding: "22px 28px 0", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <span style={{ color: "rgba(255,255,255,.5)", fontSize: 12, fontWeight: 700, letterSpacing: ".1em", textTransform: "uppercase" }}>
-          🗺 JobBlueprint
+          🗺 TalentX
         </span>
         <span style={{
           background: "linear-gradient(135deg,#d4af37,#f5e07a)", color: "#0f172a",
@@ -135,7 +135,7 @@ function PassBadge({ skillName, roleName, score, date }: { skillName: string; ro
         <div style={{ width: "100%", height: 1, background: "linear-gradient(90deg,transparent,rgba(255,255,255,.12),transparent)", marginBottom: 18 }} />
 
         <p style={{ margin: 0, color: "rgba(255,255,255,.35)", fontSize: 11, fontWeight: 600, letterSpacing: ".08em", textTransform: "uppercase", textAlign: "center" }}>
-          Issued by JobBlueprint · Career Platform
+          Issued by TalentX · Career Platform
         </p>
       </div>
     </div>
@@ -578,7 +578,7 @@ export default function SkillTestPage() {
       : [];
     const skillPassedCount = skillRows.filter((r) => r.passed).length;
     const allSkillsPassed = isKnownSkillsResult ? skillRows.length > 0 && skillRows.every((r) => r.passed) : passed;
-    const liText = `🏆 I just passed the "${displayTestTitle}" skill assessment for ${roleName} on JobBlueprint with a score of ${score}%! Career roadmaps and skill tracking. #CareerDevelopment #JobBlueprint`;
+    const liText = `🏆 I just passed the "${displayTestTitle}" skill assessment for ${roleName} on TalentX with a score of ${score}%! Career roadmaps and skill tracking. #CareerDevelopment #TalentX`;
     const liUrl  = `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent("https://jobblueprint.app")}&summary=${encodeURIComponent(liText)}`;
 
     return (
@@ -620,7 +620,7 @@ export default function SkillTestPage() {
                   style={{ ...btn("white","#6366f1"), flex:1, justifyContent:"center", borderRadius:12, minWidth:220 }}
                   onClick={() => router.replace(`${roleBase}${roleFlowQs}`)}
                 >
-                  Go to Blueprint
+                  Go to TalentX
                 </button>
                 <button
                   style={{ ...btn("white","#0ea5e9"), flex:1, justifyContent:"center", borderRadius:12, minWidth:220 }}
@@ -727,7 +727,7 @@ export default function SkillTestPage() {
                       style={{ ...btn("white","#6366f1"), flex:1, justifyContent:"center", borderRadius:12, minWidth:220 }}
                       onClick={() => router.replace(`${roleBase}${roleFlowQs}`)}
                     >
-                      Go to Blueprint
+                      Go to TalentX
                     </button>
                     <button
                       style={{ ...btn("white","#0ea5e9"), flex:1, justifyContent:"center", borderRadius:12, minWidth:220 }}

@@ -1,5 +1,5 @@
 /**
- * One-off: recolor red/orange accents in `employee-growth-path.png` to match Blueprint blue/teal palette.
+ * One-off: recolor red/orange accents in `employee-growth-path.png` to match TalentX blue/teal palette.
  *
  * - Targets: map pins + target rings + tie (red-ish pixels) -> teal.
  * - Leaves: white path, dark suit, background untouched.
@@ -16,7 +16,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(__dirname, "..");
 const input = path.join(root, "apps/web/public/ui-images/employee-growth-path.png");
 
-// Blueprint accent: teal leaning mint (pairs with #054a90 + #4f46e5)
+// TalentX accent: teal leaning mint (pairs with #054a90 + #4f46e5)
 const OUT = { r: 0, g: 191, b: 166 }; // #00bfa6
 
 function isAccentRed(r, g, b, a) {

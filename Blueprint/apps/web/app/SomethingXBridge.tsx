@@ -5,7 +5,7 @@ import { getApiPrefix } from "@/lib/apiBase";
 
 /**
  * When SomethingX redirects here with ?token=&sxUserId=&email=&name=&userType=,
- * persist identity for Job Blueprint v2 (studentId) and optionally seed user profile.
+ * persist identity for TalentX (studentId) and optionally seed user profile.
  * URL params are then stripped to avoid leaking the token in the address bar.
  */
 export function SomethingXBridge() {
