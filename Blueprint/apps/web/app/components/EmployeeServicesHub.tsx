@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { useMemo } from "react";
+import { useEffect, useMemo } from "react";
+import { usePathname, useSearchParams } from "next/navigation";
 import { appPath, publicAssetUrl } from "@/lib/apiBase";
 import type { OrgUser } from "@/lib/orgAuth";
 import { buildInterviewXStudentPrepHomeUrl } from "@/lib/interviewx";
@@ -23,6 +24,20 @@ const INTERVIEW_PREP_TIPS = [
 
 export function EmployeeServicesHub(props: { user: OrgUser }) {
   const { user } = props;
+  const searchParams = useSearchParams();
+  const pathname = usePathname();
+  const isNew = searchParams?.get("new") === "1";
+
+  useEffect(() => {
+    if (!isNew) return;
+    const sp = new URLSearchParams(searchParams?.toString() || "");
+    sp.delete("new");
+    const next = sp.toString();
+    const url = next ? `${pathname}?${next}` : pathname;
+    window.history.replaceState({}, "", url);
+    // intentionally run once on mount for current URL
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const interviewPrepUrl = useMemo(() => {
     return buildInterviewXStudentPrepHomeUrl({
@@ -48,7 +63,9 @@ export function EmployeeServicesHub(props: { user: OrgUser }) {
                 <span className="emp-eyebrow-dot" />
                 Employee workspace
               </span>
-              <h1 className="emp-h1">Welcome back, {user.fullName?.split(" ")[0] || "there"}</h1>
+              <h1 className="emp-h1">
+                {isNew ? "Welcome" : "Welcome back"}, {user.fullName?.split(" ")[0] || "there"}
+              </h1>
               <p className="emp-sub">
                 Choose how you want to grow today: structured role development in Job Blueprint, or interview readiness
                 and practice in InterviewX. Built for teams that care about measurable outcomes.
@@ -146,46 +163,6 @@ export function EmployeeServicesHub(props: { user: OrgUser }) {
             </div>
           </div>
         </div>
-
-        <motion.section
-          className="emp-about"
-          initial={fade}
-          animate={fadeIn}
-          transition={{ duration: 0.5, delay: 0.16 }}
-          aria-labelledby="emp-about-heading"
-        >
-          <h2 id="emp-about-heading" className="emp-about-title">
-            About these services
-          </h2>
-          <div className="emp-about-grid">
-            <div className="emp-about-card">
-              <h3>Job Blueprint</h3>
-              <p>
-                Job Blueprint connects employees to <b>role-specific learning paths</b>: what to study, how to validate
-                skills with tests, and how progress rolls up for managers. It is ideal when your organization wants
-                consistent expectations across teams and evidence-backed development conversations.
-              </p>
-              <ul className="emp-about-list">
-                <li>Target roles, roadmaps, and gap analysis in one place</li>
-                <li>Assessments and prep tied to real job requirements</li>
-                <li>Visibility for HR and managers without losing employee ownership</li>
-              </ul>
-            </div>
-            <div className="emp-about-card">
-              <h3>Interview preparation (InterviewX)</h3>
-              <p>
-                InterviewX focuses on <b>how candidates show up in interviews</b>: communication, problem-solving,
-                HR and technical rounds, and repeatable practice. It complements Blueprint by sharpening delivery and
-                confidence before high-stakes conversations.
-              </p>
-              <ul className="emp-about-list">
-                <li>Technical and HR practice with clear feedback loops</li>
-                <li>Labs and sessions designed for remote and hybrid interviews</li>
-                <li>Enterprise-friendly workflows your talent team can standardize on</li>
-              </ul>
-            </div>
-          </div>
-        </motion.section>
       </div>
 
       <div className="emp-footer-wrap">

@@ -140,8 +140,10 @@ function RolesPageContent() {
     if (!isRecommendMode) return roles;
     if (!recoResolved) return [];
     if (recommendRolesList.length > 0) {
-      const lower = new Set(recommendRolesList.map((r) => r.toLowerCase()));
-      return roles.filter((r) => lower.has(r.toLowerCase()));
+      // Match roles ignoring case/punctuation (backend also normalizes like this).
+      const key = (s: string) => String(s || "").toLowerCase().replace(/[^a-z0-9]+/g, "");
+      const want = new Set(recommendRolesList.map((r) => key(r)).filter(Boolean));
+      return roles.filter((r) => want.has(key(r)));
     }
     if (domainDerivedRoles && domainDerivedRoles.length > 0) return domainDerivedRoles;
     // HR: if org map returned nothing, keep the full role catalog so HR can still recommend.
