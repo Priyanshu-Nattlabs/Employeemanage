@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { NavBar } from "./components/NavBar";
 
 export const metadata: Metadata = {
@@ -6,8 +6,20 @@ export const metadata: Metadata = {
   description: "Career roadmap and learning plan"
 };
 
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+};
+
 const globalCss = `
   *, *::before, *::after { box-sizing: border-box; }
+  img, video, canvas, svg { max-width: 100%; height: auto; }
+  /* Prevent long content from forcing horizontal scroll */
+  :where(p, h1, h2, h3, h4, h5, h6, li, a, button, label) { overflow-wrap: anywhere; }
+  :where(pre, code) { max-width: 100%; }
+  pre { overflow-x: auto; }
+  table { width: 100%; max-width: 100%; }
   html { overflow-x: hidden; }
   body { margin: 0; padding: 0; font-family: Inter, "Segoe UI", system-ui, sans-serif; background: #f8fafc; color: #0f172a; -webkit-font-smoothing: antialiased; overflow-x: hidden; }
   a { color: inherit; }
