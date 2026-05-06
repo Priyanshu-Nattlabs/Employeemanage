@@ -412,7 +412,7 @@ function RolePageContent() {
   const [mounted,         setMounted]         = useState(false);
   const [viewerRole,      setViewerRole]      = useState<string>("");
   const [userId,          setUserId]          = useState("demo-student-1");
-  /** Job title from org profile — used to load a baseline blueprint role when comparing at target Level 1 */
+  /** Job title from org profile — used as baseline role for skill comparison. */
   const [employeeDesignation, setEmployeeDesignation] = useState("");
   const [profileRemainingMonths, setProfileRemainingMonths] = useState<number | null>(null);
   const [data,            setData]            = useState<any>(null);
@@ -783,32 +783,21 @@ function RolePageContent() {
       setProficiencyDelta(items);
     };
 
-    // Level 1: compare target role (level 1) to user's current job role (designation → blueprint role name).
-    if (currentLevel === 1) {
-      if (!designation) {
-        setPreviousLevelSkills([]);
-        setProficiencyDelta([]);
-        return;
-      }
-      setSkillCompareLoading(true);
-      Promise.all([
-        fetch(`${API}/api/blueprint/role/${enc(designation)}`).then((r) => r.json()).catch(() => null),
-        fetch(
-          `${API}/api/blueprint/role/${enc(roleName)}/proficiency-delta?level=1&baselineRole=${enc(designation)}`
-        )
-          .then((r) => r.json())
-          .catch(() => null),
-      ])
-        .then(([d, delta]) => applyDelta(d, delta))
-        .finally(() => setSkillCompareLoading(false));
+    // Always compare with employee's current designation at the same selected level.
+    if (!designation) {
+      setPreviousLevelSkills([]);
+      setProficiencyDelta([]);
       return;
     }
-
-    const previousLevel = String(currentLevel - 1);
+    const levelStr = String(currentLevel);
     setSkillCompareLoading(true);
     Promise.all([
-      fetch(`${API}/api/blueprint/role/${enc(roleName)}?level=${enc(previousLevel)}`).then((r) => r.json()).catch(() => null),
-      fetch(`${API}/api/blueprint/role/${enc(roleName)}/proficiency-delta?level=${enc(employeeLevel)}`).then((r) => r.json()).catch(() => null),
+      fetch(`${API}/api/blueprint/role/${enc(designation)}?level=${enc(levelStr)}`).then((r) => r.json()).catch(() => null),
+      fetch(
+        `${API}/api/blueprint/role/${enc(roleName)}/proficiency-delta?level=${enc(levelStr)}&baselineRole=${enc(designation)}`
+      )
+        .then((r) => r.json())
+        .catch(() => null),
     ])
       .then(([d, delta]) => applyDelta(d, delta))
       .finally(() => setSkillCompareLoading(false));
@@ -1205,22 +1194,21 @@ function RolePageContent() {
   const skillComparisonMode = useMemo(() => {
     const n = Number(employeeLevel);
     if (!Number.isFinite(n) || n < 1) return "none" as const;
-    if (n === 1) return employeeDesignation.trim() ? ("baseline" as const) : ("none" as const);
-    return "adjacent" as const;
+    return employeeDesignation.trim() ? ("baseline" as const) : ("none" as const);
   }, [employeeLevel, employeeDesignation]);
   const waitForSkillComparison =
-    (skillComparisonMode === "adjacent" || skillComparisonMode === "baseline") && skillCompareLoading;
+    skillComparisonMode === "baseline" && skillCompareLoading;
   const skillCompareWaitLabel =
     skillComparisonMode === "baseline"
-      ? "Matching skills with your current job role…"
-      : "Comparing with previous level…";
+      ? "Matching skills with your current designation and level…"
+      : "";
   const comparativeChartTitle =
     skillComparisonMode === "baseline"
-      ? "Technical skills: current job role vs target (Level 1)"
+      ? `Technical skills: current designation vs target (Level ${employeeLevel})`
       : "Common Technical Skills: Current vs Target Proficiency Need";
   const comparativeChartSub =
     skillComparisonMode === "baseline"
-      ? `Baseline is your profile job title (“${employeeDesignation.trim()}”) matched to a catalogue role when possible.`
+      ? `Baseline is your profile designation (“${employeeDesignation.trim()}”) at Level ${employeeLevel}, matched to the closest catalogue role.`
       : "Compare required proficiency for your current role level and the selected target role level.";
   const baselineLegendLabel = skillComparisonMode === "baseline" ? "Your current role" : "Current role need";
 
@@ -1309,27 +1297,14 @@ function RolePageContent() {
                 </div>
               </div>
             )}
-            {(Number(employeeLevel) > 1 || skillComparisonMode === "baseline") && (
+            {skillComparisonMode === "baseline" && (
               <div style={{ margin: "0 0 10px", fontSize: 12, color: "#475569", display: "flex", gap: 10, flexWrap: "wrap" }}>
-                {skillComparisonMode === "baseline" ? (
-                  <>
-                    <span style={{ background: "#ECFDF5", border: "1px solid #86EFAC", borderRadius: 999, padding: "4px 10px", fontWeight: 700, color: "#166534" }}>
-                      Overlap with current role
-                    </span>
-                    <span style={{ background: "#FFF7ED", border: "1px solid #FDBA74", borderRadius: 999, padding: "4px 10px", fontWeight: 700, color: "#9A3412" }}>
-                      New for this target (Level 1)
-                    </span>
-                  </>
-                ) : (
-                  <>
-                    <span style={{ background: "#ECFDF5", border: "1px solid #86EFAC", borderRadius: 999, padding: "4px 10px", fontWeight: 700, color: "#166534" }}>
-                      Common with Level {Number(employeeLevel) - 1}
-                    </span>
-                    <span style={{ background: "#FFF7ED", border: "1px solid #FDBA74", borderRadius: 999, padding: "4px 10px", fontWeight: 700, color: "#9A3412" }}>
-                      New at Level {employeeLevel}
-                    </span>
-                  </>
-                )}
+                <span style={{ background: "#ECFDF5", border: "1px solid #86EFAC", borderRadius: 999, padding: "4px 10px", fontWeight: 700, color: "#166534" }}>
+                  Overlap with current designation
+                </span>
+                <span style={{ background: "#FFF7ED", border: "1px solid #FDBA74", borderRadius: 999, padding: "4px 10px", fontWeight: 700, color: "#9A3412" }}>
+                  New for target role at Level {employeeLevel}
+                </span>
               </div>
             )}
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 8, marginBottom: 12 }}>
@@ -1698,27 +1673,14 @@ function RolePageContent() {
               </div>
             </div>
           )}
-          {(Number(employeeLevel) > 1 || skillComparisonMode === "baseline") && (
+          {skillComparisonMode === "baseline" && (
             <div style={{ margin: "0 0 10px", fontSize: 12, color: "#475569", display: "flex", gap: 10, flexWrap: "wrap" }}>
-              {skillComparisonMode === "baseline" ? (
-                <>
-                  <span style={{ background: "#ECFDF5", border: "1px solid #86EFAC", borderRadius: 999, padding: "4px 10px", fontWeight: 700, color: "#166534" }}>
-                    Overlap with current role
-                  </span>
-                  <span style={{ background: "#FFF7ED", border: "1px solid #FDBA74", borderRadius: 999, padding: "4px 10px", fontWeight: 700, color: "#9A3412" }}>
-                    New for this target (Level 1)
-                  </span>
-                </>
-              ) : (
-                <>
-                  <span style={{ background: "#ECFDF5", border: "1px solid #86EFAC", borderRadius: 999, padding: "4px 10px", fontWeight: 700, color: "#166534" }}>
-                    Common with Level {Number(employeeLevel) - 1}
-                  </span>
-                  <span style={{ background: "#FFF7ED", border: "1px solid #FDBA74", borderRadius: 999, padding: "4px 10px", fontWeight: 700, color: "#9A3412" }}>
-                    New at Level {employeeLevel}
-                  </span>
-                </>
-              )}
+              <span style={{ background: "#ECFDF5", border: "1px solid #86EFAC", borderRadius: 999, padding: "4px 10px", fontWeight: 700, color: "#166534" }}>
+                Overlap with current designation
+              </span>
+              <span style={{ background: "#FFF7ED", border: "1px solid #FDBA74", borderRadius: 999, padding: "4px 10px", fontWeight: 700, color: "#9A3412" }}>
+                New for target role at Level {employeeLevel}
+              </span>
             </div>
           )}
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 8, marginBottom: 12 }}>

@@ -4,8 +4,8 @@ import { useEffect, useMemo, useState } from "react";
 import { appPath } from "@/lib/apiBase";
 import {
   orgGetPublicSignupOrgOptions,
-  orgGetDesignationOptions,
   orgRegisterEmployee,
+  orgGetDesignationOptions,
   setOrgAuthInStorage,
   type OrgSignupOptions,
 } from "@/lib/orgAuth";
@@ -51,6 +51,9 @@ export default function EmployeeRegisterPage() {
   const [fullName, setFullName] = useState("");
   const [companyName, setCompanyName] = useState("");
   const [designation, setDesignation] = useState("");
+  const [designationLevel, setDesignationLevel] = useState("");
+  const [designationOptions, setDesignationOptions] = useState<string[]>([]);
+  const [designationLoading, setDesignationLoading] = useState(false);
   const [department, setDepartment] = useState("");
   const [deptMode, setDeptMode] = useState<"PICK" | "OTHER">("PICK");
   const [deptOther, setDeptOther] = useState("");
@@ -66,9 +69,6 @@ export default function EmployeeRegisterPage() {
   const [signupOrgLoading, setSignupOrgLoading] = useState(false);
 
   const useOrgCatalog = Boolean(signupOrg?.industries?.length);
-
-  const [designationOptions, setDesignationOptions] = useState<string[]>([]);
-  const [designationOptionsLoading, setDesignationOptionsLoading] = useState(false);
 
   /** With org catalog: only departments for the selected industry (none until industry is chosen). */
   const departmentSelectOptions = useMemo(() => {
@@ -120,23 +120,23 @@ export default function EmployeeRegisterPage() {
   useEffect(() => {
     let cancelled = false;
     const q = designation.trim();
+    if (!q) {
+      setDesignationOptions([]);
+      setDesignationLoading(false);
+      return;
+    }
+    setDesignationLoading(true);
     const t = window.setTimeout(async () => {
-      if (!q) {
-        setDesignationOptions([]);
-        setDesignationOptionsLoading(false);
-        return;
-      }
-      setDesignationOptionsLoading(true);
       try {
         const list = await orgGetDesignationOptions(q);
         if (cancelled) return;
-        setDesignationOptions(Array.isArray(list) ? list.slice(0, 30) : []);
+        setDesignationOptions(Array.isArray(list) ? list.slice(0, 12) : []);
       } catch {
         if (!cancelled) setDesignationOptions([]);
       } finally {
-        if (!cancelled) setDesignationOptionsLoading(false);
+        if (!cancelled) setDesignationLoading(false);
       }
-    }, 250);
+    }, 180);
     return () => {
       cancelled = true;
       window.clearTimeout(t);
@@ -161,14 +161,16 @@ export default function EmployeeRegisterPage() {
       if (!inferredDomain) throw new Error("Please enter a valid company email");
       const designationTrimmed = designation.trim();
       if (!designationTrimmed) throw new Error("Designation is required");
+      if (!designationLevel) throw new Error("Level is required");
       if (!effectiveDepartment) throw new Error("Department is required");
       if (!effectiveIndustry) throw new Error("Industry is required");
+      const designationWithLevel = `${designationTrimmed} (Level ${designationLevel})`;
 
       const r = await orgRegisterEmployee({
         email,
         password,
         fullName,
-        designation: designationTrimmed,
+        designation: designationWithLevel,
         department: effectiveDepartment,
         industry: effectiveIndustry,
         companyName,
@@ -179,14 +181,14 @@ export default function EmployeeRegisterPage() {
         companyDomain: inferredDomain,
       });
       if ("verificationRequired" in r && r.verificationRequired) {
-        const nextPath = appPath("/employee/?new=1");
+        const nextPath = appPath("/employee/");
         const debugOtpQuery = r.debugOtp ? `&debugOtp=${encodeURIComponent(r.debugOtp)}` : "";
         window.location.href = `${appPath("/auth/verify-otp")}?email=${encodeURIComponent(r.email)}&next=${encodeURIComponent(nextPath)}${debugOtpQuery}`;
         return;
       }
       if (!("token" in r) || !r.token || !r.user) throw new Error("Registration succeeded but login payload missing.");
       setOrgAuthInStorage(r.token, r.user);
-      window.location.href = appPath("/employee/?new=1");
+      window.location.href = appPath("/employee/");
     } catch (err: any) {
       setError(err?.message || "Registration failed");
     } finally {
@@ -224,17 +226,38 @@ export default function EmployeeRegisterPage() {
             required
             type="text"
             style={inputStyle}
-            placeholder="Employee"
-            list="designation-options"
+            placeholder="e.g. Employee, Software Engineer"
+            list="designation-suggestions"
           />
-          <datalist id="designation-options">
+          <datalist id="designation-suggestions">
             {designationOptions.map((d) => (
               <option key={d} value={d} />
             ))}
           </datalist>
           <div style={hintStyle}>
-            Start typing to see role suggestions{designationOptionsLoading ? "…" : ""}.
+            {designation.trim()
+              ? designationLoading
+                ? "Loading role suggestions..."
+                : designationOptions.length
+                  ? "Suggestions are from saved blueprint roles in DB."
+                  : "No matching saved roles found. You can still type manually."
+              : "Start typing to see role suggestions from saved blueprint roles."}
           </div>
+        </Field>
+        <Field label="Level">
+          <select
+            value={designationLevel}
+            onChange={(e) => setDesignationLevel(e.target.value)}
+            required
+            style={inputStyle}
+          >
+            <option value="" disabled>
+              Select level
+            </option>
+            <option value="1">1</option>
+            <option value="2">2</option>
+            <option value="3">3</option>
+          </select>
         </Field>
         <Field label="Industry">
           <div style={{ display: "grid", gap: 8 }}>
@@ -338,13 +361,13 @@ export default function EmployeeRegisterPage() {
           <input value={employeeId} onChange={(e) => setEmployeeId(e.target.value)} required style={inputStyle} placeholder="Employee ID" />
         </Field>
 
-        <Field label="Reporting manager email">
+        <Field label="Reporting manager email (Gmail)">
           <input
             value={reportingManagerEmail}
             onChange={(e) => setReportingManagerEmail(e.target.value)}
             type="email"
             style={inputStyle}
-            placeholder="manager@company.com"
+            placeholder="manager@gmail.com"
           />
           <div style={hintStyle}>
             Optional. If provided, your manager will see you in their employee database.
