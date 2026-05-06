@@ -98,6 +98,9 @@ export function EmployeeServicesHub(props: { user: OrgUser }) {
                         prep and assessments, and show readiness with data your leaders can review.
                       </p>
                     </div>
+                    <div className="emp-card-icon bp" aria-hidden>
+                      BP
+                    </div>
                   </div>
                   <div className="emp-card-visual">
                     <img src={heroImg} alt="" decoding="async" />
@@ -128,6 +131,9 @@ export function EmployeeServicesHub(props: { user: OrgUser }) {
                         Practice technical and HR rounds, get structured feedback, use labs and mentor flows, and walk
                         into real interviews with confidence — aligned to how hiring teams actually evaluate candidates.
                       </p>
+                    </div>
+                    <div className="emp-card-icon ix" aria-hidden>
+                      IX
                     </div>
                   </div>
                   <div className="emp-card-visual" style={{ paddingTop: 8 }}>
