@@ -1,6 +1,6 @@
-# Job Blueprint v2 (Docker)
+# TalentX (Docker)
 
-This folder contains a Docker Compose setup for the `job-blueprint-v2` app.
+This folder contains a Docker Compose setup for the `talentx` app.
 
 ## Start
 From this folder:

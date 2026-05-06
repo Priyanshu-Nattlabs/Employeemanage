@@ -272,7 +272,7 @@ export class InterviewXService {
     const interviewXBackendOrigin = this.normalizeOrigin(
       this.config.get<string>("INTERVIEWX_BACKEND_ORIGIN") ||
         this.config.get<string>("NEXT_PUBLIC_INTERVIEWX_ORIGIN") ||
-        // When Blueprint API runs inside Docker, `localhost` points to the same container.
+        // When TalentX API runs inside Docker, `localhost` points to the same container.
         // `host.docker.internal` reaches the host machine where InterviewX is exposed.
         "http://host.docker.internal:8180",
     );
@@ -473,7 +473,7 @@ export class InterviewXService {
     for (const configId of uniqueConfigIds) {
       const candidates = candidatesByConfig.get(configId) ?? [];
       if (candidates.length === 0) {
-        // At minimum count it as one scheduled (from our Blueprint record)
+        // At minimum count it as one scheduled (from our TalentX record)
         totalScheduled += 1;
         totalPending += 1;
         continue;
@@ -514,7 +514,7 @@ export class InterviewXService {
     const failed = hiringBreakdown.NO_HIRE;
     const maybe = hiringBreakdown.MAYBE;
 
-    // Monthly trend – use stored interviewStartDateTime from Blueprint records
+    // Monthly trend – use stored interviewStartDateTime from TalentX records
     const monthCountMap = new Map<string, number>();
     const monthOrder: string[] = [];
     const monthLabels = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];

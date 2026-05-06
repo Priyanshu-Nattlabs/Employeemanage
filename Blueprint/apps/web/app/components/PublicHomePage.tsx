@@ -312,7 +312,7 @@ export function PublicHomePage() {
       <section className="section" aria-labelledby="modules-heading">
         <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "end", flexWrap: "wrap" }}>
           <h2 id="modules-heading" className="section-title">Four connected modules, one talent system</h2>
-          <p style={{ margin: 0, color: "#1F5FBF", fontSize: 13 }}>Blueprint → Evaluate → Prepare → Monitor — all aligned to roles.</p>
+          <p style={{ margin: 0, color: "#1F5FBF", fontSize: 13 }}>TalentX → Evaluate → Prepare → Monitor — all aligned to roles.</p>
         </div>
 
         <div className="modules-grid">
@@ -321,21 +321,21 @@ export function PublicHomePage() {
               <div style={{ display: "flex", gap: 12, minWidth: 0 }}>
                 <div className="module-icon" aria-hidden>BP</div>
                 <div style={{ minWidth: 0 }}>
-                  <h3 className="module-title">Blueprint (Role Pathways)</h3>
+                  <h3 className="module-title">TalentX (Role Pathways)</h3>
                   <p className="module-desc">
                     Define target roles, required skills, and a guided roadmap. Employees get clarity; managers get consistency.
                   </p>
                 </div>
               </div>
             </div>
-            <div className="module-tags" aria-label="Blueprint highlights">
+            <div className="module-tags" aria-label="TalentX highlights">
               <span className="tag">Skill gaps</span>
               <span className="tag alt">Roadmaps</span>
               <span className="tag">Assessments</span>
             </div>
             <div className="module-cta">
               <a href={appPath("/role/")} className="module-link primary">
-                Explore Blueprints <span aria-hidden>→</span>
+                Explore TalentX <span aria-hidden>→</span>
               </a>
               <a href={appPath("/target-role")} className="module-link">
                 Start a plan <span aria-hidden>→</span>

@@ -1,5 +1,5 @@
 /**
- * One-off: recolor the "growth puzzle" hero image to match Blueprint blue/teal palette.
+ * One-off: recolor the "growth puzzle" hero image to match TalentX blue/teal palette.
  *
  * - Converts bright red highlight + rays -> teal (#00bfa6).
  * - Slight cool-tint on the light gray background for better harmony with the hero gradient.

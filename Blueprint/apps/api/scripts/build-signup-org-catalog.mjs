@@ -154,7 +154,7 @@ function main() {
     }
     console.log(`CSV: ${csvPath} (${byMap.size} industries so far)`);
   } else {
-    console.warn("⚠️  Master_functions CSV not found; set SIGNUP_CATALOG_CSV or place file under Blueprint/");
+    console.warn("⚠️  Master_functions CSV not found; set SIGNUP_CATALOG_CSV or place file under TalentX/");
   }
 
   if (xlsxPath) {

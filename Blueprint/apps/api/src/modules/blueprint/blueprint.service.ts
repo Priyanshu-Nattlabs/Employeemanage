@@ -850,7 +850,7 @@ Return ONLY the JSON object.`;
     const q = String(topic || "").trim().replace(/\s+/g, " ");
     if (!q) return { query: "", wikipedia: [] as Item[], books: [] as Item[], papers: [] as Item[], videos: [] as Item[] };
 
-    const UA = "JobBlueprintStudyBot/1.0 (educational; https://github.com/)";
+    const UA = "TalentXStudyBot/1.0 (educational; https://github.com/)";
 
     const fetchJson = async (url: string) => {
       const r = await fetch(url, { headers: { "User-Agent": UA, Accept: "application/json" } });

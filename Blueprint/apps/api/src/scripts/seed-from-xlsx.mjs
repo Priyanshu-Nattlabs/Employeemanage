@@ -10,7 +10,7 @@
  *   BLUEPRINT_XLSX_FILE      — single file (backward compatible)
  *
  * Defaults (run from apps/api): ../../Job_Blueprint_Final_Phase13.xlsx then ../../NEW JD 123.xlsx (if missing, ../../NEW JD.xlsx).
- * One-command NEW JD only: from Blueprint repo root run `npm run seed:new-jd` (see scripts/seed-new-jd-workbook.mjs).
+ * One-command NEW JD only: from TalentX repo root run `npm run seed:new-jd` (see scripts/seed-new-jd-workbook.mjs).
  */
 import { readFileSync, existsSync } from "fs";
 import path from "path";
@@ -477,7 +477,7 @@ async function main() {
 
   for (const f of files) {
     if (!existsSync(f)) {
-      throw new Error(`Seed file not found: ${f}\nFix BLUEPRINT_SEED_SOURCES paths or place xlsx next to the Blueprint repo root.`);
+      throw new Error(`Seed file not found: ${f}\nFix BLUEPRINT_SEED_SOURCES paths or place xlsx next to the TalentX repo root.`);
     }
   }
 

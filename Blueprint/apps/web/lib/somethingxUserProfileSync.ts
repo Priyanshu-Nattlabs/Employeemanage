@@ -1,5 +1,5 @@
 /**
- * Pulls the student profile from SomethingX (Java API) and upserts into Job Blueprint v2 (Nest user_profiles).
+ * Pulls the student profile from SomethingX (Java API) and upserts into TalentX (Nest user_profiles).
  * Uses the same JWT stored at SSO handoff (somethingx_auth_token).
  */
 

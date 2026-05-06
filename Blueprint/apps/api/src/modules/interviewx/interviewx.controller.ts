@@ -38,10 +38,10 @@ export class InterviewXController {
   ) {}
 
   /**
-   * Blueprint Manager one-click flow:
-   * - Server looks up the employee + their active prep role in Blueprint DB
+   * TalentX Manager one-click flow:
+   * - Server looks up the employee + their active prep role in TalentX DB
    * - Creates InterviewX AI interview config + candidate (no manual forms)
-   * - Returns the generated credentials so Blueprint UI can display them
+   * - Returns the generated credentials so TalentX UI can display them
    */
   @Post("blueprint-open-ai-interview")
   async blueprintOpenAiInterview(

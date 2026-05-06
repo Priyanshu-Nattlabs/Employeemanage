@@ -90,7 +90,7 @@ export default function ManagerPortalHomePage() {
               {greeting}, {firstName}
             </h1>
             <p style={{ margin: "8px 0 0", fontSize: 14, color: "rgba(255,255,255,0.65)", maxWidth: 520, lineHeight: 1.55 }}>
-              Choose where to work next: interviews on InterviewX, candidate development in Job Blueprint, or the combined overview hub.
+              Choose where to work next: interviews on InterviewX, candidate development in TalentX, or the combined overview hub.
             </p>
           </div>
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
@@ -169,7 +169,7 @@ export default function ManagerPortalHomePage() {
               <span style={{ fontSize: 28 }}>📈</span>
               <div style={{ fontSize: 17, fontWeight: 900 }}>Candidate development</div>
               <div style={{ fontSize: 13, color: "#64748b", lineHeight: 1.5, flex: 1 }}>
-                Open the CDP workspace (configured via NEXT_PUBLIC_CDP_WEB_ORIGIN) with a Blueprint hand-off.
+                Open the CDP workspace (configured via NEXT_PUBLIC_CDP_WEB_ORIGIN) with a TalentX hand-off.
               </div>
               <span style={{ fontSize: 13, fontWeight: 800, color: "#059669" }}>Open CDP ↗</span>
             </a>
@@ -191,7 +191,7 @@ export default function ManagerPortalHomePage() {
               <span style={{ fontSize: 28 }}>📈</span>
               <div style={{ fontSize: 17, fontWeight: 900 }}>Candidate development</div>
               <div style={{ fontSize: 13, color: "#64748b", lineHeight: 1.5, flex: 1 }}>
-                Track role prep, skill tests, recommendations, and department progress for your team in Job Blueprint.
+                Track role prep, skill tests, recommendations, and department progress for your team in TalentX.
               </div>
               <span style={{ fontSize: 13, fontWeight: 800, color: "#059669" }}>Open manager dashboard →</span>
             </Link>

@@ -1,5 +1,5 @@
 /**
- * InterviewX deep links used by Blueprint UI.
+ * InterviewX deep links used by TalentX UI.
  */
 export type BuildInterviewXUrlInput = {
   prefillRole?: string;
@@ -145,7 +145,7 @@ export function buildInterviewXAiInterviewUrl(
 export function buildInterviewXIndustryOpenUrl(): string {
   const base = interviewXBase();
   // Always open the InterviewX manager landing/dashboard page so all
-  // manager entry points in Blueprint are consistent.
+  // manager entry points in TalentX are consistent.
   return `${base}/industry/ai-interview/dashboard`;
 }
 

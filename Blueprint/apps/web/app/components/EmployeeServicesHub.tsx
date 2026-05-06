@@ -67,7 +67,7 @@ export function EmployeeServicesHub(props: { user: OrgUser }) {
                 {isNew ? "Welcome" : "Welcome back"}, {user.fullName?.split(" ")[0] || "there"}
               </h1>
               <p className="emp-sub">
-                Choose how you want to grow today: structured role development in Job Blueprint, or interview readiness
+                Choose how you want to grow today: structured role development in TalentX, or interview readiness
                 and practice in InterviewX. Built for teams that care about measurable outcomes.
               </p>
               <div className="emp-meta">
@@ -87,11 +87,11 @@ export function EmployeeServicesHub(props: { user: OrgUser }) {
 
             <div className="emp-cards">
               <motion.div initial={fade} animate={fadeIn} transition={{ duration: 0.5, delay: 0.06 }}>
-                <a href={blueprintHref} className="emp-card" aria-label="Open Job Blueprint">
+                <a href={blueprintHref} className="emp-card" aria-label="Open TalentX">
                   <span className="emp-shine" aria-hidden />
                   <div className="emp-card-top">
                     <div>
-                      <div className="emp-card-kicker">Job Blueprint</div>
+                      <div className="emp-card-kicker">TalentX</div>
                       <h2 className="emp-card-title">Role pathways and skill development</h2>
                       <p className="emp-card-desc">
                         Turn company role standards into a clear path: pick a target role, see skill gaps, follow guided
@@ -107,7 +107,7 @@ export function EmployeeServicesHub(props: { user: OrgUser }) {
                   </div>
                   <div className="emp-card-footer">
                     <span className="emp-cta">
-                      Open Blueprint <span aria-hidden>{"\u2192"}</span>
+                      Open TalentX <span aria-hidden>{"\u2192"}</span>
                     </span>
                     <span className="emp-card-hint">Same sign-in</span>
                   </div>
