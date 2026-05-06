@@ -270,7 +270,7 @@ function ManagerDashboardContent() {
         position: "fixed",
         inset: 0,
         zIndex: -1,
-        background: `${theme.pageRadials}, ${theme.pageBg}`,
+        background: "radial-gradient(900px 500px at 100% -10%, rgba(99,102,241,0.07), transparent 60%), radial-gradient(700px 400px at -10% 10%, rgba(14,165,233,0.06), transparent 60%), linear-gradient(180deg, #f8fafc 0%, #eef2f7 100%)",
         pointerEvents: "none",
       }} />
 
@@ -325,16 +325,16 @@ function ManagerDashboardContent() {
 
       {/* KPI cards */}
       <div className="manager-kpi-grid">
-        <KpiCard label="Employees"           value={String(stats.total)}                                hint={isHR ? "All departments" : "Same industry & dept, or reports to you"} icon="👥" accent={theme.primary} />
-        <KpiCard label="Actively preparing"  value={`${stats.active}`}                                  hint={`${stats.activePct}% of team`}                                  icon="🔥" accent={theme.emerald} />
-        <KpiCard label="Average progress"    value={`${stats.avgProgress}%`}                            hint="Across active prep plans"                                       icon="📈" accent={theme.indigo} />
-        <KpiCard label="Avg. test score"     value={stats.avgScore == null ? "—" : `${stats.avgScore}%`} hint={`${stats.testCount} tests recorded`}                           icon="🎯" accent={theme.amber} />
+        <KpiCard label="Employees"           value={String(stats.total)}                                hint={isHR ? "All departments" : "Same industry & dept, or reports to you"} icon="👥" accent="#3b82f6" />
+        <KpiCard label="Actively preparing"  value={`${stats.active}`}                                  hint={`${stats.activePct}% of team`}                                  icon="🔥" accent="#16a34a" />
+        <KpiCard label="Average progress"    value={`${stats.avgProgress}%`}                            hint="Across active prep plans"                                       icon="📈" accent="#8b5cf6" />
+        <KpiCard label="Avg. test score"     value={stats.avgScore == null ? "—" : `${stats.avgScore}%`} hint={`${stats.testCount} tests recorded`}                           icon="🎯" accent="#f97316" />
       </div>
 
       {/* Comparison + Distribution */}
       <div className="manager-two-col">
-        <div className="manager-dash-card" style={{ ...cardElevated, ...cardAccentTop(theme.indigo), minWidth: 0, maxWidth: "100%" }}>
-          <div style={cardTitle}><span style={titleIcon(theme.indigo)}>📊</span>Progress distribution</div>
+        <div className="manager-dash-card" style={{ ...cardElevated, ...cardAccentTop("#6366f1"), minWidth: 0, maxWidth: "100%" }}>
+          <div style={cardTitle}><span style={titleIcon("#6366f1")}>📊</span>Progress distribution</div>
           <div style={cardSub}>How active learners are spread across progress bands.</div>
           <div style={{ marginTop: 14, display: "grid", gap: 10 }}>
             {stats.buckets.map((b) => (
@@ -346,9 +346,9 @@ function ManagerDashboardContent() {
           </div>
         </div>
 
-        <div className="manager-dash-card" style={{ ...cardElevated, ...cardAccentTop(theme.primary), minWidth: 0, maxWidth: "100%" }}>
+        <div className="manager-dash-card" style={{ ...cardElevated, ...cardAccentTop("#3b82f6"), minWidth: 0, maxWidth: "100%" }}>
           <div style={cardTitle}>
-            <span style={titleIcon(theme.primary)}>{isHR ? "🏢" : "🏆"}</span>
+            <span style={titleIcon("#3b82f6")}>{isHR ? "🏢" : "🏆"}</span>
             {isHR ? "Department comparison" : "Top vs. lagging in your team"}
           </div>
           <div style={cardSub}>
@@ -370,8 +370,8 @@ function ManagerDashboardContent() {
 
       {/* Bulk invite + Schedule interviews (two cards in one row) */}
       <div className="manager-two-col">
-        <div className="manager-dash-card" style={{ ...cardElevated, ...cardAccentTop(theme.emerald), minWidth: 0, maxWidth: "100%" }}>
-          <div style={cardTitle}><span style={titleIcon(theme.emerald)}>📤</span>Invite employees from Excel</div>
+        <div className="manager-dash-card" style={{ ...cardElevated, ...cardAccentTop("#10b981"), minWidth: 0, maxWidth: "100%" }}>
+          <div style={cardTitle}><span style={titleIcon("#10b981")}>📤</span>Invite employees from Excel</div>
           <div style={cardSub}>
             Upload a spreadsheet with <b>Email</b> and <b>Name</b> columns (first sheet).
             {isHR ? (
@@ -526,9 +526,9 @@ function ManagerDashboardContent() {
           ) : null}
         </div>
 
-        <div className="manager-dash-card" style={{ ...cardElevated, ...cardAccentTop(theme.sky), minWidth: 0, maxWidth: "100%" }}>
+        <div className="manager-dash-card" style={{ ...cardElevated, ...cardAccentTop("#0ea5e9"), minWidth: 0, maxWidth: "100%" }}>
           <div style={cardTitle}>
-            <span style={titleIcon(theme.sky)}>📅</span>Schedule interview
+            <span style={titleIcon("#0ea5e9")}>📅</span>Schedule interview
           </div>
           <div style={cardSub}>
             View everyone in <b>{scopeLabel}</b> with department, email, and roles they&apos;re preparing for. Interview slots and report links are no longer stored in TalentX — use InterviewX (or your tooling) for scheduling; open the hub to copy handoffs and deep links.
@@ -556,23 +556,23 @@ function ManagerDashboardContent() {
 
       {/* Activity + Role distribution (two cards in one row) */}
       <div className="manager-two-col">
-        <div className="manager-dash-card" style={{ ...cardElevated, ...cardAccentTop(theme.rose), minWidth: 0, maxWidth: "100%" }}>
-          <div style={cardTitle}><span style={titleIcon(theme.rose)}>⚡</span>Live activity feed</div>
+        <div className="manager-dash-card" style={{ ...cardElevated, ...cardAccentTop("#db2777"), minWidth: 0, maxWidth: "100%" }}>
+          <div style={cardTitle}><span style={titleIcon("#db2777")}>⚡</span>Live activity feed</div>
           <div style={cardSub}>Latest preparation actions and test results across {isHR ? "the company" : "your scoped team (industry & department peers, plus direct reports)."}</div>
           <ActivityFeed feed={activity?.activityFeed || []} />
         </div>
 
-        <div className="manager-dash-card" style={{ ...cardElevated, ...cardAccentTop(theme.indigo), minWidth: 0, maxWidth: "100%" }}>
-          <div style={cardTitle}><span style={titleIcon(theme.indigo)}>🎯</span>Roles being prepared for</div>
+        <div className="manager-dash-card" style={{ ...cardElevated, ...cardAccentTop("#7c3aed"), minWidth: 0, maxWidth: "100%" }}>
+          <div style={cardTitle}><span style={titleIcon("#7c3aed")}>🎯</span>Roles being prepared for</div>
           <div style={cardSub}>How many active learners per role, and how far along they are.</div>
           <RoleAggregateChart items={activity?.roleAggregates || []} />
         </div>
       </div>
 
       {/* Toolbar */}
-      <div className="manager-dash-card" style={{ ...cardElevated, ...cardAccentTop(theme.indigo), minWidth: 0, maxWidth: "100%" }}>
+      <div className="manager-dash-card" style={{ ...cardElevated, ...cardAccentTop("#6366f1"), minWidth: 0, maxWidth: "100%" }}>
         <div style={{ display: "grid", gap: 16 }}>
-          <div style={cardTitle}><span style={titleIcon(theme.indigo)}>👥</span>Employee preparation database</div>
+          <div style={cardTitle}><span style={titleIcon("#6366f1")}>👥</span>Employee preparation database</div>
           <div
             style={{
               display: "grid",
@@ -581,8 +581,8 @@ function ManagerDashboardContent() {
               alignItems: "stretch",
               padding: 14,
               borderRadius: 14,
-              background: "linear-gradient(180deg, #f8fafc 0%, #f2f6fb 100%)",
-              border: `1px solid ${theme.cardBorderStrong}`,
+              background: "linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%)",
+              border: "1px solid #e2e8f0",
             }}
           >
             <input
@@ -1523,11 +1523,10 @@ function computeStats(rows: EmployeeRow[]) {
   const avgScore = scores.length ? Math.round(scores.reduce((s, x) => s + x, 0) / scores.length) : null;
 
   const buckets = [
-    // Professional palette (avoid neon primaries)
-    { label: "0–25%", count: 0, color: "#e11d48" },  // rose
-    { label: "25–50%", count: 0, color: "#f59e0b" }, // amber
-    { label: "50–75%", count: 0, color: "#2563eb" }, // blue
-    { label: "75–100%", count: 0, color: "#059669" },// emerald
+    { label: "0–25%", count: 0, color: "#ef4444" },
+    { label: "25–50%", count: 0, color: "#f59e0b" },
+    { label: "50–75%", count: 0, color: "#0b5fe8" },
+    { label: "75–100%", count: 0, color: "#16a34a" },
   ];
   for (const r of active) {
     const p = r.avgPct || 0;
@@ -1550,29 +1549,6 @@ function computeStats(rows: EmployeeRow[]) {
 
 // ===================== Styles =====================
 
-const theme = {
-  pageBg: "linear-gradient(180deg, #f8fafc 0%, #eef2f7 100%)",
-  pageRadials:
-    "radial-gradient(900px 500px at 100% -10%, rgba(79,70,229,0.07), transparent 60%), radial-gradient(700px 400px at -10% 10%, rgba(2,132,199,0.06), transparent 60%)",
-  cardBg: "linear-gradient(180deg, #ffffff 0%, #fbfcfe 100%)",
-  cardBorder: "#e7edf5",
-  cardBorderStrong: "#dde6f2",
-  text: "#0b1220",
-  textMuted: "#475569",
-  textSubtle: "#64748b",
-  inkSoft: "#334155",
-  surface: "#ffffff",
-  tableHeaderBg: "#f8fafc",
-  primary: "#1d4ed8",
-  indigo: "#4f46e5",
-  sky: "#0284c7",
-  emerald: "#059669",
-  amber: "#d97706",
-  rose: "#e11d48",
-  shadowSoft: "0 8px 28px -18px rgba(15,23,42,0.16)",
-  shadowCard: "0 12px 44px -26px rgba(15,23,42,0.18)",
-};
-
 const wrap: React.CSSProperties = {
   /* Stay inside <main>; avoid calc(50% - 50vw) breakout — it misaligns with max-width main + overflow-x:hidden and clips the left edge. */
   marginTop: 2,
@@ -1590,22 +1566,22 @@ const wrap: React.CSSProperties = {
 const banner: React.CSSProperties = {
   borderRadius: 22,
   padding: "22px clamp(16px, 3vw, 24px)",
-  background: "linear-gradient(135deg,#0b1220 0%,#0f172a 28%,#1e3a8a 62%,#4f46e5 100%)",
+  background: "linear-gradient(135deg,#0f172a 0%,#1e293b 30%,#312e81 65%,#7c3aed 100%)",
   color: "#fff",
   position: "relative",
   overflow: "hidden",
-  boxShadow: "0 18px 46px -28px rgba(79,70,229,0.65)",
+  boxShadow: "0 16px 36px -22px rgba(99,102,241,0.55)",
   maxWidth: "100%",
   boxSizing: "border-box",
 };
 const blobA: React.CSSProperties = {
   position: "absolute", top: -50, right: -30, width: 200, height: 200,
-  borderRadius: "50%", background: "rgba(79,70,229,0.22)", filter: "blur(2px)",
+  borderRadius: "50%", background: "rgba(168,85,247,0.28)", filter: "blur(2px)",
   pointerEvents: "none",
 };
 const blobB: React.CSSProperties = {
   position: "absolute", bottom: -60, right: 110, width: 140, height: 140,
-  borderRadius: "50%", background: "rgba(2,132,199,0.18)",
+  borderRadius: "50%", background: "rgba(236,72,153,0.20)",
   pointerEvents: "none",
 };
 const iconTile: React.CSSProperties = {
@@ -1654,7 +1630,7 @@ const chipLive: React.CSSProperties = {
 const btnSolid: React.CSSProperties = {
   display: "inline-flex", alignItems: "center", justifyContent: "center",
   padding: "8px 14px", borderRadius: 10,
-  background: "rgba(255,255,255,0.96)", color: "#0b1220",
+  background: "#fff", color: "#0f172a",
   border: "none", fontWeight: 800, fontSize: 13,
   cursor: "pointer", boxShadow: "0 1px 4px rgba(15,23,42,0.18)",
 };
@@ -1662,11 +1638,10 @@ const btnSolid: React.CSSProperties = {
 const headerCard: React.CSSProperties = { background: "#fff", border: "1px solid #e5e7eb", borderRadius: 18, padding: 18, boxShadow: "0 4px 18px -10px rgba(15,23,42,0.08)" };
 const card: React.CSSProperties = { background: "#fff", border: "1px solid #e5e7eb", borderRadius: 16, padding: 18, boxShadow: "0 4px 18px -10px rgba(15,23,42,0.08)" };
 const cardElevated: React.CSSProperties = {
-  background: theme.cardBg,
-  border: `1px solid ${theme.cardBorder}`,
+  background: "linear-gradient(180deg, #ffffff 0%, #fafbfc 100%)",
+  border: "1px solid #e8eef5",
   borderRadius: 18,
   padding: 20,
-  boxShadow: theme.shadowCard,
 };
 const btnInvitePrimary: React.CSSProperties = {
   display: "inline-flex",
@@ -1719,15 +1694,15 @@ function titleIcon(accent: string): React.CSSProperties {
     flex: "0 0 auto",
   };
 }
-const cardSub: React.CSSProperties = { fontSize: 12, color: theme.textSubtle, marginTop: 4 };
-const btnOutline: React.CSSProperties = { border: `1px solid ${theme.cardBorderStrong}`, background: "#fff", padding: "9px 12px", borderRadius: 10, fontWeight: 800, cursor: "pointer", fontSize: 13, color: theme.inkSoft };
+const cardSub: React.CSSProperties = { fontSize: 12, color: "#64748b", marginTop: 4 };
+const btnOutline: React.CSSProperties = { border: "1px solid #cbd5e1", background: "#fff", padding: "9px 12px", borderRadius: 10, fontWeight: 800, cursor: "pointer", fontSize: 13 };
 const btnViewMore: React.CSSProperties = {
   ...btnOutline,
   width: "100%",
   marginTop: 2,
-  color: "#1e3a8a",
-  borderColor: "#dbeafe",
-  background: "linear-gradient(180deg, #eff6ff 0%, #ffffff 100%)",
+  color: "#312e81",
+  borderColor: "#c7d2fe",
+  background: "linear-gradient(180deg, #f5f3ff 0%, #fff 100%)",
 };
 const btnMini: React.CSSProperties = { border: "1px solid rgba(15,23,42,0.16)", background: "white", padding: "6px 10px", borderRadius: 10, fontWeight: 800, cursor: "pointer", color: "#0f172a", fontSize: 12, maxWidth: 220, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" };
 const employeeTableStyle: React.CSSProperties = {
@@ -1741,7 +1716,7 @@ const th: React.CSSProperties = {
   textAlign: "left",
   padding: "12px 12px",
   fontWeight: 900,
-  color: theme.text,
+  color: "#0f172a",
   whiteSpace: "normal",
   fontSize: 12,
   letterSpacing: 0.3,
@@ -1753,7 +1728,7 @@ const th: React.CSSProperties = {
 };
 const td: React.CSSProperties = {
   padding: "12px 12px",
-  color: theme.text,
+  color: "#0f172a",
   verticalAlign: "top",
   textAlign: "left",
   borderBottom: "1px solid #f1f5f9",
@@ -1766,9 +1741,9 @@ const btnEmployeeTableExpand: React.CSSProperties = {
   width: "100%",
   marginTop: 12,
   padding: "10px 14px",
-  color: "#1e3a8a",
-  borderColor: "#dbeafe",
-  background: "linear-gradient(180deg, #eff6ff 0%, #ffffff 100%)",
+  color: "#312e81",
+  borderColor: "#c7d2fe",
+  background: "linear-gradient(180deg, #f5f3ff 0%, #fff 100%)",
   fontWeight: 900,
 };
 const errorStyle: React.CSSProperties = { padding: "10px 12px", borderRadius: 10, background: "#fef2f2", border: "1px solid #fecaca", color: "#991b1b", fontSize: 13 };
@@ -1799,16 +1774,16 @@ const feedRow: React.CSSProperties = {
 const feedDot: React.CSSProperties = { width: 8, height: 8, borderRadius: 999, marginTop: 6, flex: "0 0 auto" };
 
 const btnRecommend: React.CSSProperties = {
-  border: "1px solid rgba(37, 99, 235, 0.28)",
-  background: "linear-gradient(135deg, #eff6ff 0%, #eef2ff 100%)",
-  color: "#1e40af",
+  border: "1px solid rgba(124, 58, 237, 0.35)",
+  background: "linear-gradient(135deg, #ede9fe 0%, #fae8ff 100%)",
+  color: "#5b21b6",
   padding: "8px 12px",
   borderRadius: 10,
   fontWeight: 900,
   fontSize: 12,
   cursor: "pointer",
   whiteSpace: "nowrap",
-  boxShadow: "0 2px 10px -6px rgba(37, 99, 235, 0.45)",
+  boxShadow: "0 2px 8px -4px rgba(124, 58, 237, 0.4)",
 };
 
 const recoBannerStyle: React.CSSProperties = {

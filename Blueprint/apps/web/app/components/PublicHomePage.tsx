@@ -47,24 +47,7 @@ export function PublicHomePage() {
           --ix-footer-bar-text-hover: #e2e8f0;
         }
 
-        /* Full-bleed inside <main> without triggering horizontal scroll. */
-        .public-home {
-          position: relative;
-          margin-left: calc(50% - 50vw);
-          margin-right: calc(50% - 50vw);
-          margin-top: -18px;
-          width: 100vw;
-          overflow-x: clip;
-          background: var(--bg);
-          color: var(--ink);
-        }
-        @supports (width: 100dvw) {
-          .public-home {
-            margin-left: calc(50% - 50dvw);
-            margin-right: calc(50% - 50dvw);
-            width: 100dvw;
-          }
-        }
+        .public-home { position: relative; margin-left: calc(50% - 50vw); margin-right: calc(50% - 50vw); margin-top: -18px; width: 100vw; overflow-x: hidden; background: var(--bg); color: var(--ink); }
         .public-bg {
           pointer-events: none;
           position: absolute;
@@ -234,31 +217,19 @@ export function PublicHomePage() {
 
         .section { position: relative; z-index: 1; max-width: 1240px; margin: 0 auto; padding: 54px 20px; }
         .section-title { margin: 0; font-size: clamp(24px, 3.2vw, 36px); font-weight: 900; color: var(--ink); letter-spacing: -0.02em; }
-        .modules-grid { display: grid; gap: 26px; grid-template-columns: 1fr; margin-top: 24px; align-items: stretch; }
-        .module-card {
-          border: 1px solid rgba(15,23,42,0.10);
-          background: rgba(255,255,255,0.86);
-          backdrop-filter: blur(10px);
-          border-radius: 26px;
-          padding: clamp(24px, 2.6vw, 34px);
-          box-shadow: var(--shadow-soft);
-          transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease;
-          display: flex;
-          flex-direction: column;
-          height: 100%;
-          min-height: clamp(210px, 19vw, 270px);
-        }
+        .modules-grid { display: grid; gap: 14px; grid-template-columns: 1fr; margin-top: 14px; }
+        .module-card { border: 1px solid rgba(15,23,42,0.10); background: rgba(255,255,255,0.86); backdrop-filter: blur(10px); border-radius: 18px; padding: 18px; box-shadow: var(--shadow-soft); transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease; }
         .module-card:hover { transform: translateY(-2px); border-color: rgba(15,23,42,0.18); box-shadow: 0 18px 46px rgba(15,23,42,0.12); }
         .module-head { display: flex; gap: 12px; align-items: flex-start; justify-content: space-between; }
-        .module-icon { width: 60px; height: 60px; border-radius: 19px; display: grid; place-items: center; font-weight: 1000; color: var(--ink); background: linear-gradient(135deg, rgba(79,70,229,.16), rgba(0,191,166,.14)); border: 1px solid rgba(15,23,42,0.12); }
-        .module-title { margin: 0; font-size: 21px; font-weight: 950; color: var(--ink); letter-spacing: -0.014em; }
-        .module-desc { margin: 12px 0 0; color: rgba(71,84,103,0.92); font-size: 15.5px; line-height: 1.85; max-width: 66ch; }
-        .module-tags { margin-top: 14px; display: flex; flex-wrap: wrap; gap: 8px; }
+        .module-icon { width: 42px; height: 42px; border-radius: 14px; display: grid; place-items: center; font-weight: 1000; color: var(--ink); background: linear-gradient(135deg, rgba(79,70,229,.16), rgba(0,191,166,.14)); border: 1px solid rgba(15,23,42,0.12); }
+        .module-title { margin: 0; font-size: 16px; font-weight: 900; color: var(--ink); letter-spacing: -0.01em; }
+        .module-desc { margin: 8px 0 0; color: rgba(71,84,103,0.92); font-size: 13px; line-height: 1.75; }
+        .module-tags { margin-top: 12px; display: flex; flex-wrap: wrap; gap: 8px; }
         .tag { font-size: 11px; font-weight: 900; color: rgba(11,18,32,0.86); background: rgba(0,191,166,.12); border: 1px solid rgba(0,191,166,.28); padding: 4px 9px; border-radius: 999px; }
         .tag.alt { background: rgba(79,70,229,.10); border-color: rgba(79,70,229,.22); }
-        .module-cta { margin-top: auto; padding-top: 20px; display: flex; flex-wrap: wrap; gap: 12px; }
-        .module-link { display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 14px 20px; border-radius: 16px; font-size: 14.25px; font-weight: 950; text-decoration: none; border: 1px solid rgba(15,23,42,0.14); background: rgba(255,255,255,0.94); color: var(--ink); box-shadow: 0 12px 26px rgba(15,23,42,0.07); }
-        .module-link.primary { border: none; background: linear-gradient(90deg, var(--brandC), var(--brandA) 55%, var(--brandMint)); color: #fff; box-shadow: 0 16px 34px rgba(31,95,191,.18); }
+        .module-cta { margin-top: 14px; display: flex; flex-wrap: wrap; gap: 10px; }
+        .module-link { display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 10px 14px; border-radius: 14px; font-size: 13px; font-weight: 900; text-decoration: none; border: 1px solid rgba(15,23,42,0.14); background: rgba(255,255,255,0.90); color: var(--ink); box-shadow: 0 10px 22px rgba(15,23,42,0.06); }
+        .module-link.primary { border: none; background: linear-gradient(90deg, var(--brandC), var(--brandA) 55%, var(--brandMint)); color: #fff; box-shadow: 0 14px 30px rgba(31,95,191,.16); }
         .module-link:hover { filter: brightness(0.99); }
         .enterprise-grid { display: grid; gap: 14px; grid-template-columns: 1fr; margin-top: 14px; }
         .enterprise-card { border-radius: 18px; border: 1px solid rgba(15,23,42,0.10); background: rgba(255,255,255,0.86); backdrop-filter: blur(10px); padding: 18px; box-shadow: var(--shadow-soft); }
@@ -395,6 +366,60 @@ export function PublicHomePage() {
               </a>
               <a href={appPath("/auth/manager/login")} className="module-link">
                 Interview dashboard <span aria-hidden>→</span>
+              </a>
+            </div>
+          </motion.div>
+
+          <motion.div {...sectionIn} className="module-card">
+            <div className="module-head">
+              <div style={{ display: "flex", gap: 12, minWidth: 0 }}>
+                <div className="module-icon" aria-hidden>IP</div>
+                <div style={{ minWidth: 0 }}>
+                  <h3 className="module-title">Interview Preparation</h3>
+                  <p className="module-desc">
+                    Technical + HR practice, structured feedback, and mentor interview requests — so candidates improve faster.
+                  </p>
+                </div>
+              </div>
+            </div>
+            <div className="module-tags" aria-label="Interview prep highlights">
+              <span className="tag">Technical</span>
+              <span className="tag alt">HR round</span>
+              <span className="tag">Mentors</span>
+            </div>
+            <div className="module-cta">
+              <a href={appPath("/auth/employee/login")} className="module-link primary">
+                Employee login <span aria-hidden>→</span>
+              </a>
+              <a href={appPath("/auth/employee/register")} className="module-link">
+                Create account <span aria-hidden>→</span>
+              </a>
+            </div>
+          </motion.div>
+
+          <motion.div {...sectionIn} className="module-card">
+            <div className="module-head">
+              <div style={{ display: "flex", gap: 12, minWidth: 0 }}>
+                <div className="module-icon" aria-hidden>MN</div>
+                <div style={{ minWidth: 0 }}>
+                  <h3 className="module-title">Monitoring & Analytics</h3>
+                  <p className="module-desc">
+                    A manager dashboard for activity, progress distribution, team comparisons, and employee tracking by role.
+                  </p>
+                </div>
+              </div>
+            </div>
+            <div className="module-tags" aria-label="Monitoring highlights">
+              <span className="tag alt">Activity feed</span>
+              <span className="tag">KPI view</span>
+              <span className="tag alt">Tracking</span>
+            </div>
+            <div className="module-cta">
+              <a href={appPath("/auth/manager/login")} className="module-link primary">
+                Open dashboard <span aria-hidden>→</span>
+              </a>
+              <a href={appPath("/dashboard/manager")} className="module-link">
+                Manager view <span aria-hidden>→</span>
               </a>
             </div>
           </motion.div>

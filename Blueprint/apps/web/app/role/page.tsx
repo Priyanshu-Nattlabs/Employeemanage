@@ -198,25 +198,11 @@ function RolesPageContent() {
   };
 
   return (
-    <div className="roles-shell" style={{ display: "flex", margin: "-18px -20px -48px", minHeight: "calc(100vh - 64px)", background: "#fff" }}>
-      <style>{`
-        @media (max-width: 860px) {
-          .roles-shell { flex-direction: column; margin: -18px -12px -48px; }
-          .roles-aside {
-            width: 100% !important;
-            position: relative !important;
-            top: auto !important;
-            height: auto !important;
-            border-right: 0 !important;
-            border-bottom: 1px solid #E2E8F0;
-          }
-          .roles-main { padding: 16px 14px !important; }
-        }
-      `}</style>
+    <div style={{ display: "flex", margin: "-18px -20px -48px", minHeight: "calc(100vh - 64px)", background: "#fff" }}>
 
       {/* ── LEFT SIDEBAR ─────────────────────────────────── */}
       {!isRecommendMode ? (
-      <aside className="roles-aside" style={{
+      <aside style={{
         width: 260, flexShrink: 0, background: "#F1F5F9",
         borderRight: "1px solid #E2E8F0",
         position: "sticky", top: 64, height: "calc(100vh - 64px)",
@@ -297,7 +283,7 @@ function RolesPageContent() {
       ) : null}
 
       {/* ── MAIN CONTENT ─────────────────────────────────── */}
-      <main className="roles-main" style={{ flex: 1, padding: "24px 28px", overflowX: "hidden", minWidth: 0 }}>
+      <main style={{ flex: 1, padding: "24px 28px", overflowX: "hidden", minWidth: 0 }}>
 
         {isRecommendMode ? (
           <div style={{

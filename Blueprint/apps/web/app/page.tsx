@@ -230,7 +230,7 @@ export default function HomePage() {
         marginRight: "calc(50% - 50vw)",
         marginTop: -18,
         fontFamily: "Inter, 'Segoe UI', sans-serif",
-        overflowX: "clip",
+        overflowX: "hidden",
         background: "#fff",
       }}
     >
@@ -311,13 +311,6 @@ export default function HomePage() {
           box-shadow: 0 16px 36px rgba(15,23,42,0.16);
           background: #fff;
         }
-        @supports (width: 100dvw) {
-          .jb-fullbleed {
-            width: 100dvw !important;
-            margin-left: calc(50% - 50dvw) !important;
-            margin-right: calc(50% - 50dvw) !important;
-          }
-        }
         @media (max-width: 900px) {
           .jb-hero-ref-row { flex-direction:column !important; align-items:stretch !important; }
           .jb-hero-ref-images { justify-content:center !important; margin-top:8px; pointer-events:none; }
@@ -328,7 +321,6 @@ export default function HomePage() {
 
       {/* ══ HERO (matches UI Reference / Job Blue Print.svg) ═══════════ */}
       <div
-        className="jb-fullbleed"
         style={{
           background: "linear-gradient(125deg, #dff1ff 0%, #e4e8ff 50%, #e8fff5 100%)",
           overflow: "hidden",
@@ -466,7 +458,7 @@ export default function HomePage() {
       
 
       {/* ══ WHY CHOOSE JOB BLUEPRINT? ════════════════════════════════ */}
-      <div className="jb-fullbleed" style={{ background: "#f6f8fc", padding: "clamp(42px, 7vw, 72px) clamp(14px, 4vw, 32px)" }}>
+      <div style={{ background: "#f6f8fc", padding: "72px 32px" }}>
         <div style={{ maxWidth: 1100, margin: "0 auto" }}>
           <h2 style={{ textAlign: "center", margin: "0 0 40px", fontSize: 30, fontWeight: 800, color: "#054a90", letterSpacing: "-0.5px" }}>
             Why Teams Choose This Platform
@@ -484,7 +476,7 @@ export default function HomePage() {
             boxShadow: "0 2px 12px rgba(0,0,0,0.06)",
           }}>
             <div style={{ height: 8, background: "linear-gradient(90deg,#7c3aed,#14b8a6,#f59e0b)" }} />
-            <div style={{ padding: "clamp(18px, 4vw, 40px) clamp(14px, 3.4vw, 32px)", display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 24, alignItems: "center" }}>
+            <div style={{ padding: "40px 32px", display: "grid", gridTemplateColumns: "1fr 1fr", gap: 24, alignItems: "center" }}>
               <div>
                 <div style={{ fontSize: 13, fontWeight: 700, color: "#6d28d9", textTransform: "uppercase", letterSpacing: ".06em", marginBottom: 10 }}>Your Personalized Path</div>
                 <h3 style={{ margin: "0 0 12px", fontSize: 20, fontWeight: 800, color: "#312e81" }}>From current role to next role with clarity</h3>
@@ -507,7 +499,7 @@ export default function HomePage() {
           </div>
 
           {/* 2-row × 3-col features */}
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 16 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 16 }}>
             {[
               {
                 icon: (
@@ -567,7 +559,7 @@ export default function HomePage() {
       </div>
 
       {/* ══ HOW IT WORKS ═════════════════════════════════════════════ */}
-      <div className="jb-fullbleed" style={{ background: "#fff", padding: "clamp(42px, 7vw, 72px) clamp(14px, 4vw, 32px)" }}>
+      <div style={{ background: "#fff", padding: "72px 32px" }}>
         <div style={{ maxWidth: 1100, margin: "0 auto" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 48, justifyContent: "center" }}>
             <svg width="32" height="32" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -575,7 +567,7 @@ export default function HomePage() {
             </svg>
             <h2 style={{ margin: 0, fontSize: 30, fontWeight: 800, color: "#312e81", letterSpacing: "-0.5px" }}>How It Works</h2>
           </div>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 24 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 32 }}>
             {[
               {
                 step: "01",
@@ -610,13 +602,13 @@ export default function HomePage() {
       </div>
 
       {/* ══ CTA BANNER ═══════════════════════════════════════════════ */}
-      <div className="jb-fullbleed" style={{ padding: "0 clamp(14px, 4vw, 32px) clamp(42px, 7vw, 64px)" }}>
+      <div style={{ padding: "0 32px 64px" }}>
         <div style={{
           maxWidth: 1100,
           margin: "0 auto",
           background: "#5b21b6",
           borderRadius: 20,
-          padding: "clamp(28px, 6vw, 56px) clamp(18px, 5vw, 48px)",
+          padding: "56px 48px",
           textAlign: "center",
           position: "relative",
           overflow: "hidden",
@@ -691,7 +683,6 @@ export default function HomePage() {
 
       {/* ══ FOOTER (same as SomethingX StudentLanding + SiteFooter) ═════ */}
       <div
-        className="jb-fullbleed"
         style={{
           width: "100vw",
           marginLeft: "calc(50% - 50vw)",
