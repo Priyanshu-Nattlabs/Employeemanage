@@ -33,9 +33,9 @@ function interviewXBase(): string {
 
   if (typeof window !== "undefined") {
     const { hostname, protocol, port } = window.location;
-    // Local dev: InterviewX runs directly on :3300 (not via /interviewx gateway).
+    // Local dev: InterviewX Docker serves the SPA under /interviewx on :3300.
     if (hostname === "localhost" || hostname === "127.0.0.1") {
-      return `${protocol}//${hostname}:3300`;
+      return `${protocol}//${hostname}:3300/interviewx`;
     }
     if (hostname && hostname !== "localhost" && hostname !== "127.0.0.1") {
       const p = port ? `:${port}` : "";
@@ -160,6 +160,11 @@ export function buildInterviewXManagerLandingUrl(): string {
   return `${interviewXBase()}/industry/ai-interview`;
 }
 
+/** AI Interview dashboard for industry/manager/HR users. */
+export function buildInterviewXManagerDashboardUrl(): string {
+  return `${interviewXBase()}/industry/ai-interview/dashboard`;
+}
+
 /**
  * Same as `buildInterviewXManagerLandingUrl`, but includes SSO params so InterviewX can auto-auth.
  * InterviewX reads these from URL on first load:
@@ -173,6 +178,27 @@ export function buildInterviewXManagerLandingUrlWithSso(opts: {
   userType?: string;
 }): string {
   const u = new URL(buildInterviewXManagerLandingUrl());
+  const t = clean(opts?.token);
+  if (t) u.searchParams.set("token", t);
+  const email = clean(opts?.email);
+  if (email) u.searchParams.set("email", email);
+  const name = clean(opts?.name);
+  if (name) u.searchParams.set("name", name);
+  const userType = clean(opts?.userType);
+  if (userType) u.searchParams.set("userType", userType);
+  return u.toString();
+}
+
+/**
+ * Same as `buildInterviewXManagerDashboardUrl`, but includes SSO params so InterviewX can auto-auth.
+ */
+export function buildInterviewXManagerDashboardUrlWithSso(opts: {
+  token: string;
+  email?: string;
+  name?: string;
+  userType?: string;
+}): string {
+  const u = new URL(buildInterviewXManagerDashboardUrl());
   const t = clean(opts?.token);
   if (t) u.searchParams.set("token", t);
   const email = clean(opts?.email);
