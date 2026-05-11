@@ -3,6 +3,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState, type CSSProperties } from "react";
 import { publicAssetUrl } from "@/lib/apiBase";
+import { buildInterviewXManagerDashboardUrlWithSso } from "@/lib/interviewx";
 import {
   clearOrgAuthInStorage,
   getOrgAuthFromStorage,
@@ -110,7 +111,16 @@ export function NavBar() {
     router.push(`/role/${encodeURIComponent(rec.roleName)}`);
   };
 
-  const dashboardHref = isAdmin ? "/dashboard/admin" : isManagerOrHR ? "/dashboard/manager/home" : "/";
+  const dashboardHref = isAdmin
+    ? "/dashboard/admin"
+    : isManagerOrHR
+      ? buildInterviewXManagerDashboardUrlWithSso({
+          token: orgAuth.token,
+          email: user?.email,
+          name: user?.fullName,
+          userType: isHR ? "HR" : "MANAGER",
+        })
+      : "/";
   const profileHref = isAdmin ? "/profile/admin" : "/profile/employee";
   const profileLabel = isAdmin ? "Admin Profile" : "Employee Profile";
   /** Employees → employee hub; Manager/HR → manager portal home; others → marketing home. */
@@ -206,9 +216,15 @@ export function NavBar() {
               </div>
             ) : null}
             {(isAdmin || isManagerOrHR) ? (
-              <Link href={dashboardHref} style={portalDashStyle}>
-                Dashboard
-              </Link>
+              isManagerOrHR ? (
+                <a href={dashboardHref} style={portalDashStyle}>
+                  Dashboard
+                </a>
+              ) : (
+                <Link href={dashboardHref} style={portalDashStyle}>
+                  Dashboard
+                </Link>
+              )
             ) : null}
             <Link href={profileHref} style={portalDashStyle}>
               {profileLabel}
