@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { appPath } from "@/lib/apiBase";
 import { clearOrgAuthInStorage, getOrgAuthFromStorage, isOrgManagerOrHr } from "@/lib/orgAuth";
+import { buildInterviewXManagerLandingUrlWithSso } from "@/lib/interviewx";
 
 export default function HrLandingPage() {
   const [{ token, user }, setAuth] = useState(() => getOrgAuthFromStorage());
@@ -23,6 +24,13 @@ export default function HrLandingPage() {
       window.location.href = appPath("/dashboard/manager");
       return;
     }
+    // HR should also land directly on InterviewX AI Interview (this page is kept for backwards-compatible deep links)
+    window.location.href = buildInterviewXManagerLandingUrlWithSso({
+      token,
+      email: user.email,
+      name: user.fullName,
+      userType: user.currentRole,
+    });
   }, [token, user]);
 
   const firstName = useMemo(() => {

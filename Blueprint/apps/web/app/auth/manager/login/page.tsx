@@ -8,7 +8,7 @@ import {
   orgRequestManagerHrPasswordResetOtp,
   setOrgAuthInStorage,
 } from "@/lib/orgAuth";
-import { buildInterviewXManagerLandingUrl } from "@/lib/interviewx";
+import { buildInterviewXManagerLandingUrlWithSso } from "@/lib/interviewx";
 
 export default function ManagerLoginPage() {
   const [email, setEmail] = useState("");
@@ -44,7 +44,13 @@ export default function ManagerLoginPage() {
       const allowed = r.user.accountType === "EMPLOYEE" && (role === "MANAGER" || role === "HR");
       if (!allowed) throw new Error("This area is for Manager / HR accounts. Please use Employee login.");
       setOrgAuthInStorage(r.token, r.user);
-      window.location.href = role === "HR" ? "/dashboard/hr" : buildInterviewXManagerLandingUrl();
+      // Manager and HR should land directly on InterviewX AI Interview (SSO via URL params)
+      window.location.href = buildInterviewXManagerLandingUrlWithSso({
+        token: r.token,
+        email: r.user.email,
+        name: r.user.fullName,
+        userType: role, // "MANAGER" | "HR"
+      });
     } catch (err: any) {
       setError(err?.message || "Login failed");
     } finally {
@@ -102,7 +108,13 @@ export default function ManagerLoginPage() {
       const allowed = r.user.accountType === "EMPLOYEE" && (role === "MANAGER" || role === "HR");
       if (!allowed) throw new Error("Session error for Manager / HR account.");
       setOrgAuthInStorage(r.token, r.user);
-      window.location.href = role === "HR" ? "/dashboard/hr" : buildInterviewXManagerLandingUrl();
+      // Manager and HR should land directly on InterviewX AI Interview (SSO via URL params)
+      window.location.href = buildInterviewXManagerLandingUrlWithSso({
+        token: r.token,
+        email: r.user.email,
+        name: r.user.fullName,
+        userType: role, // "MANAGER" | "HR"
+      });
     } catch (err: any) {
       setError(err?.message || "Could not reset password.");
     } finally {

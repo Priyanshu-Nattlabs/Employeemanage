@@ -39,7 +39,8 @@ export function NavBar() {
 
   const logoutOrg = () => {
     clearOrgAuthInStorage();
-    window.location.href = "/";
+    // Manager/HR logout should return to Manager/HR login (not public home).
+    window.location.href = "/auth/manager/login";
   };
 
   const user = orgAuth.user as any | null;
