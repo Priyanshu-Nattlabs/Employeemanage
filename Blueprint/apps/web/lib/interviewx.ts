@@ -33,6 +33,10 @@ function interviewXBase(): string {
 
   if (typeof window !== "undefined") {
     const { hostname, protocol, port } = window.location;
+    // Local dev: InterviewX runs directly on :3300 (not via /interviewx gateway).
+    if (hostname === "localhost" || hostname === "127.0.0.1") {
+      return `${protocol}//${hostname}:3300`;
+    }
     if (hostname && hostname !== "localhost" && hostname !== "127.0.0.1") {
       const p = port ? `:${port}` : "";
       let o = normalizeOrigin(`${protocol}//${hostname}${p}`);
@@ -42,7 +46,7 @@ function interviewXBase(): string {
     }
   }
 
-  return "http://localhost:3300/interviewx";
+  return "http://localhost:3300";
 }
 
 /**
@@ -144,9 +148,8 @@ export function buildInterviewXAiInterviewUrl(
 
 export function buildInterviewXIndustryOpenUrl(): string {
   const base = interviewXBase();
-  // Always open the InterviewX manager landing/dashboard page so all
-  // manager entry points in TalentX are consistent.
-  return `${base}/industry/ai-interview/dashboard`;
+  // Public AI Interview landing page.
+  return `${base}/industry/ai-interview`;
 }
 
 /**
@@ -155,6 +158,30 @@ export function buildInterviewXIndustryOpenUrl(): string {
  */
 export function buildInterviewXManagerLandingUrl(): string {
   return `${interviewXBase()}/industry/ai-interview`;
+}
+
+/**
+ * Same as `buildInterviewXManagerLandingUrl`, but includes SSO params so InterviewX can auto-auth.
+ * InterviewX reads these from URL on first load:
+ * - token: JWT
+ * - email, name, userType: optional hints to bootstrap UI before /auth/profile returns
+ */
+export function buildInterviewXManagerLandingUrlWithSso(opts: {
+  token: string;
+  email?: string;
+  name?: string;
+  userType?: string;
+}): string {
+  const u = new URL(buildInterviewXManagerLandingUrl());
+  const t = clean(opts?.token);
+  if (t) u.searchParams.set("token", t);
+  const email = clean(opts?.email);
+  if (email) u.searchParams.set("email", email);
+  const name = clean(opts?.name);
+  if (name) u.searchParams.set("name", name);
+  const userType = clean(opts?.userType);
+  if (userType) u.searchParams.set("userType", userType);
+  return u.toString();
 }
 
 export function buildInterviewXCandidatesUrl(interviewConfigId: string): string {
