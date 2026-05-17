@@ -238,15 +238,9 @@ export function PublicHomePage() {
         .module-link { display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 10px 14px; border-radius: 14px; font-size: 13px; font-weight: 900; text-decoration: none; border: 1px solid rgba(15,23,42,0.14); background: rgba(255,255,255,0.90); color: var(--ink); box-shadow: 0 10px 22px rgba(15,23,42,0.06); }
         .module-link.primary { border: none; background: linear-gradient(90deg, var(--brandC), var(--brandA) 55%, var(--brandMint)); color: #fff; box-shadow: 0 14px 30px rgba(31,95,191,.16); }
         .module-link:hover { filter: brightness(0.99); }
-        .enterprise-grid { display: grid; gap: 14px; grid-template-columns: 1fr; margin-top: 14px; }
-        .enterprise-card { border-radius: 18px; border: 1px solid rgba(15,23,42,0.10); background: rgba(255,255,255,0.86); backdrop-filter: blur(10px); padding: 18px; box-shadow: var(--shadow-soft); }
-        .enterprise-h { margin: 0; font-size: 12px; font-weight: 1000; color: rgba(71,84,103,0.85); letter-spacing: .14em; text-transform: uppercase; }
-        .enterprise-ul { margin: 10px 0 0; padding-left: 18px; color: rgba(71,84,103,0.92); font-size: 13px; line-height: 1.75; }
-
         @media (min-width: 980px) {
           .public-grid2 { grid-template-columns: 1.05fr .95fr; align-items: center; }
           .modules-grid { grid-template-columns: repeat(2, minmax(0,1fr)); }
-          .enterprise-grid { grid-template-columns: repeat(3, minmax(0,1fr)); }
         }
 
         @media (prefers-reduced-motion: reduce) {
@@ -266,7 +260,7 @@ export function PublicHomePage() {
             <div style={{ marginTop: 20, display: "grid", gap: 14 }}>
               <h1 className="public-h1">If talent is your edge, this is your operating system.</h1>
               <p className="public-p">
-                A connected platform for <b>role blueprinting</b>, <b>AI interviews</b>, <b>interview preparation</b>, and <b>manager monitoring</b> — so hiring and development are driven by consistent evidence.
+                A connected platform for <b>role blueprinting</b> and <b>AI interviews</b> — so hiring and development are driven by consistent evidence.
               </p>
             </div>
             <div className="public-btns">
@@ -318,8 +312,8 @@ export function PublicHomePage() {
 
       <section className="section" aria-labelledby="modules-heading">
         <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "end", flexWrap: "wrap" }}>
-          <h2 id="modules-heading" className="section-title">Four connected modules, one talent system</h2>
-          <p style={{ margin: 0, color: "#1F5FBF", fontSize: 13 }}>TalentX → Evaluate → Prepare → Monitor — all aligned to roles.</p>
+          <h2 id="modules-heading" className="section-title">TalentX and InterviewX, one talent system</h2>
+          <p style={{ margin: 0, color: "#1F5FBF", fontSize: 13 }}>Role pathways and AI interviews — aligned to the same roles.</p>
         </div>
 
         <div className="modules-grid">
@@ -376,95 +370,9 @@ export function PublicHomePage() {
               </a>
             </div>
           </motion.div>
-
-          <motion.div {...sectionIn} className="module-card">
-            <div className="module-head">
-              <div style={{ display: "flex", gap: 12, minWidth: 0 }}>
-                <div className="module-icon" aria-hidden>IP</div>
-                <div style={{ minWidth: 0 }}>
-                  <h3 className="module-title">Interview Preparation</h3>
-                  <p className="module-desc">
-                    Technical + HR practice, structured feedback, and mentor interview requests — so candidates improve faster.
-                  </p>
-                </div>
-              </div>
-            </div>
-            <div className="module-tags" aria-label="Interview prep highlights">
-              <span className="tag">Technical</span>
-              <span className="tag alt">HR round</span>
-              <span className="tag">Mentors</span>
-            </div>
-            <div className="module-cta">
-              <a href={appPath("/auth/employee/login")} className="module-link primary">
-                Employee login <span aria-hidden>→</span>
-              </a>
-              <a href={appPath("/auth/employee/register")} className="module-link">
-                Create account <span aria-hidden>→</span>
-              </a>
-            </div>
-          </motion.div>
-
-          <motion.div {...sectionIn} className="module-card">
-            <div className="module-head">
-              <div style={{ display: "flex", gap: 12, minWidth: 0 }}>
-                <div className="module-icon" aria-hidden>MN</div>
-                <div style={{ minWidth: 0 }}>
-                  <h3 className="module-title">Monitoring & Analytics</h3>
-                  <p className="module-desc">
-                    A manager dashboard for activity, progress distribution, team comparisons, and employee tracking by role.
-                  </p>
-                </div>
-              </div>
-            </div>
-            <div className="module-tags" aria-label="Monitoring highlights">
-              <span className="tag alt">Activity feed</span>
-              <span className="tag">KPI view</span>
-              <span className="tag alt">Tracking</span>
-            </div>
-            <div className="module-cta">
-              <a href={appPath("/auth/manager/login")} className="module-link primary">
-                Open dashboard <span aria-hidden>→</span>
-              </a>
-              <a href={appPath("/dashboard/manager")} className="module-link">
-                Manager view <span aria-hidden>→</span>
-              </a>
-            </div>
-          </motion.div>
         </div>
       </section>
 
-      <motion.section {...sectionIn} className="section" aria-labelledby="enterprise-heading">
-        <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "end", flexWrap: "wrap" }}>
-          <h2 id="enterprise-heading" className="section-title">Enterprise-ready by design</h2>
-          <p style={{ margin: 0, color: "#1F5FBF", fontSize: 13 }}>Practical governance, clear audit trails, and role-based access.</p>
-        </div>
-        <div className="enterprise-grid">
-          <div className="enterprise-card">
-            <p className="enterprise-h">Security</p>
-            <ul className="enterprise-ul">
-              <li>Role-based access for employees, managers, HR, and admins</li>
-              <li>Reports and scores stored per candidate and interview</li>
-              <li>Proctoring summary surfaced in interview reports (when enabled)</li>
-            </ul>
-          </div>
-          <div className="enterprise-card">
-            <p className="enterprise-h">Operations</p>
-            <ul className="enterprise-ul">
-              <li>Manager dashboard with activity feed and engagement views</li>
-              <li>Bulk invite employees via Excel for faster onboarding</li>
-              <li>Consistent role blueprints to standardize expectations</li>
-            </ul>
-          </div>
-          <div className="enterprise-card">
-            <p className="enterprise-h">Decisioning</p>
-            <ul className="enterprise-ul">
-              <li>Promotion readiness based on assessments + progress</li>
-              <li>Compare team progress distribution across roles</li>
-              <li>Track employee preparation analytics by role</li>
-            </ul>
-          </div>
-        </div>
-      </motion.section>
 
       {/* Footer must be the final full-bleed section */}
       <div style={{ marginTop: 22, position: "relative", zIndex: 1 }}>

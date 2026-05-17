@@ -3,6 +3,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState, type CSSProperties } from "react";
 import { publicAssetUrl } from "@/lib/apiBase";
+import { buildInterviewXManagerDashboardUrlWithSso } from "@/lib/interviewx";
 import {
   clearOrgAuthInStorage,
   getOrgAuthFromStorage,
@@ -39,7 +40,8 @@ export function NavBar() {
 
   const logoutOrg = () => {
     clearOrgAuthInStorage();
-    window.location.href = "/";
+    // Manager/HR logout should return to Manager/HR login (not public home).
+    window.location.href = "/auth/manager/login";
   };
 
   const user = orgAuth.user as any | null;
@@ -109,35 +111,59 @@ export function NavBar() {
     router.push(`/role/${encodeURIComponent(rec.roleName)}`);
   };
 
-  const dashboardHref = isAdmin ? "/dashboard/admin" : isManagerOrHR ? "/dashboard/manager/home" : "/";
+  const managerInterviewXDashboardHref = isManagerOrHR
+    ? buildInterviewXManagerDashboardUrlWithSso({
+        token: orgAuth.token,
+        email: user?.email,
+        name: user?.fullName,
+        userType: isHR ? "HR" : "MANAGER",
+      })
+    : "";
+  const dashboardHref = isAdmin ? "/dashboard/admin" : isManagerOrHR ? managerInterviewXDashboardHref : "/";
   const profileHref = isAdmin ? "/profile/admin" : "/profile/employee";
   const profileLabel = isAdmin ? "Admin Profile" : "Employee Profile";
-  /** Employees → employee hub; Manager/HR → manager portal home; others → marketing home. */
+  /** Employees → employee hub; Manager/HR → InterviewX AI Interview dashboard; others → marketing home. */
   const brandHref =
-    isLoggedIn && isEmployee ? "/employee/" : isLoggedIn && isManagerOrHR ? "/dashboard/manager/home" : "/";
+    isLoggedIn && isEmployee ? "/employee/" : isLoggedIn && isManagerOrHR ? managerInterviewXDashboardHref : "/";
   const brandAriaLabel =
     isLoggedIn && isEmployee
       ? "Corporate Development — go to employee home"
       : isLoggedIn && isManagerOrHR
-        ? "Corporate Development — go to manager home"
+        ? "Corporate Development — go to AI Interview dashboard"
         : "Corporate Development — home";
 
   return (
     <header className="jb-nav">
       <div className="jb-nav__inner">
-        <Link href={brandHref} className="jb-nav__brand" aria-label={brandAriaLabel}>
-          <span className="jb-nav__logoWrap">
-            <img
-              src={publicAssetUrl("/brand/sx-workforce-transparent.png")}
-              alt="SX Workforce"
-              width={640}
-              height={200}
-              className="jb-nav__logo"
-              decoding="async"
-              fetchPriority="high"
-            />
-          </span>
-        </Link>
+        {isLoggedIn && isManagerOrHR ? (
+          <a href={brandHref} className="jb-nav__brand" aria-label={brandAriaLabel}>
+            <span className="jb-nav__logoWrap">
+              <img
+                src={publicAssetUrl("/brand/sx-workforce-transparent.png")}
+                alt="SX Workforce"
+                width={640}
+                height={200}
+                className="jb-nav__logo"
+                decoding="async"
+                fetchPriority="high"
+              />
+            </span>
+          </a>
+        ) : (
+          <Link href={brandHref} className="jb-nav__brand" aria-label={brandAriaLabel}>
+            <span className="jb-nav__logoWrap">
+              <img
+                src={publicAssetUrl("/brand/sx-workforce-transparent.png")}
+                alt="SX Workforce"
+                width={640}
+                height={200}
+                className="jb-nav__logo"
+                decoding="async"
+                fetchPriority="high"
+              />
+            </span>
+          </Link>
+        )}
 
         <div style={{ flex: 1, minWidth: 0 }} />
 
@@ -205,9 +231,15 @@ export function NavBar() {
               </div>
             ) : null}
             {(isAdmin || isManagerOrHR) ? (
-              <Link href={dashboardHref} style={portalDashStyle}>
-                Dashboard
-              </Link>
+              isManagerOrHR ? (
+                <a href={dashboardHref} style={portalDashStyle}>
+                  Dashboard
+                </a>
+              ) : (
+                <Link href={dashboardHref} style={portalDashStyle}>
+                  Dashboard
+                </Link>
+              )
             ) : null}
             <Link href={profileHref} style={portalDashStyle}>
               {profileLabel}
