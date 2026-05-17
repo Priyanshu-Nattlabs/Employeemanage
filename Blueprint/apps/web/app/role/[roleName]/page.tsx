@@ -6,7 +6,7 @@ import Link from "next/link";
 
 import { appPath, getApiPrefix } from "@/lib/apiBase";
 import { buildInterviewXStudentPrepHomeUrl } from "@/lib/interviewx";
-import { getOrgAuthFromStorage, orgCreateRecommendation } from "@/lib/orgAuth";
+import { getOrgAuthFromStorage, orgCreateRecommendation, orgGetMyProfile } from "@/lib/orgAuth";
 import { flowQueryString, mergeRoleFlowParams, pickRoleFlowParams, writeRoleFlowParams } from "@/lib/roleFlowParams";
 
 const API = getApiPrefix();
@@ -70,6 +70,92 @@ const skillsAreSimilar = (a: string, b: string) => {
   const inter = Array.from(ta).filter((t) => tb.has(t)).length;
   return inter >= 1;
 };
+
+/**
+ * Soft / universal skills that should not count as "common" when profile role ≠ target role
+ * (e.g. Software Developer → Journalist still shares Communication in data, but is a career change).
+ */
+const CROSS_ROLE_GENERIC_SKILL_NAMES = new Set([
+  "communication",
+  "critical thinking",
+  "adaptability",
+  "time management",
+  "teamwork",
+  "problem solving",
+  "problem-solving",
+  "attention to detail",
+  "integrity",
+  "curiosity",
+  "leadership",
+  "collaboration",
+  "interpersonal skills",
+  "work ethic",
+  "emotional intelligence",
+  "creativity",
+  "flexibility",
+]);
+
+function isGenericCrossRoleSkill(name: string) {
+  const n = normSkill(name);
+  if (!n) return false;
+  if (CROSS_ROLE_GENERIC_SKILL_NAMES.has(n)) return true;
+  const compact = n.replace(/-/g, " ");
+  return CROSS_ROLE_GENERIC_SKILL_NAMES.has(compact);
+}
+
+/** Ignore generic tokens when deciding if two roles share a skill (cross-role only). */
+const SKILL_OVERLAP_STOPWORDS = new Set([
+  "skills",
+  "skill",
+  "basic",
+  "and",
+  "the",
+  "for",
+  "with",
+  "use",
+  "using",
+  "thinking",
+  "tools",
+  "tool",
+  "development",
+  "technical",
+  "soft",
+  "non",
+  "communication",
+  "management",
+]);
+
+function significantTokenOverlapCount(a: string, b: string) {
+  const sigTokens = (s: string) =>
+    Array.from(skillTokens(normSkill(s))).filter((t) => t.length >= 4 && !SKILL_OVERLAP_STOPWORDS.has(t));
+  const ta = sigTokens(a);
+  const tb = new Set(sigTokens(b));
+  let n = 0;
+  for (const t of ta) if (tb.has(t)) n++;
+  return n;
+}
+
+function skillsOverlapForRoles(targetSkill: string, baselineSkills: string[], sameRoleCatalog: boolean) {
+  const key = skillKeyLower(targetSkill);
+  if (!key || !baselineSkills.length) return false;
+  if (!sameRoleCatalog && isGenericCrossRoleSkill(targetSkill)) return false;
+  for (const prev of baselineSkills) {
+    const pk = skillKeyLower(prev);
+    if (!pk) continue;
+    if (pk === key) {
+      if (!sameRoleCatalog && (isGenericCrossRoleSkill(targetSkill) || isGenericCrossRoleSkill(prev))) continue;
+      return true;
+    }
+    if (sameRoleCatalog) {
+      if (skillsAreSimilar(targetSkill, prev)) return true;
+      continue;
+    }
+    if (isGenericCrossRoleSkill(prev)) continue;
+    if (significantTokenOverlapCount(targetSkill, prev) >= 2) return true;
+    if (key.length >= 10 && pk.length >= 10 && (key.includes(pk) || pk.includes(key))) return true;
+  }
+  return false;
+}
 
 const skillKeyLower = (v: string) => String(v || "").trim().toLowerCase();
 
@@ -652,9 +738,53 @@ function RolePageContent() {
     const prev = prevPathnameRef.current;
     prevPathnameRef.current = pathname;
     if (pathname.includes("/test/")) return;
-    if (prev.includes("/test/")) void load(userId);
+    if (prev.includes("/test/")) {
+      try {
+        window.sessionStorage.removeItem(roleStateCacheKey);
+      } catch {
+        // ignore
+      }
+      void load(userId);
+    }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pathname, roleName, userId, isRecommendMode]);
+  }, [pathname, roleName, userId, isRecommendMode, roleStateCacheKey]);
+
+  const lastPrepUpdateRef = useRef(0);
+  useEffect(() => {
+    const read = () => {
+      try {
+        const v = Number(localStorage.getItem("jbv2_prepUpdatedAt") || "0");
+        return Number.isFinite(v) ? v : 0;
+      } catch {
+        return 0;
+      }
+    };
+    lastPrepUpdateRef.current = read();
+
+    const reloadPrep = () => {
+      const v = read();
+      if (!v || v === lastPrepUpdateRef.current) return;
+      lastPrepUpdateRef.current = v;
+      try {
+        window.sessionStorage.removeItem(roleStateCacheKey);
+      } catch {
+        // ignore
+      }
+      void load(userId);
+    };
+
+    window.addEventListener("jbv2-prep-updated", reloadPrep);
+    window.addEventListener("focus", reloadPrep);
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === "jbv2_prepUpdatedAt") reloadPrep();
+    };
+    window.addEventListener("storage", onStorage);
+    return () => {
+      window.removeEventListener("jbv2-prep-updated", reloadPrep);
+      window.removeEventListener("focus", reloadPrep);
+      window.removeEventListener("storage", onStorage);
+    };
+  }, [userId, roleName, roleStateCacheKey]);
 
   /**
    * Replan using existing skills — used by "Apply & Regenerate" in modal.
@@ -680,11 +810,20 @@ function RolePageContent() {
   };
 
   useEffect(() => {
-    const authUser = getOrgAuthFromStorage()?.user || null;
+    const auth = getOrgAuthFromStorage();
+    const authUser = auth?.user || null;
     setViewerRole(String(authUser?.currentRole || ""));
     const uid = authUser?.id || "demo-student-1";
     setUserId(uid);
     setEmployeeDesignation(String(authUser?.designation || "").trim());
+    if (auth?.token) {
+      void orgGetMyProfile(auth.token)
+        .then((p) => {
+          const d = String(p?.designation || "").trim();
+          if (d) setEmployeeDesignation(d);
+        })
+        .catch(() => {});
+    }
 
     // Initial calculation from localStorage to avoid extra fetch if possible,
     // though we still fetch for fresh data.
@@ -845,9 +984,56 @@ function RolePageContent() {
     const currentLevel = Number(employeeLevel);
     const parsed = profileDesignationBaseline;
 
-    if (!Number.isFinite(currentLevel) || currentLevel < 1) {
+    const applyBaselineSkillsFromDoc = (d: any) => {
+      const reqSkills = Array.isArray(d?.skillRequirements)
+        ? d.skillRequirements.map((s: any) => String(s?.skillName || "").trim()).filter(Boolean)
+        : [];
+      const legacyTech = Array.isArray(d?.skills?.technical)
+        ? d.skills.technical.map((s: any) => String(s || "").trim()).filter(Boolean)
+        : [];
+      const legacySoft = Array.isArray(d?.skills?.soft)
+        ? d.skills.soft.map((s: any) => String(s || "").trim()).filter(Boolean)
+        : [];
+      setPreviousLevelSkills(Array.from(new Set([...reqSkills, ...legacyTech, ...legacySoft])));
+    };
+
+    if (!parsed?.catalogName) {
       setPreviousLevelSkills([]);
       setProficiencyDelta([]);
+      return;
+    }
+
+    const baselineRole = parsed.catalogName;
+    const baselineLevel = parsed.level;
+    const baselineLvl = Number(baselineLevel);
+    const sameRoleAsTarget = normRoleName(baselineRole) === normRoleName(roleName);
+    const profileMeetsOrExceedsTargetNow =
+      sameRoleAsTarget && Number.isFinite(baselineLvl) && Number.isFinite(currentLevel) && baselineLvl >= currentLevel;
+
+    if (!Number.isFinite(currentLevel) || currentLevel < 1) {
+      setSkillCompareLoading(true);
+      setProficiencyDelta([]);
+      fetch(`${API}/api/blueprint/role/${enc(baselineRole)}?level=${enc(baselineLevel)}`)
+        .then((r) => r.json())
+        .then((d) => applyBaselineSkillsFromDoc(d))
+        .catch(() => setPreviousLevelSkills([]))
+        .finally(() => setSkillCompareLoading(false));
+      return;
+    }
+
+    if (profileMeetsOrExceedsTargetNow) {
+      setSkillCompareLoading(true);
+      fetch(`${API}/api/blueprint/role/${enc(baselineRole)}?level=${enc(baselineLevel)}`)
+        .then((r) => r.json())
+        .then((d) => {
+          applyBaselineSkillsFromDoc(d);
+          setProficiencyDelta([]);
+        })
+        .catch(() => {
+          setPreviousLevelSkills([]);
+          setProficiencyDelta([]);
+        })
+        .finally(() => setSkillCompareLoading(false));
       return;
     }
 
@@ -872,15 +1058,7 @@ function RolePageContent() {
       setProficiencyDelta(items);
     };
 
-    if (!parsed?.catalogName) {
-      setPreviousLevelSkills([]);
-      setProficiencyDelta([]);
-      return;
-    }
-
     const targetLevelStr = String(currentLevel);
-    const baselineRole = parsed.catalogName;
-    const baselineLevel = parsed.level;
     const deltaQs = new URLSearchParams();
     deltaQs.set("level", targetLevelStr);
     deltaQs.set("baselineRole", baselineRole);
@@ -1273,12 +1451,29 @@ function RolePageContent() {
     return Array.from(out).filter(Boolean);
   }, [previousLevelSkills, proficiencyDelta]);
 
+  const rolesAreDifferentCatalog = useMemo(
+    () =>
+      !!profileDesignationBaseline?.catalogName &&
+      normRoleName(profileDesignationBaseline.catalogName) !== normRoleName(roleName),
+    [profileDesignationBaseline, roleName]
+  );
+
   const isSkillCommonWithPrevious = (skill: string) => {
+    if (rolesAreDifferentCatalog) {
+      return skillsOverlapForRoles(skill, previousLevelSkills, false);
+    }
     const key = String(skill || "").trim().toLowerCase();
     if (!key) return false;
     if (previousSkillKeySet.has(key)) return true;
     return previousComparableSkills.some((prevSkill) => skillsAreSimilar(skill, prevSkill));
   };
+
+  /** Overlap between target-role skills and profile baseline role skills (blueprint only, not AI gap pairs). */
+  const profileTargetSkillOverlap = useMemo(() => {
+    if (!previousLevelSkills.length || !allRoleSkillNames.length) return false;
+    const sameRole = !rolesAreDifferentCatalog;
+    return allRoleSkillNames.some((skill) => skillsOverlapForRoles(skill, previousLevelSkills, sameRole));
+  }, [allRoleSkillNames, previousLevelSkills, rolesAreDifferentCatalog]);
 
   const knownSkillsSet = new Set<string>((knownSkillsSelection || []).map((s) => String(s)));
   const testQueueSkills: string[] = Array.isArray(prep?.knownSkillsForTest) ? prep.knownSkillsForTest : [];
@@ -1300,6 +1495,23 @@ function RolePageContent() {
     );
   }, [data?.skillRequirements]);
   const comparativeSkillBars = useMemo(() => {
+    const profileMeetsOrExceedsTargetNow =
+      !!profileDesignationBaseline &&
+      normRoleName(profileDesignationBaseline.catalogName) === normRoleName(roleName) &&
+      (() => {
+        const b = Number(profileDesignationBaseline.level);
+        const t = Number(employeeLevel);
+        return Number.isFinite(b) && Number.isFinite(t) && b >= t;
+      })();
+    if (
+      profileDesignationBaseline &&
+      Number.isFinite(Number(employeeLevel)) &&
+      Number(employeeLevel) >= 1 &&
+      !profileMeetsOrExceedsTargetNow &&
+      !profileTargetSkillOverlap
+    ) {
+      return [];
+    }
     const rows = (Array.isArray(proficiencyDelta) ? proficiencyDelta : []).filter((p) => {
       if (!technicalSkillSet.size) return true;
       return technicalSkillSet.has(String(p.skillName || "").trim().toLowerCase());
@@ -1309,7 +1521,7 @@ function RolePageContent() {
       const currentNeed = Math.max(20, targetNeed - p.increasePct);
       return { ...p, currentNeed, targetNeed, gap: targetNeed - currentNeed };
     });
-  }, [proficiencyDelta, technicalSkillSet]);
+  }, [proficiencyDelta, technicalSkillSet, profileDesignationBaseline, employeeLevel, roleName, profileTargetSkillOverlap]);
 
   /* Build skill rows from Gantt + completed-only entries (after tasks were stripped server-side). */
   const chartSkillReqsAll = useMemo(() => {
@@ -1438,6 +1650,14 @@ function RolePageContent() {
       profileDesignationBaseline.level === String(Number(employeeLevel)),
     [profileDesignationBaseline, roleName, employeeLevel]
   );
+  /** Profile role matches target and employee level is same or higher — no skill gap chart. */
+  const profileMeetsOrExceedsTarget = useMemo(() => {
+    if (!profileDesignationBaseline) return false;
+    if (normRoleName(profileDesignationBaseline.catalogName) !== normRoleName(roleName)) return false;
+    const b = Number(profileDesignationBaseline.level);
+    const t = Number(employeeLevel);
+    return Number.isFinite(b) && Number.isFinite(t) && b >= t;
+  }, [profileDesignationBaseline, roleName, employeeLevel]);
   const skillComparisonMode = useMemo(() => {
     const n = Number(employeeLevel);
     if (!Number.isFinite(n) || n < 1) return "none" as const;
@@ -1461,9 +1681,23 @@ function RolePageContent() {
   const forceAllOverlapGreen =
     skillComparisonMode === "baseline" && exactRoleMatch && previousComparableSkills.length > 0;
   const noCommonSkillsWithProfile =
-    skillComparisonMode === "baseline" &&
+    !!profileDesignationBaseline?.catalogName &&
     !skillCompareLoading &&
-    (!Array.isArray(proficiencyDelta) || proficiencyDelta.length === 0);
+    !profileMeetsOrExceedsTarget &&
+    allRoleSkillNames.length > 0 &&
+    previousLevelSkills.length > 0 &&
+    !profileTargetSkillOverlap &&
+    (rolesAreDifferentCatalog || skillComparisonMode === "baseline");
+  const noCommonSkillsMessage = profileDesignationBaseline
+    ? `Between your profile role (“${profileDesignationBaseline.catalogName}” at Level ${profileDesignationBaseline.level}) and your target role (“${roleName}”${
+        Number(employeeLevel) >= 1 ? ` at Level ${employeeLevel}` : ""
+      }), no skill is common. All skills below are new for this target.`
+    : `Between your current role and “${roleName}”, no skill is common.`;
+  const profileNoGapMessage = profileMeetsOrExceedsTarget
+    ? exactRoleMatch
+      ? `You are already at “${roleName}” Level ${employeeLevel}. There is no proficiency gap to close for this target.`
+      : `Your profile role is Level ${profileDesignationBaseline?.level} and this target is Level ${employeeLevel} — you already meet or exceed this level, so no gap is shown.`
+    : "";
 
   if (showSkillSelectionOnly) {
     return (
@@ -1506,6 +1740,12 @@ function RolePageContent() {
             <p style={{ margin: "0 0 10px", fontSize: 13, color: "#64748b" }}>
               Select skills you already know. These move to the test section and are removed from the learning blueprint for now.
             </p>
+            {profileNoGapMessage ? (
+              <div style={{ marginBottom: 12, border: "1px solid #86efac", background: "#ecfdf5", borderRadius: 10, padding: 12 }}>
+                <div style={{ fontSize: 13, fontWeight: 900, color: "#166534", marginBottom: 4 }}>No proficiency gap</div>
+                <div style={{ fontSize: 12, color: "#15803d", lineHeight: 1.55 }}>{profileNoGapMessage}</div>
+              </div>
+            ) : null}
             {comparativeSkillBars.length > 0 && (
               <div style={{ marginBottom: 12, border: "1px solid #dbeafe", background: "#f8fbff", borderRadius: 10, padding: 12 }}>
                 <div style={{ fontSize: 13, fontWeight: 900, color: "#1e3a8a", marginBottom: 4 }}>
@@ -1552,14 +1792,13 @@ function RolePageContent() {
             )}
             {noCommonSkillsWithProfile && (
               <div style={{ marginBottom: 12, border: "1px solid #fde68a", background: "#fffbeb", borderRadius: 10, padding: 12 }}>
-                <div style={{ fontSize: 13, fontWeight: 900, color: "#92400e", marginBottom: 4 }}>{comparativeChartTitle}</div>
-                <div style={{ fontSize: 11, color: "#78350f", marginBottom: 8 }}>{comparativeChartSub}</div>
-                <div style={{ fontSize: 12, fontWeight: 700, color: "#9a3412" }}>
-                  No skill is common between your submitted current role and this target role for the comparison — there is no shared skill to chart.
+                <div style={{ fontSize: 13, fontWeight: 900, color: "#92400e", marginBottom: 4 }}>No common skills between your roles</div>
+                <div style={{ fontSize: 12, fontWeight: 700, color: "#9a3412", lineHeight: 1.55 }}>
+                  {noCommonSkillsMessage}
                 </div>
               </div>
             )}
-            {skillComparisonMode === "baseline" && (
+            {skillComparisonMode === "baseline" && !noCommonSkillsWithProfile && (
               <div style={{ margin: "0 0 10px", fontSize: 12, color: "#475569", display: "flex", gap: 10, flexWrap: "wrap" }}>
                 <span style={{ background: "#ECFDF5", border: "1px solid #86EFAC", borderRadius: 999, padding: "4px 10px", fontWeight: 700, color: "#166534" }}>
                   Overlap with current designation
@@ -1572,7 +1811,7 @@ function RolePageContent() {
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 8, marginBottom: 12 }}>
               {allRoleSkillNames.map((skill) => {
                 const checked = knownSkillsSet.has(skill);
-                const isCommon = isSkillCommonWithPrevious(skill);
+                const isCommon = !noCommonSkillsWithProfile && isSkillCommonWithPrevious(skill);
                 const baseBg = isCommon ? "#ECFDF5" : "#FFF7ED";
                 const baseBorder = isCommon ? "#86EFAC" : "#FDBA74";
                 return (
@@ -1881,6 +2120,12 @@ function RolePageContent() {
           <p style={{ margin: "0 0 10px", fontSize: 13, color: "#64748b" }}>
             Select skills you already know. These move to the test section and are removed from the learning blueprint for now.
           </p>
+          {profileNoGapMessage ? (
+            <div style={{ marginBottom: 12, border: "1px solid #86efac", background: "#ecfdf5", borderRadius: 10, padding: 12 }}>
+              <div style={{ fontSize: 13, fontWeight: 900, color: "#166534", marginBottom: 4 }}>No proficiency gap</div>
+              <div style={{ fontSize: 12, color: "#15803d", lineHeight: 1.55 }}>{profileNoGapMessage}</div>
+            </div>
+          ) : null}
           {comparativeSkillBars.length > 0 && (
             <div style={{ marginBottom: 12, border: "1px solid #dbeafe", background: "#f8fbff", borderRadius: 10, padding: 12 }}>
               <div style={{ fontSize: 13, fontWeight: 900, color: "#1e3a8a", marginBottom: 4 }}>
@@ -1927,14 +2172,13 @@ function RolePageContent() {
           )}
           {noCommonSkillsWithProfile && (
             <div style={{ marginBottom: 12, border: "1px solid #fde68a", background: "#fffbeb", borderRadius: 10, padding: 12 }}>
-              <div style={{ fontSize: 13, fontWeight: 900, color: "#92400e", marginBottom: 4 }}>{comparativeChartTitle}</div>
-              <div style={{ fontSize: 11, color: "#78350f", marginBottom: 8 }}>{comparativeChartSub}</div>
-              <div style={{ fontSize: 12, fontWeight: 700, color: "#9a3412" }}>
-                No skill is common between your submitted current role and this target role for the comparison — there is no shared skill to chart.
+              <div style={{ fontSize: 13, fontWeight: 900, color: "#92400e", marginBottom: 4 }}>No common skills between your roles</div>
+              <div style={{ fontSize: 12, fontWeight: 700, color: "#9a3412", lineHeight: 1.55 }}>
+                {noCommonSkillsMessage}
               </div>
             </div>
           )}
-          {skillComparisonMode === "baseline" && (
+          {skillComparisonMode === "baseline" && !noCommonSkillsWithProfile && (
             <div style={{ margin: "0 0 10px", fontSize: 12, color: "#475569", display: "flex", gap: 10, flexWrap: "wrap" }}>
               <span style={{ background: "#ECFDF5", border: "1px solid #86EFAC", borderRadius: 999, padding: "4px 10px", fontWeight: 700, color: "#166534" }}>
                 Overlap with current designation
@@ -1949,7 +2193,8 @@ function RolePageContent() {
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 8, marginBottom: 12 }}>
             {allRoleSkillNames.map((skill) => {
               const checked = knownSkillsSet.has(skill);
-              const isCommon = forceAllOverlapGreen || isSkillCommonWithPrevious(skill);
+              const isCommon =
+                !noCommonSkillsWithProfile && (forceAllOverlapGreen || isSkillCommonWithPrevious(skill));
               const baseBg = isCommon ? "#ECFDF5" : "#FFF7ED";
               const baseBorder = isCommon ? "#86EFAC" : "#FDBA74";
               return (

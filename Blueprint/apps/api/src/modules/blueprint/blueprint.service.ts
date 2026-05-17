@@ -57,6 +57,34 @@ export class BlueprintService {
     return { ...role, skillRequirements, description };
   }
 
+  private normRoleKey(name: string) {
+    return String(name || "")
+      .toLowerCase()
+      .replace(/[^a-z0-9\s]/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+  }
+
+  /**
+   * No proficiency gap when the employee's profile role/level already meets or exceeds the target.
+   */
+  private proficiencyDeltaSkipped(
+    targetRoleName: string,
+    targetLevelText: string,
+    baselineRoleName: string,
+    baselineLevelText: string
+  ): { skip: true; reason: "same_role_and_level" | "baseline_above_target" } | { skip: false } {
+    if (this.normRoleKey(targetRoleName) !== this.normRoleKey(baselineRoleName)) return { skip: false };
+    const targetLvl = Number(String(targetLevelText || "").trim());
+    const baselineLvl = Number(String(baselineLevelText || "").trim());
+    if (!Number.isFinite(targetLvl) || !Number.isFinite(baselineLvl) || targetLvl < 1 || baselineLvl < 1) {
+      return { skip: false };
+    }
+    if (baselineLvl > targetLvl) return { skip: true, reason: "baseline_above_target" };
+    if (baselineLvl === targetLvl) return { skip: true, reason: "same_role_and_level" };
+    return { skip: false };
+  }
+
   private extractRoleSkillNames(role: any): string[] {
     const fromReq = Array.isArray(role?.skillRequirements)
       ? role.skillRequirements.map((s: any) => String(s?.skillName || "").trim()).filter(Boolean)
@@ -271,8 +299,22 @@ Rules:
 
     // Baseline compare: target role at chosen level vs employee's current profile role (optionally at a different level).
     if (baseline && levelText) {
-      const target = (await this.getRole(roleName, levelText)) || (await this.getRole(roleName));
       const baseLvl = baselineLevelText || levelText;
+      const skip = this.proficiencyDeltaSkipped(roleName, levelText, baseline, baseLvl);
+      if (skip.skip) {
+        return {
+          roleName,
+          level: levelText,
+          previousLevel: baseline,
+          baselineRole: baseline,
+          baselineLevel: baseLvl,
+          items: [] as any[],
+          noGap: true,
+          skipReason: skip.reason,
+        };
+      }
+
+      const target = (await this.getRole(roleName, levelText)) || (await this.getRole(roleName));
       let base = await this.getRole(baseline, baseLvl);
       if (!base) base = await this.getRole(baseline);
       if (!base && baseLvl !== "1") base = await this.getRole(baseline, "1");

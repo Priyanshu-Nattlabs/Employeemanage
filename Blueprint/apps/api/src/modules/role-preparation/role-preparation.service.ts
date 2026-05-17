@@ -19,6 +19,40 @@ export class RolePreparationService {
     return String(v || "").trim().toLowerCase();
   }
 
+  private passedKnownSkillScore(prep: any, skillName: string): number | undefined {
+    const want = this.skillKeyLower(skillName);
+    const badges = Array.isArray(prep?.earnedBadges) ? prep.earnedBadges : [];
+    for (let i = badges.length - 1; i >= 0; i--) {
+      const b = badges[i];
+      if (this.skillKeyLower(String(b?.skillName || "")) !== want) continue;
+      if (typeof b?.score === "number") return b.score;
+    }
+    return undefined;
+  }
+
+  private applyPassedKnownToSkillProgress(prep: any, progress: Record<string, any>) {
+    const passed = this.uniq(prep?.passedKnownSkills || []);
+    if (!passed.length) return progress;
+    const gc = prep?.ganttChartData;
+    const today = new Date().toISOString().slice(0, 10);
+    for (const raw of passed) {
+      const canonical = this.resolveCanonicalSkillName(raw, prep, gc);
+      if (!canonical) continue;
+      const prev = progress[canonical] || { completed: false, subtopicCompletion: {} };
+      if (prev.completed) {
+        progress[canonical] = prev;
+        continue;
+      }
+      progress[canonical] = {
+        ...prev,
+        completed: true,
+        score: typeof prev.score === "number" ? prev.score : this.passedKnownSkillScore(prep, canonical),
+        completedDate: prev.completedDate || today,
+      };
+    }
+    return progress;
+  }
+
   /** Align test URL / DB skill name with chart task names (e.g. "sql" vs "SQL"). */
   private resolveCanonicalSkillName(submitted: string, prep: any, gc: any): string {
     const sn = String(submitted || "").trim();
@@ -114,9 +148,10 @@ export class RolePreparationService {
         const updated: Record<string, any> = {};
         const skillNames = chartSkillNames.length ? chartSkillNames : Object.keys(existing);
         for (const name of skillNames) {
-          updated[name] = existing[name] || { completed: false, subtopicCompletion: {} };
+          const prev = existing[name] || { completed: false, subtopicCompletion: {} };
+          updated[name] = prev.completed ? prev : { ...prev, completed: false };
         }
-        prep.skillProgress = updated;
+        prep.skillProgress = this.applyPassedKnownToSkillProgress(prep, updated);
       }
       await prep.save();
     }
@@ -279,7 +314,9 @@ export class RolePreparationService {
       score,
       completedDate: new Date().toISOString().slice(0, 10),
     };
-    prep.isActive = true;
+    if (!prep.isActive && gc?.plan?.tasks?.length) {
+      prep.isActive = true;
+    }
     prep.markModified("skillProgress");
 
     // Keep locked Gantt snapshot aligned with progress (same document the UI loads when isActive).
@@ -303,12 +340,15 @@ export class RolePreparationService {
   async markKnownSkillPassed(studentId: string, roleName: string, skillName: string, score: number) {
     const prep = await this.prepModel.findOne({ studentId, roleName });
     if (!prep) return null;
-    prep.knownSkillsForTest = this.uniq((prep.knownSkillsForTest || []).filter((s) => s !== skillName));
-    prep.passedKnownSkills = this.uniq([...(prep.passedKnownSkills || []), skillName]);
-    prep.failedKnownSkills = this.uniq((prep.failedKnownSkills || []).filter((s) => s !== skillName));
+    const gc: any = prep.ganttChartData && typeof prep.ganttChartData === "object" ? prep.ganttChartData : null;
+    const canonical = this.resolveCanonicalSkillName(skillName, prep, gc);
+    const drop = (s: string) => this.skillKeyLower(s) !== this.skillKeyLower(canonical);
+    prep.knownSkillsForTest = this.uniq((prep.knownSkillsForTest || []).filter(drop));
+    prep.passedKnownSkills = this.uniq([...(prep.passedKnownSkills || []), canonical]);
+    prep.failedKnownSkills = this.uniq((prep.failedKnownSkills || []).filter(drop));
     prep.earnedBadges = Array.isArray(prep.earnedBadges) ? prep.earnedBadges : [];
     prep.earnedBadges.push({
-      skillName,
+      skillName: canonical,
       roleName,
       score,
       earnedAt: new Date().toISOString(),
@@ -322,26 +362,33 @@ export class RolePreparationService {
     const prep = await this.prepModel.findOne({ studentId, roleName });
     if (!prep) return null;
 
-    prep.knownSkillsForTest = this.uniq((prep.knownSkillsForTest || []).filter((s) => s !== skillName));
-    prep.failedKnownSkills = this.uniq([...(prep.failedKnownSkills || []), skillName]);
-    prep.passedKnownSkills = this.uniq((prep.passedKnownSkills || []).filter((s) => s !== skillName));
+    const gc: any = prep.ganttChartData && typeof prep.ganttChartData === "object" ? prep.ganttChartData : null;
+    const canonical = this.resolveCanonicalSkillName(skillName, prep, gc);
+    const drop = (s: string) => this.skillKeyLower(s) !== this.skillKeyLower(canonical);
+    prep.knownSkillsForTest = this.uniq((prep.knownSkillsForTest || []).filter(drop));
+    prep.failedKnownSkills = this.uniq([...(prep.failedKnownSkills || []), canonical]);
+    prep.passedKnownSkills = this.uniq((prep.passedKnownSkills || []).filter(drop));
 
     prep.skillProgress = prep.skillProgress || {};
-    if (!prep.skillProgress[skillName]) {
-      prep.skillProgress[skillName] = { completed: false, subtopicCompletion: {} } as any;
+    const progressKey =
+      Object.keys(prep.skillProgress).find((k) => this.skillKeyLower(k) === this.skillKeyLower(canonical)) || canonical;
+    if (!prep.skillProgress[progressKey]) {
+      prep.skillProgress[progressKey] = { completed: false, subtopicCompletion: {} } as any;
     } else {
-      prep.skillProgress[skillName] = { ...prep.skillProgress[skillName], completed: false };
+      prep.skillProgress[progressKey] = { ...prep.skillProgress[progressKey], completed: false };
     }
     prep.markModified("skillProgress");
 
-    const gc: any = prep.ganttChartData || {};
-    if (Array.isArray(gc?.plan?.tasks)) {
-      const exists = gc.plan.tasks.some((t: any) => String(t?.name || "") === skillName);
+    const gcFail: any = prep.ganttChartData || {};
+    if (Array.isArray(gcFail?.plan?.tasks)) {
+      const exists = gcFail.plan.tasks.some(
+        (t: any) => this.skillKeyLower(String(t?.name || "")) === this.skillKeyLower(canonical)
+      );
       if (!exists) {
-        const totalMonths = Number(gc?.plan?.totalMonths || 12);
-        gc.plan.tasks.push({
-          id: `skill_${skillName.replace(/\s+/g, "_").replace(/[^a-zA-Z0-9_]/g, "")}`,
-          name: skillName,
+        const totalMonths = Number(gcFail?.plan?.totalMonths || 12);
+        gcFail.plan.tasks.push({
+          id: `skill_${canonical.replace(/\s+/g, "_").replace(/[^a-zA-Z0-9_]/g, "")}`,
+          name: canonical,
           start: totalMonths,
           end: totalMonths,
           difficulty: "intermediate",
@@ -353,7 +400,7 @@ export class RolePreparationService {
           isOptional: false,
         });
       }
-      prep.ganttChartData = gc;
+      prep.ganttChartData = gcFail;
       prep.markModified("ganttChartData");
     }
 

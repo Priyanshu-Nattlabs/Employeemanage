@@ -479,6 +479,11 @@ Return only JSON array.`;
           const row = (test.skillBreakdown || {})[skill];
           const skillScore = typeof row?.score === "number" ? row.score : score;
           if (row?.passed) {
+            try {
+              await this.prepService.markCompletedAfterTest(test.studentId, test.roleName, skill, skillScore);
+            } catch (e: any) {
+              this.logger.warn(`Known-skill completion sync failed for "${skill}": ${e?.message || e}`);
+            }
             await this.prepService.markKnownSkillPassed(test.studentId, test.roleName, skill, skillScore);
           } else {
             await this.prepService.markKnownSkillFailed(test.studentId, test.roleName, skill);
