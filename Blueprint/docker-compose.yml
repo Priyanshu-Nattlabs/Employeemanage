@@ -5,24 +5,28 @@ services:
     # mongo:5+ often requires CPU AVX; common VPS hosts fail healthchecks. Pin 4.4 for reliable deploys.
     # If this volume was created by Mongo 7+, run once: docker compose down && docker volume rm talentx_talentx-mongo-data (data loss).
     image: mongo:4.4
-    container_name: talentx-mongodb
+    # No fixed container_name — avoids "name already in use" when an old container was not removed.
     # Host 27017 is often taken (local MongoDB / another stack). Backend still uses mongodb:27017 on the Docker network.
     ports:
       - "${BLUEPRINT_MONGO_HOST_PORT:-27018}:27017"
     volumes:
       - talentx-mongo-data:/data/db
     restart: unless-stopped
+    # Faster "healthy" so backend + seed are not blocked longer than needed on a warm volume.
+    stop_grace_period: 12s
     healthcheck:
       test: ["CMD", "mongo", "--quiet", "--eval", "db.adminCommand('ping')"]
-      interval: 5s
-      timeout: 10s
-      retries: 24
-      start_period: 60s
+      interval: 4s
+      timeout: 8s
+      retries: 18
+      start_period: 30s
 
   # Runs on every `docker compose up`: if `blueprints` is empty, seeds from Excel under repo root; otherwise exits immediately.
+  # Uses Alpine + minimal `mongodb` install for the DB check; full `npm install` runs only when seeding (see ensure-blueprint-seed.mjs).
+  # Set BLUEPRINT_SKIP_AUTO_SEED=1 in `.env` to skip this step entirely for fastest local starts (you must already have blueprint data).
   # Requires Docker Compose v2.20+ (service_completed_successfully). Excel files optional but at least one workbook must exist to seed.
   seed-ensure:
-    image: node:22-bookworm-slim
+    image: node:22-alpine
     working_dir: /app/apps/api
     volumes:
       - .:/app
@@ -31,22 +35,21 @@ services:
         condition: service_healthy
     environment:
       MONGODB_URI: mongodb://mongodb:27017/job_blueprint_v2
-      # Faster first connect after mongo healthy (override if Mongo is slow to accept connections)
-      BLUEPRINT_AUTO_SEED_CONNECT_RETRIES: "8"
-      BLUEPRINT_AUTO_SEED_CONNECT_DELAY_MS: "1000"
+      BLUEPRINT_SKIP_AUTO_SEED: ${BLUEPRINT_SKIP_AUTO_SEED:-}
+      BLUEPRINT_AUTO_SEED_CONNECT_RETRIES: "6"
+      BLUEPRINT_AUTO_SEED_CONNECT_DELAY_MS: "500"
     restart: "no"
     command:
       [
         "sh",
         "-c",
-        "if [ ! -d node_modules/mongodb ]; then npm install --workspaces=false; fi && node src/scripts/ensure-blueprint-seed.mjs",
+        "if [ \"${BLUEPRINT_SKIP_AUTO_SEED:-}\" = \"1\" ]; then echo \"⏭️  BLUEPRINT_SKIP_AUTO_SEED=1 — skipping seed-ensure.\"; exit 0; fi; cd /app/apps/api && { [ -d node_modules/mongodb ] || npm install mongodb --omit=dev --no-audit --no-fund --loglevel=error; } && node src/scripts/ensure-blueprint-seed.mjs",
       ]
 
   backend:
     build:
       context: ./apps/api
       dockerfile: Dockerfile
-    container_name: talentx-backend
     # Host port defaults to 9081 so a local Nest/API on 8081 does not clash. Set BACKEND_PUBLISH_PORT=8081 to use 8081.
     ports:
       - "${BACKEND_PUBLISH_PORT:-9081}:8081"
@@ -63,9 +66,10 @@ services:
     restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://localhost:8081/api/blueprint/all >/dev/null || exit 1"]
-      interval: 15s
-      timeout: 7s
-      retries: 8
+      interval: 5s
+      timeout: 5s
+      retries: 18
+      start_period: 25s
 
   # After pulling new routes (e.g. /dashboard/manager/home/), rebuild without cache or you may still run an old bundle:
   #   docker compose build --no-cache frontend && docker compose up -d frontend
@@ -80,7 +84,6 @@ services:
         NEXT_PUBLIC_BASE_PATH: ${DOCKER_NEXT_PUBLIC_BASE_PATH:-}
         NEXT_PUBLIC_SAARTHIX_URL: ${NEXT_PUBLIC_SAARTHIX_URL:-}
         NEXT_PUBLIC_INTERVIEWX_ORIGIN: ${NEXT_PUBLIC_INTERVIEWX_ORIGIN:-}
-    container_name: talentx-frontend
     # UI: http://localhost:3002/ (no path prefix unless DOCKER_NEXT_PUBLIC_BASE_PATH is set)
     ports:
       - "3002:3001"

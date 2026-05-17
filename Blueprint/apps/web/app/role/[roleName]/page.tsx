@@ -1,7 +1,7 @@
 "use client";
 import React, { Suspense, useEffect, useMemo, useState, useRef } from "react";
 import { createPortal } from "react-dom";
-import { useParams, useRouter, useSearchParams } from "next/navigation";
+import { useParams, usePathname, useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 
 import { appPath, getApiPrefix } from "@/lib/apiBase";
@@ -70,6 +70,91 @@ const skillsAreSimilar = (a: string, b: string) => {
   const inter = Array.from(ta).filter((t) => tb.has(t)).length;
   return inter >= 1;
 };
+
+const skillKeyLower = (v: string) => String(v || "").trim().toLowerCase();
+
+/**
+ * Normalised substrings used to match verbose contextual JD labels to chart / prep keys
+ * (e.g. "Structured Query Language (SQL)" ↔ "SQL", "Version control (Git)" ↔ "Git").
+ */
+function skillMatchVariants(name: string): Set<string> {
+  const raw = String(name || "").trim();
+  const out = new Set<string>();
+  if (!raw) return out;
+  const add = (s: string) => {
+    const k = skillKeyLower(s);
+    if (k) out.add(k);
+    for (const w of k.split(/\s+/).filter((x) => x.length >= 3)) out.add(w);
+  };
+  add(raw);
+  const absorbInner = (inner: string) => {
+    for (const part of inner
+      .split(/[/,]|(?:\s+or\s+)|(?:\s+and\s+)/i)
+      .map((x) => x.trim())
+      .filter(Boolean)) {
+      add(part);
+    }
+  };
+  const re = /\(([^)]*)\)/g;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(raw)) != null) absorbInner(String(m[1] || ""));
+  const base = String(raw.replace(/\([^)]*\)/g, " "))
+    .replace(/\s+/g, " ")
+    .trim();
+  if (base) absorbInner(base);
+  return out;
+}
+
+/** Match prep.skillProgress keys: CI equality, then parenthetical / slash token overlap vs chart keys. */
+function resolveSkillProgressKey(skillProgress: Record<string, any> | undefined, skillName: string): string | null {
+  if (!skillProgress) return null;
+  const want = skillKeyLower(skillName);
+  if (!want) return null;
+  for (const k of Object.keys(skillProgress)) {
+    if (skillKeyLower(k) === want) return String(k).trim();
+  }
+  const targetVars = skillMatchVariants(skillName);
+  for (const k of Object.keys(skillProgress)) {
+    const keyVars = skillMatchVariants(k);
+    for (const v of targetVars) {
+      if (keyVars.has(v)) return String(k).trim();
+    }
+  }
+  return null;
+}
+
+function isSkillProgressCompleted(skillProgress: Record<string, any> | undefined, skillName: string): boolean {
+  const k = resolveSkillProgressKey(skillProgress, skillName);
+  if (!k) return false;
+  return !!(skillProgress as any)[k]?.completed;
+}
+
+function getPrepSkillEntry(skillProgress: Record<string, any> | undefined, skillName: string): any {
+  const k = resolveSkillProgressKey(skillProgress, skillName);
+  if (!k || !skillProgress) return undefined;
+  return skillProgress[k];
+}
+
+const normRoleName = (v: string) =>
+  String(v || "")
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+/** Matches employee register format: `Role Title (Level N)` → catalogue role + blueprint level. */
+const PROFILE_DESIGNATION_LEVEL = /\(\s*[Ll]evel\s*([1-9]\d*)\s*\)\s*$/;
+function parseProfileDesignationBaseline(raw: string): { catalogName: string; level: string } | null {
+  const s = String(raw || "").trim();
+  if (!s) return null;
+  const m = s.match(PROFILE_DESIGNATION_LEVEL);
+  if (m && m.index !== undefined) {
+    const catalogName = s.slice(0, m.index).trim();
+    if (!catalogName) return null;
+    return { catalogName, level: String(Number(m[1])) };
+  }
+  return { catalogName: s, level: "1" };
+}
 
 /** Search links for this topic only (not role/skill). */
 function topicPrepUrls(topic: string) {
@@ -368,6 +453,7 @@ function RolePageContent() {
   const params       = useParams<{ roleName: string }>();
   const searchParams = useSearchParams();
   const router       = useRouter();
+  const pathname     = usePathname() || "";
   const roleName     = decodeURIComponent(params.roleName);
 
   /* manager → "recommend role" flow context (passed via querystring from /dashboard/manager) */
@@ -457,6 +543,11 @@ function RolePageContent() {
   const levelQuery = employeeLevel ? `?level=${enc(employeeLevel)}` : "";
   const targetDurationMonths = Number(mergedFlow.get("targetDurationMonths") || "");
 
+  const profileDesignationBaseline = useMemo(
+    () => parseProfileDesignationBaseline(employeeDesignation),
+    [employeeDesignation]
+  );
+
   // Only employees should be able to open/attempt tests. Managers/HR may view this page via links,
   // and can recommend roles, but should not see test actions.
   const canTakeTests = viewerRole === "EMPLOYEE" && !isRecommendMode;
@@ -474,19 +565,6 @@ function RolePageContent() {
   }, [employeeLevel]);
   const taskTopicsKey = (t: { name: string; start: number; end: number }) =>
     `${t.name}_${t.start}_${t.end}${topicsLevelSuffix}`;
-
-  const mockInterviewHref = useMemo(() => {
-    if (typeof window === "undefined") {
-      return buildInterviewXStudentPrepHomeUrl({ role: roleName });
-    }
-    const auth = getOrgAuthFromStorage();
-    const u = auth.user;
-    return buildInterviewXStudentPrepHomeUrl({
-      role: roleName,
-      email: u?.email || undefined,
-      name: u?.fullName || undefined,
-    });
-  }, [roleName]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -566,6 +644,17 @@ function RolePageContent() {
       setData(chartData);
     } finally { setLoading(false); }
   };
+
+  // Refetch prep + chart when returning from a skill test (roleFlowSig may be unchanged).
+  const prevPathnameRef = useRef("");
+  useEffect(() => {
+    if (isRecommendMode || !userId || !roleName) return;
+    const prev = prevPathnameRef.current;
+    prevPathnameRef.current = pathname;
+    if (pathname.includes("/test/")) return;
+    if (prev.includes("/test/")) void load(userId);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pathname, roleName, userId, isRecommendMode]);
 
   /**
    * Replan using existing skills — used by "Apply & Regenerate" in modal.
@@ -754,7 +843,7 @@ function RolePageContent() {
 
   useEffect(() => {
     const currentLevel = Number(employeeLevel);
-    const designation = employeeDesignation.trim();
+    const parsed = profileDesignationBaseline;
 
     if (!Number.isFinite(currentLevel) || currentLevel < 1) {
       setPreviousLevelSkills([]);
@@ -783,25 +872,30 @@ function RolePageContent() {
       setProficiencyDelta(items);
     };
 
-    // Always compare with employee's current designation at the same selected level.
-    if (!designation) {
+    if (!parsed?.catalogName) {
       setPreviousLevelSkills([]);
       setProficiencyDelta([]);
       return;
     }
-    const levelStr = String(currentLevel);
+
+    const targetLevelStr = String(currentLevel);
+    const baselineRole = parsed.catalogName;
+    const baselineLevel = parsed.level;
+    const deltaQs = new URLSearchParams();
+    deltaQs.set("level", targetLevelStr);
+    deltaQs.set("baselineRole", baselineRole);
+    deltaQs.set("baselineLevel", baselineLevel);
+
     setSkillCompareLoading(true);
     Promise.all([
-      fetch(`${API}/api/blueprint/role/${enc(designation)}?level=${enc(levelStr)}`).then((r) => r.json()).catch(() => null),
-      fetch(
-        `${API}/api/blueprint/role/${enc(roleName)}/proficiency-delta?level=${enc(levelStr)}&baselineRole=${enc(designation)}`
-      )
+      fetch(`${API}/api/blueprint/role/${enc(baselineRole)}?level=${enc(baselineLevel)}`).then((r) => r.json()).catch(() => null),
+      fetch(`${API}/api/blueprint/role/${enc(roleName)}/proficiency-delta?${deltaQs.toString()}`)
         .then((r) => r.json())
         .catch(() => null),
     ])
       .then(([d, delta]) => applyDelta(d, delta))
       .finally(() => setSkillCompareLoading(false));
-  }, [roleName, employeeLevel, employeeDesignation]);
+  }, [roleName, employeeLevel, profileDesignationBaseline]);
 
   /* ── trending jobs insights (Jsearch) ── */
   useEffect(() => {
@@ -836,6 +930,19 @@ function RolePageContent() {
     };
   }, [roleName, ctxIndustry, ctxEducation, ctxSpecialization]);
 
+  const planTasksAll = useMemo(
+    () => (Array.isArray(data?.plan?.tasks) ? data.plan.tasks : []) as any[],
+    [data?.plan?.tasks]
+  );
+  const visibleTasks = useMemo(
+    () =>
+      planTasksAll.filter((t: any) => {
+        const n = String(t?.name || "").trim();
+        return n && !isSkillProgressCompleted(prep?.skillProgress, n);
+      }),
+    [planTasksAll, prep?.skillProgress]
+  );
+
   /* ── topics: background-fetch all tasks as soon as chart arrives ── */
   const fetchTopics = async (task: any) => {
     const key = taskTopicsKey(task);
@@ -867,10 +974,9 @@ function RolePageContent() {
   };
 
   useEffect(() => {
-    const tasks: any[] = data?.plan?.tasks || [];
-    if (!tasks.length) return;
-    tasks.forEach((t, i) => setTimeout(() => fetchTopics(t), i * 100));
-  }, [data?.plan?.tasks, data?.plan?.totalMonths, roleName, employeeLevel, topicsLevelSuffix]);
+    if (!visibleTasks.length) return;
+    visibleTasks.forEach((t, i) => setTimeout(() => fetchTopics(t), i * 100));
+  }, [visibleTasks, data?.plan?.totalMonths, roleName, employeeLevel, topicsLevelSuffix]);
 
   // If user expands a skill panel but topics weren't loaded (or loaded empty),
   // fetch topics for that skill immediately.
@@ -880,11 +986,10 @@ function RolePageContent() {
       .map(([k]) => k);
     if (!expanded.length) return;
 
-    const planTasks: any[] = data?.plan?.tasks || [];
-    if (!planTasks.length) return;
+    if (!planTasksAll.length) return;
 
     for (const skillName of expanded) {
-      const task = planTasks.find(t => t?.name === skillName);
+      const task = planTasksAll.find(t => t?.name === skillName);
       if (!task) continue;
       const key = taskTopicsKey(task);
       const cached = topicsCache[key];
@@ -893,7 +998,7 @@ function RolePageContent() {
         void fetchTopics(task);
       }
     }
-  }, [expandedSkills, data?.plan?.tasks, topicsCache, topicsLoading, roleName, employeeLevel, topicsLevelSuffix]);
+  }, [expandedSkills, planTasksAll, topicsCache, topicsLoading, roleName, employeeLevel, topicsLevelSuffix]);
 
   /* ── start / lock preparation ── */
   const startPrep = async () => {
@@ -901,27 +1006,60 @@ function RolePageContent() {
     setSaving(true);
     // Save the full chart snapshot so it loads identically next time
     const snapshot = { ...data, topicsCache, savedAt: new Date().toISOString() };
-    const res = await fetch(`${API}/api/role-preparation/start/${enc(roleName)}?studentId=${enc(userId)}`, {
-      method: "POST", headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        ganttChartData: snapshot,
-        targetStartDate: targetStartDate || undefined,
-        targetCompletionDate: targetCompletionDate || undefined,
-        employeeLevel: employeeLevel || undefined,
-      }),
-    });
-    setSavedMsg("Preparation locked & saved!"); setTimeout(() => setSavedMsg(""), 3000);
-    await load();
-    setSaving(false);
+    try {
+      const res = await fetch(`${API}/api/role-preparation/start/${enc(roleName)}?studentId=${enc(userId)}`, {
+        method: "POST", headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          ganttChartData: snapshot,
+          targetStartDate: targetStartDate || undefined,
+          targetCompletionDate: targetCompletionDate || undefined,
+          employeeLevel: employeeLevel || undefined,
+        }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => null);
+        const msg = String(err?.message || "Could not start preparation.");
+        setSavedMsg(msg);
+        setTimeout(() => setSavedMsg(""), 3500);
+        return;
+      }
+      setSavedMsg("Preparation locked & saved!"); setTimeout(() => setSavedMsg(""), 3000);
+      await load();
+    } finally {
+      setSaving(false);
+    }
   };
 
   /* ── stop / unlock preparation ── */
   const stopPrep = async () => {
     setSaving(true);
-    const res = await fetch(`${API}/api/role-preparation/${enc(roleName)}?studentId=${enc(userId)}`, { method: "DELETE" });
-    setSavedMsg("Preparation stopped."); setTimeout(() => setSavedMsg(""), 2500);
-    await load();
-    setSaving(false);
+    try {
+      const res = await fetch(`${API}/api/role-preparation/${enc(roleName)}?studentId=${enc(userId)}`, { method: "DELETE" });
+      if (!res.ok) {
+        const err = await res.json().catch(() => null);
+        setSavedMsg(String(err?.message || "Could not stop preparation."));
+        setTimeout(() => setSavedMsg(""), 3000);
+        return;
+      }
+
+      // Clear per-role local/session state so picking this role again starts from scratch
+      // (comparison + known-skills test flow), not from cached selections/snapshot.
+      if (typeof window !== "undefined") {
+        try {
+          window.localStorage.removeItem(`jbv2-known-skills:${userId}:${roleName}`);
+          window.sessionStorage.removeItem(roleStateCacheKey);
+        } catch {
+          // ignore storage access errors
+        }
+      }
+
+      setSavedMsg("Preparation stopped. Redirecting to Target Role...");
+      setTimeout(() => {
+        window.location.href = appPath("/target-role");
+      }, 350);
+    } finally {
+      setSaving(false);
+    }
   };
 
   const saveKnownSkillsAndStart = async () => {
@@ -1008,15 +1146,50 @@ function RolePageContent() {
      If contextualData is ready, use it for JD + skills; use base data for Gantt.
      baseRole fills JD/skills when prep snapshot or AI chart payload omits them. */
   const activeData     = contextualData || data;   // contextual overrides JD/skills
-  const tasks: any[]      = data?.plan?.tasks || [];
   const totalMonths =
     loading
       ? (profileRemainingMonths ?? data?.plan?.totalMonths ?? 12)
       : (data?.plan?.totalMonths ?? profileRemainingMonths ?? 12);
   const planBreakMonths   = useMemo(() => new Set<number>(data?.plan?.breakMonths || []), [data?.plan?.breakMonths]);
-  const completedCount = prep ? Object.values(prep.skillProgress||{}).filter((v:any)=>v?.completed).length : 0;
-  const totalCount     = tasks.length;
-  const pct            = totalCount ? Math.round((completedCount/totalCount)*100) : 0;
+  const completedCount = useMemo(() => {
+    if (!prep?.skillProgress) return 0;
+    return Object.values(prep.skillProgress).filter((v: any) => v?.completed).length;
+  }, [prep?.skillProgress]);
+  const totalCount = useMemo(() => {
+    const n = prep?.skillProgress ? Object.keys(prep.skillProgress).length : 0;
+    if (n > 0) return n;
+    return planTasksAll.length;
+  }, [prep?.skillProgress, planTasksAll.length]);
+  const pct = totalCount ? Math.round((completedCount / totalCount) * 100) : 0;
+  const completedSkillNames = useMemo(() => {
+    const names = new Set<string>();
+    for (const t of planTasksAll) {
+      const n = String(t?.name || "").trim();
+      if (n && isSkillProgressCompleted(prep?.skillProgress, n)) names.add(n);
+    }
+    if (prep?.skillProgress) {
+      for (const [k, v] of Object.entries(prep.skillProgress)) {
+        const nk = String(k || "").trim();
+        if (nk && (v as any)?.completed) names.add(nk);
+      }
+    }
+    return Array.from(names);
+  }, [planTasksAll, prep?.skillProgress]);
+  const MOCK_MIN_PCT = 30;
+  const canOpenMockInterview = canTakeTests && pct >= MOCK_MIN_PCT && completedSkillNames.length > 0;
+  const mockInterviewHref = useMemo(() => {
+    if (typeof window === "undefined") {
+      return buildInterviewXStudentPrepHomeUrl({ role: roleName, completedSkills: completedSkillNames });
+    }
+    const auth = getOrgAuthFromStorage();
+    const u = auth.user;
+    return buildInterviewXStudentPrepHomeUrl({
+      role: roleName,
+      email: u?.email || undefined,
+      name: u?.fullName || undefined,
+      completedSkills: completedSkillNames,
+    });
+  }, [roleName, completedSkillNames]);
   const { techSkills, softSkills } = useMemo(() => {
     const extract = (r: any) => {
       const t = r?.skills?.technical;
@@ -1047,6 +1220,23 @@ function RolePageContent() {
     }
     return { techSkills: tech, softSkills: soft };
   }, [contextualData, data, baseRole]);
+
+  const techSkillsActive = useMemo(
+    () => techSkills.filter((s) => !isSkillProgressCompleted(prep?.skillProgress, s)),
+    [techSkills, prep?.skillProgress]
+  );
+  const techSkillsCompleted = useMemo(
+    () => techSkills.filter((s) => isSkillProgressCompleted(prep?.skillProgress, s)),
+    [techSkills, prep?.skillProgress]
+  );
+  const softSkillsActive = useMemo(
+    () => softSkills.filter((s) => !isSkillProgressCompleted(prep?.skillProgress, s)),
+    [softSkills, prep?.skillProgress]
+  );
+  const softSkillsCompleted = useMemo(
+    () => softSkills.filter((s) => isSkillProgressCompleted(prep?.skillProgress, s)),
+    [softSkills, prep?.skillProgress]
+  );
 
   const mergedJobDescription = useMemo(() => {
     return (
@@ -1121,44 +1311,94 @@ function RolePageContent() {
     });
   }, [proficiencyDelta, technicalSkillSet]);
 
-  /* Build skill-requirement cards directly from Gantt tasks (source of truth).
-     Augment with prerequisites / description from skillRequirements where names match.
-     This avoids name-mismatch issues when generated skills vary. */
-  const chartSkillReqs = useMemo(() => {
-    if (!tasks.length) return [];
-    // build lookup by skill name from contextual (preferred) or base DB data
+  /* Build skill rows from Gantt + completed-only entries (after tasks were stripped server-side). */
+  const chartSkillReqsAll = useMemo(() => {
     const reqMap = new Map<string, any>();
     for (const s of (contextualData?.skillRequirements || data?.skillRequirements || [])) {
       if (s.skillName) reqMap.set(s.skillName, s);
     }
-    return tasks.map((t: any) => {
+    const rows: any[] = [];
+    const seenLower = new Set<string>();
+    for (const t of planTasksAll) {
+      const n = String(t?.name || "").trim();
+      if (!n) continue;
+      const lk = skillKeyLower(n);
+      if (seenLower.has(lk)) continue;
+      seenLower.add(lk);
       const matched = reqMap.get(t.name);
-      return {
-        skillName:          t.name,
-        skillType:          t.type,
+      rows.push({
+        skillName: n,
+        skillType: t.type,
         timeRequiredMonths: t.timeRequired ?? (t.end - t.start + 1),
-        difficulty:         t.difficulty   || matched?.difficulty   || "intermediate",
-        importance:         t.importance   || matched?.importance   || "Important",
-        description:        t.description  || matched?.description  || "",
-        prerequisites:      matched?.prerequisites || [],
-        isOptional:         t.isOptional   ?? matched?.isOptional   ?? false,
-      };
-    });
-  }, [tasks, contextualData?.skillRequirements, data?.skillRequirements]);
+        difficulty: t.difficulty || matched?.difficulty || "intermediate",
+        importance: t.importance || matched?.importance || "Important",
+        description: t.description || matched?.description || "",
+        prerequisites: matched?.prerequisites || [],
+        isOptional: t.isOptional ?? matched?.isOptional ?? false,
+      });
+    }
+    if (prep?.skillProgress) {
+      for (const [k, v] of Object.entries(prep.skillProgress)) {
+        const nk = String(k || "").trim();
+        if (!nk || !(v as any)?.completed) continue;
+        const lk = skillKeyLower(nk);
+        if (seenLower.has(lk)) continue;
+        seenLower.add(lk);
+        const matched = reqMap.get(nk);
+        const st = String(matched?.skillType || "technical").toLowerCase();
+        rows.push({
+          skillName: nk,
+          skillType: st.includes("non") ? "non-technical" : "technical",
+          timeRequiredMonths: matched?.timeRequiredMonths ?? 1,
+          difficulty: matched?.difficulty || "intermediate",
+          importance: matched?.importance || "Important",
+          description: matched?.description || "",
+          prerequisites: matched?.prerequisites || [],
+          isOptional: matched?.isOptional ?? false,
+        });
+      }
+    }
+    return rows;
+  }, [planTasksAll, prep?.skillProgress, contextualData?.skillRequirements, data?.skillRequirements]);
+
+  const chartSkillReqsActive = useMemo(
+    () => chartSkillReqsAll.filter((s) => !isSkillProgressCompleted(prep?.skillProgress, s.skillName)),
+    [chartSkillReqsAll, prep?.skillProgress]
+  );
+  const chartSkillReqsCompleted = useMemo(
+    () => chartSkillReqsAll.filter((s) => isSkillProgressCompleted(prep?.skillProgress, s.skillName)),
+    [chartSkillReqsAll, prep?.skillProgress]
+  );
 
   const taskKeyBySkill = useMemo(() => {
     const m: Record<string, string> = {};
-    for (const t of tasks) m[t.name] = taskTopicsKey(t);
+    for (const t of planTasksAll) m[t.name] = taskTopicsKey(t);
+    if (prep?.skillProgress) {
+      for (const [k, v] of Object.entries(prep.skillProgress)) {
+        const nk = String(k || "").trim();
+        if (!(v as any)?.completed || m[nk]) continue;
+        m[nk] = `${nk}_1_1${topicsLevelSuffix}`;
+      }
+    }
     return m;
-  }, [tasks, topicsLevelSuffix]);
+  }, [planTasksAll, prep?.skillProgress, topicsLevelSuffix]);
 
   const topicStats = (skillName: string) => {
-    const key = taskKeyBySkill[skillName];
-    const topicByMonth = (key && topicsCache[key]) ? topicsCache[key] : {};
-    const subDone = prep?.skillProgress?.[skillName]?.subtopicCompletion || {};
-    const skillCompleted = !!prep?.skillProgress?.[skillName]?.completed;
+    let topKey = taskKeyBySkill[skillName];
+    if (!topKey) {
+      const match = planTasksAll.find((t: any) => skillKeyLower(String(t?.name || "")) === skillKeyLower(skillName));
+      if (match) topKey = taskTopicsKey(match);
+    }
+    if (!topKey) {
+      const pk = resolveSkillProgressKey(prep?.skillProgress, skillName);
+      if (pk) topKey = `${pk}_1_1${topicsLevelSuffix}`;
+    }
+    const pk = resolveSkillProgressKey(prep?.skillProgress, skillName) || skillName;
+    const topicByMonth = (topKey && topicsCache[topKey]) ? topicsCache[topKey] : {};
+    const subDone = prep?.skillProgress?.[pk]?.subtopicCompletion || {};
+    const skillCompleted = !!prep?.skillProgress?.[pk]?.completed;
     if (skillCompleted) {
-      return { total: 1, done: 1, pct: 100, key, topicByMonth };
+      return { total: 1, done: 1, pct: 100, key: topKey, topicByMonth };
     }
     let total = 0;
     let done = 0;
@@ -1170,7 +1410,7 @@ function RolePageContent() {
       });
     }
     const pct = total ? Math.round((done * 100) / total) : 0;
-    return { total, done, pct, key, topicByMonth };
+    return { total, done, pct, key: topKey, topicByMonth };
   };
 
   /* hydration-safe month labels */
@@ -1191,11 +1431,18 @@ function RolePageContent() {
   const tooltipIsLoading = tooltip ? !!topicsLoading[tooltip.topKey] : false;
   /** When null prep (e.g. manager recommend flow), avoid treating as "skill selection" and skipping the JD layout. */
   const showSkillSelectionOnly = !isRecommendMode && !prep?.knownSkillsConfigured;
+  const exactRoleMatch = useMemo(
+    () =>
+      !!profileDesignationBaseline &&
+      normRoleName(profileDesignationBaseline.catalogName) === normRoleName(roleName) &&
+      profileDesignationBaseline.level === String(Number(employeeLevel)),
+    [profileDesignationBaseline, roleName, employeeLevel]
+  );
   const skillComparisonMode = useMemo(() => {
     const n = Number(employeeLevel);
     if (!Number.isFinite(n) || n < 1) return "none" as const;
-    return employeeDesignation.trim() ? ("baseline" as const) : ("none" as const);
-  }, [employeeLevel, employeeDesignation]);
+    return profileDesignationBaseline?.catalogName ? ("baseline" as const) : ("none" as const);
+  }, [employeeLevel, profileDesignationBaseline]);
   const waitForSkillComparison =
     skillComparisonMode === "baseline" && skillCompareLoading;
   const skillCompareWaitLabel =
@@ -1204,13 +1451,19 @@ function RolePageContent() {
       : "";
   const comparativeChartTitle =
     skillComparisonMode === "baseline"
-      ? `Technical skills: current designation vs target (Level ${employeeLevel})`
+      ? `Technical skills: your profile role vs target (Level ${employeeLevel})`
       : "Common Technical Skills: Current vs Target Proficiency Need";
   const comparativeChartSub =
-    skillComparisonMode === "baseline"
-      ? `Baseline is your profile designation (“${employeeDesignation.trim()}”) at Level ${employeeLevel}, matched to the closest catalogue role.`
+    skillComparisonMode === "baseline" && profileDesignationBaseline
+      ? `Baseline is your submitted profile role (“${profileDesignationBaseline.catalogName}” at Level ${profileDesignationBaseline.level}) compared to “${roleName}” at Level ${employeeLevel}.`
       : "Compare required proficiency for your current role level and the selected target role level.";
   const baselineLegendLabel = skillComparisonMode === "baseline" ? "Your current role" : "Current role need";
+  const forceAllOverlapGreen =
+    skillComparisonMode === "baseline" && exactRoleMatch && previousComparableSkills.length > 0;
+  const noCommonSkillsWithProfile =
+    skillComparisonMode === "baseline" &&
+    !skillCompareLoading &&
+    (!Array.isArray(proficiencyDelta) || proficiencyDelta.length === 0);
 
   if (showSkillSelectionOnly) {
     return (
@@ -1294,6 +1547,15 @@ function RolePageContent() {
                       {p.reason ? <div style={{ marginTop: 5, fontSize: 11, color: "#64748b" }}>{p.reason}</div> : null}
                     </div>
                   ))}
+                </div>
+              </div>
+            )}
+            {noCommonSkillsWithProfile && (
+              <div style={{ marginBottom: 12, border: "1px solid #fde68a", background: "#fffbeb", borderRadius: 10, padding: 12 }}>
+                <div style={{ fontSize: 13, fontWeight: 900, color: "#92400e", marginBottom: 4 }}>{comparativeChartTitle}</div>
+                <div style={{ fontSize: 11, color: "#78350f", marginBottom: 8 }}>{comparativeChartSub}</div>
+                <div style={{ fontSize: 12, fontWeight: 700, color: "#9a3412" }}>
+                  No skill is common between your submitted current role and this target role for the comparison — there is no shared skill to chart.
                 </div>
               </div>
             )}
@@ -1578,16 +1840,6 @@ function RolePageContent() {
             ) : null}
           </div>
           {savedMsg && <p style={{ marginTop:10, color:"#bbf7d0", fontWeight:600 }}>{savedMsg}</p>}
-          {((mappings?.industries||[]).length > 0 || (mappings?.educations||[]).length > 0) && (
-            <div style={{ marginTop:16, display:"flex", gap:6, flexWrap:"wrap" }}>
-              {(mappings?.industries||[]).map((i:string) => (
-                <span key={i} style={{ background:"rgba(255,255,255,.12)", color:"rgba(255,255,255,.9)", borderRadius:999, padding:"4px 12px", fontSize:12, fontWeight:600, border:"1px solid rgba(255,255,255,.15)" }}>🏭 {i}</span>
-              ))}
-              {(mappings?.educations||[]).map((e:string) => (
-                <span key={e} style={{ background:"rgba(255,255,255,.12)", color:"rgba(255,255,255,.9)", borderRadius:999, padding:"4px 12px", fontSize:12, fontWeight:600, border:"1px solid rgba(255,255,255,.15)" }}>🎓 {e}</span>
-              ))}
-            </div>
-          )}
         </div>
       </div>
 
@@ -1673,20 +1925,31 @@ function RolePageContent() {
               </div>
             </div>
           )}
+          {noCommonSkillsWithProfile && (
+            <div style={{ marginBottom: 12, border: "1px solid #fde68a", background: "#fffbeb", borderRadius: 10, padding: 12 }}>
+              <div style={{ fontSize: 13, fontWeight: 900, color: "#92400e", marginBottom: 4 }}>{comparativeChartTitle}</div>
+              <div style={{ fontSize: 11, color: "#78350f", marginBottom: 8 }}>{comparativeChartSub}</div>
+              <div style={{ fontSize: 12, fontWeight: 700, color: "#9a3412" }}>
+                No skill is common between your submitted current role and this target role for the comparison — there is no shared skill to chart.
+              </div>
+            </div>
+          )}
           {skillComparisonMode === "baseline" && (
             <div style={{ margin: "0 0 10px", fontSize: 12, color: "#475569", display: "flex", gap: 10, flexWrap: "wrap" }}>
               <span style={{ background: "#ECFDF5", border: "1px solid #86EFAC", borderRadius: 999, padding: "4px 10px", fontWeight: 700, color: "#166534" }}>
                 Overlap with current designation
               </span>
-              <span style={{ background: "#FFF7ED", border: "1px solid #FDBA74", borderRadius: 999, padding: "4px 10px", fontWeight: 700, color: "#9A3412" }}>
-                New for target role at Level {employeeLevel}
-              </span>
+              {!forceAllOverlapGreen && (
+                <span style={{ background: "#FFF7ED", border: "1px solid #FDBA74", borderRadius: 999, padding: "4px 10px", fontWeight: 700, color: "#9A3412" }}>
+                  New for target role at Level {employeeLevel}
+                </span>
+              )}
             </div>
           )}
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 8, marginBottom: 12 }}>
             {allRoleSkillNames.map((skill) => {
               const checked = knownSkillsSet.has(skill);
-              const isCommon = isSkillCommonWithPrevious(skill);
+              const isCommon = forceAllOverlapGreen || isSkillCommonWithPrevious(skill);
               const baseBg = isCommon ? "#ECFDF5" : "#FFF7ED";
               const baseBorder = isCommon ? "#86EFAC" : "#FDBA74";
               return (
@@ -1760,7 +2023,7 @@ function RolePageContent() {
       {!isRecommendMode && (
       <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(150px,1fr))", gap:10, marginBottom:20 }}>
         {[
-          { label:"Total Skills", val:tasks.length||data?.skillRequirements?.length||"–", accent:"#3170A5" },
+          { label:"Total Skills", val: totalCount || data?.skillRequirements?.length || "–", accent:"#3170A5" },
           { label:"Completed",    val:completedCount, accent:"#15614B" },
           { label:"Remaining",    val:Math.max(0,totalCount-completedCount), accent:"#0F2B43" },
           { label:"Readiness",    val:`${pct}%`, accent:"#0EA5E9" },
@@ -1821,19 +2084,36 @@ function RolePageContent() {
                   </span>
                 )}
               </div>
-              {techSkills.length > 0 && (
+              {techSkillsActive.length > 0 && (
                 <div style={{ marginBottom:14 }}>
-                  <p style={{ margin:"0 0 8px", fontSize:11, fontWeight:800, color:"#3170A5", letterSpacing:"0.06em", textTransform:"uppercase" }}>Technical</p>
+                  <p style={{ margin:"0 0 8px", fontSize:11, fontWeight:800, color:"#3170A5", letterSpacing:"0.06em", textTransform:"uppercase" }}>Technical — in progress</p>
                   <div style={{ display:"flex", flexWrap:"wrap", gap:6 }}>
-                    {techSkills.map(s=><span key={s} style={pill("#EFF6FF","#1e40af")}>{s}</span>)}
+                    {techSkillsActive.map((s) => (
+                      <span key={s} style={pill("#EFF6FF","#1e40af")}>{s}</span>
+                    ))}
                   </div>
                 </div>
               )}
-              {softSkills.length > 0 && (
-                <div>
-                  <p style={{ margin:"0 0 8px", fontSize:11, fontWeight:800, color:"#7c3aed", letterSpacing:"0.06em", textTransform:"uppercase" }}>Soft Skills</p>
+              {softSkillsActive.length > 0 && (
+                <div style={{ marginBottom: techSkillsCompleted.length || softSkillsCompleted.length ? 14 : 0 }}>
+                  <p style={{ margin:"0 0 8px", fontSize:11, fontWeight:800, color:"#7c3aed", letterSpacing:"0.06em", textTransform:"uppercase" }}>Soft skills — in progress</p>
                   <div style={{ display:"flex", flexWrap:"wrap", gap:6 }}>
-                    {softSkills.map(s=><span key={s} style={pill("#FAF5FF","#6d28d9")}>{s}</span>)}
+                    {softSkillsActive.map((s) => (
+                      <span key={s} style={pill("#FAF5FF","#6d28d9")}>{s}</span>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {(techSkillsCompleted.length > 0 || softSkillsCompleted.length > 0) && (
+                <div style={{ marginTop: 12, paddingTop: 12, borderTop: "1px solid #E2E8F0" }}>
+                  <p style={{ margin:"0 0 8px", fontSize:11, fontWeight:800, color:"#166534", letterSpacing:"0.06em", textTransform:"uppercase" }}>✅ Completed (verified test)</p>
+                  <div style={{ display:"flex", flexWrap:"wrap", gap:6 }}>
+                    {techSkillsCompleted.map((s) => (
+                      <span key={`d-${s}`} style={pill("#DCFCE7","#166534")}>✓ {s}</span>
+                    ))}
+                    {softSkillsCompleted.map((s) => (
+                      <span key={`ds-${s}`} style={pill("#DCFCE7","#166534")}>✓ {s}</span>
+                    ))}
                   </div>
                 </div>
               )}
@@ -2083,8 +2363,8 @@ function RolePageContent() {
                 <button
                   style={{ ...btn("white","rgba(255,255,255,.12)","rgba(255,255,255,.3)"), fontSize:12 }}
                   onClick={() => {
-                    if (custPriority.length === 0 && tasks.length > 0) {
-                      setCustPriority(tasks.map((t:any) => t.name));
+                    if (custPriority.length === 0 && planTasksAll.length > 0) {
+                      setCustPriority(planTasksAll.map((t:any) => t.name));
                     } else if (custPriority.length === 0 && data?.skillRequirements?.length > 0) {
                       setCustPriority(data.skillRequirements.map((s:any) => s.skillName));
                     }
@@ -2113,7 +2393,7 @@ function RolePageContent() {
           </div>
         )}
 
-        {!loading && tasks.length === 0 && (
+        {!loading && planTasksAll.length === 0 && (
           <div style={{ padding:52, textAlign:"center", color:"#64748b" }}>
             <p style={{ fontSize:32, margin:"0 0 10px" }}>📅</p>
             <p style={{ fontWeight:700, margin:"0 0 6px" }}>No scheduled tasks yet.</p>
@@ -2121,8 +2401,16 @@ function RolePageContent() {
           </div>
         )}
 
+        {!loading && planTasksAll.length > 0 && visibleTasks.length === 0 && (
+          <div style={{ padding:40, textAlign:"center", color:"#166534", background:"#f0fdf4", borderTop:"1px solid #bbf7d0" }}>
+            <p style={{ fontSize:28, margin:"0 0 8px" }}>✅</p>
+            <p style={{ fontWeight:800, margin:0, fontSize:15 }}>All scheduled skills are complete</p>
+            <p style={{ fontSize:13, color:"#15803d", margin:"8px 0 0" }}>Your Gantt has no remaining rows. Completed skills stay listed below in Skill Requirements.</p>
+          </div>
+        )}
+
         {/* GANTT TABLE */}
-        {!loading && tasks.length > 0 && (
+        {!loading && visibleTasks.length > 0 && (
           <div style={{ overflowX:"auto" }} onMouseLeave={()=>setTooltip(null)}>
             <table style={{ borderCollapse:"collapse", width:"100%", minWidth:200+totalMonths*78 }}>
               <thead>
@@ -2148,11 +2436,12 @@ function RolePageContent() {
                 </tr>
               </thead>
               <tbody>
-                {tasks.map((task:any, ri:number) => {
+                {visibleTasks.map((task:any, ri:number) => {
                   const color  = taskColor(task.type, ri);
                   const diff   = diffColor(task.difficulty);
                   const imp    = impColor(task.importance);
-                  const isDone = !!prep?.skillProgress?.[task.name]?.completed;
+                  const isDone = isSkillProgressCompleted(prep?.skillProgress, task.name);
+                  const taskPk = resolveSkillProgressKey(prep?.skillProgress, task.name) || task.name;
                   const topKey = taskTopicsKey(task);
                   const topicsReady = !topicsLoading[topKey] && !!topicsCache[topKey];
 
@@ -2237,7 +2526,7 @@ function RolePageContent() {
                           <div style={{ display:"flex", flexDirection:"column", gap:4 }}>
                             {!showTestsUi ? null : prep?.isActive ? (
                               canTakeTests ? (
-                                <Link href={`/role/${enc(roleName)}/test/${enc(task.name)}${roleFlowQs}`} style={{ textDecoration:"none" }}>
+                                <Link href={`/role/${enc(roleName)}/test/${enc(taskPk)}${roleFlowQs}`} style={{ textDecoration:"none" }}>
                                   <button
                                     style={{
                                       width:"100%", fontSize:11, padding:"6px 0",
@@ -2249,8 +2538,8 @@ function RolePageContent() {
                                     }}
                                   >
                                     {isDone
-                                      ? (typeof (prep?.skillProgress?.[task.name]?.score) === "number"
-                                          ? `🔄 Retake · ${prep.skillProgress[task.name].score}%`
+                                      ? (typeof getPrepSkillEntry(prep?.skillProgress, task.name)?.score === "number"
+                                          ? `🔄 Retake · ${getPrepSkillEntry(prep?.skillProgress, task.name)!.score}%`
                                           : "🔄 Retake")
                                       : "🧠 Take Test"}
                                   </button>
@@ -2274,7 +2563,7 @@ function RolePageContent() {
                               </button>
                             )}
                             {isDone && prep?.isActive && (
-                              <button style={{ ...btn("#854D0E","#FEF3C7","#FDE68A"), fontSize:10, justifyContent:"center", width:"100%", padding:"5px 0" }} onClick={()=>markUndone(task.name)}>
+                              <button style={{ ...btn("#854D0E","#FEF3C7","#FDE68A"), fontSize:10, justifyContent:"center", width:"100%", padding:"5px 0" }} onClick={()=>markUndone(taskPk)}>
                                 ↩ Undo
                               </button>
                             )}
@@ -2290,14 +2579,14 @@ function RolePageContent() {
         )}
 
         {/* footer legend */}
-        {!loading && tasks.length > 0 && (
+        {!loading && planTasksAll.length > 0 && (
           <div style={{ padding:"12px 20px", background:"#F8FAFC", borderTop:"1px solid #e2e8f0", display:"flex", gap:10, flexWrap:"wrap", alignItems:"center", justifyContent:"space-between" }}>
             <div style={{ display:"flex", gap:6, flexWrap:"wrap", alignItems:"center" }}>
               <span style={pill("#EFF6FF","#3170A5")}>💻 Technical</span>
               <span style={pill("#FAF5FF","#6d28d9")}>🎯 Non-Technical</span>
               <span style={pill("#ECFDF5","#065F46")}>✅ Completed</span>
               {planBreakMonths.size > 0 && <span style={pill("#FEF2F2","#991B1B")}>☕ Break Month</span>}
-              {tasks.some((t:any) => t.parallel) && <span style={pill("#FFFBEB","#854D0E")}>⚡ Parallel</span>}
+              {visibleTasks.some((t:any) => t.parallel) && <span style={pill("#FFFBEB","#854D0E")}>⚡ Parallel</span>}
               <span style={{ fontSize:11, color:"#94a3b8" }}>· Hover a bar cell to see monthly topics</span>
             </div>
             {(data?.plan?.warnings||[]).length > 0 && (
@@ -2319,13 +2608,18 @@ function RolePageContent() {
       )}
 
       {/* ── SKILL REQUIREMENT CARDS ──────────────────────────── */}
-      {!isRecommendMode && chartSkillReqs.length > 0 && (
+      {!isRecommendMode && chartSkillReqsAll.length > 0 && (
         <div style={{ marginBottom:24 }}>
           <h2 style={{ marginBottom:14, fontSize:17, fontWeight:900, color:"#0F1724" }}>🎯 Skill Requirements</h2>
           <div style={{ display:"grid", gap:8 }}>
-            {chartSkillReqs.map((s:any) => {
-              const isDone = !!prep?.skillProgress?.[s.skillName]?.completed;
-              const score  = prep?.skillProgress?.[s.skillName]?.score;
+            {chartSkillReqsActive.length > 0 && (
+              <h3 style={{ margin:"0 0 4px", fontSize:13, fontWeight:800, color:"#334155", letterSpacing:".02em" }}>📘 In progress — take tests from here</h3>
+            )}
+            {chartSkillReqsActive.map((s:any) => {
+              const entry = getPrepSkillEntry(prep?.skillProgress, s.skillName);
+              const isDone = !!entry?.completed;
+              const score  = typeof entry?.score === "number" ? entry.score : undefined;
+              const pk = resolveSkillProgressKey(prep?.skillProgress, s.skillName) || s.skillName;
               const diff   = diffColor(s.difficulty);
               const imp    = impColor(s.importance);
               return (
@@ -2382,7 +2676,7 @@ function RolePageContent() {
                       })()}
                       {!showTestsUi ? null : prep?.isActive ? (
                         canTakeTests ? (
-                          <Link href={`/role/${enc(roleName)}/test/${enc(s.skillName)}${roleFlowQs}`} style={{ textDecoration:"none" }} onClick={(e)=>e.stopPropagation()}>
+                          <Link href={`/role/${enc(roleName)}/test/${enc(pk)}${roleFlowQs}`} style={{ textDecoration:"none" }} onClick={(e)=>e.stopPropagation()}>
                             <button style={{
                               background: isDone ? "#ECFDF5" : "#2563EB",
                               color: isDone ? "#065F46" : "white",
@@ -2449,7 +2743,7 @@ function RolePageContent() {
                                 <p style={{ margin:"0 0 6px", fontSize:11, fontWeight:800, color:"#3170A5" }}>Month {month}</p>
                                 <div style={{ display:"grid", gap:5 }}>
                                   {list.map((topic, i) => {
-                                    const doneTopic = !!prep?.skillProgress?.[s.skillName]?.subtopicCompletion?.[`month_${month}_topic_${i}`];
+                                    const doneTopic = !!prep?.skillProgress?.[pk]?.subtopicCompletion?.[`month_${month}_topic_${i}`];
                                     return (
                                       <div
                                         key={`${month}_${i}`}
@@ -2469,7 +2763,7 @@ function RolePageContent() {
                                           <input
                                             type="checkbox"
                                             checked={doneTopic}
-                                            onChange={e => toggleTopicDone(s.skillName, Number(month), i, e.target.checked)}
+                                            onChange={e => toggleTopicDone(pk, Number(month), i, e.target.checked)}
                                             style={{ marginTop:2, flexShrink:0 }}
                                           />
                                           <span style={{ textDecoration:doneTopic ? "line-through" : "none", color: doneTopic ? "#16a34a" : "#334155" }}>{topic}</span>
@@ -2486,6 +2780,42 @@ function RolePageContent() {
                       </div>
                     );
                   })()}
+                </div>
+              );
+            })}
+            {chartSkillReqsCompleted.length > 0 && (
+              <h3 style={{ margin:"14px 0 4px", fontSize:13, fontWeight:800, color:"#166534", letterSpacing:".02em" }}>
+                ✅ Completed — removed from your Gantt after you passed the test
+              </h3>
+            )}
+            {chartSkillReqsCompleted.map((s: any) => {
+              const entry = getPrepSkillEntry(prep?.skillProgress, s.skillName);
+              const sc = typeof entry?.score === "number" ? entry.score : null;
+              const pk = resolveSkillProgressKey(prep?.skillProgress, s.skillName) || s.skillName;
+              return (
+                <div
+                  key={s.skillName}
+                  style={{
+                    background: "#f0fdf4",
+                    borderRadius: 10,
+                    border: "1px solid #bbf7d0",
+                    padding: "12px 14px",
+                    display: "flex",
+                    flexWrap: "wrap",
+                    gap: 10,
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                  }}
+                >
+                  <span style={{ fontWeight: 800, color: "#166534", fontSize: 14 }}>✅ {s.skillName}</span>
+                  {sc != null && <span style={{ fontSize: 12, color: "#15803d", fontWeight: 700 }}>Score: {sc}%</span>}
+                  {showTestsUi && prep?.isActive && canTakeTests ? (
+                    <Link href={`/role/${enc(roleName)}/test/${enc(pk)}${roleFlowQs}`} style={{ textDecoration: "none" }}>
+                      <button type="button" style={{ ...btn("#065F46", "#ECFDF5", "#86EFAC"), fontSize: 11, padding: "6px 12px" }}>
+                        🔄 Retake test
+                      </button>
+                    </Link>
+                  ) : null}
                 </div>
               );
             })}
@@ -2682,28 +3012,60 @@ function RolePageContent() {
           <p style={{ margin: "6px 0 0", fontSize: 12, color: "#64748b", maxWidth: 520 }}>
             Practice a technical interview aligned to <b>{roleName}</b>. Opens InterviewX in a new tab.
           </p>
+          <p style={{ margin: "6px 0 0", fontSize: 12, color: canOpenMockInterview ? "#15614B" : "#b45309", maxWidth: 520 }}>
+            {canTakeTests
+              ? canOpenMockInterview
+                ? `Eligible: ${pct}% complete. Mock will include only your completed skills (${completedSkillNames.length}).`
+                : `Complete at least ${MOCK_MIN_PCT}% skills in this role to unlock mock interview. Current progress: ${pct}%.`
+              : "Mock interview is available only for employee role-preparation accounts."}
+          </p>
         </div>
-        <a
-          href={mockInterviewHref}
-          target="_blank"
-          rel="noopener noreferrer"
-          style={{
-            flexShrink: 0,
-            display: "inline-flex",
-            alignItems: "center",
-            gap: 8,
-            padding: "12px 20px",
-            borderRadius: 10,
-            fontWeight: 800,
-            fontSize: 14,
-            textDecoration: "none",
-            color: "white",
-            background: "linear-gradient(135deg, #4f46e5, #6366f1)",
-            boxShadow: "0 4px 14px rgba(99,102,241,.35)",
-          }}
-        >
-          🎤 Mock Interview
-        </a>
+        {canOpenMockInterview ? (
+          <a
+            href={mockInterviewHref}
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{
+              flexShrink: 0,
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 8,
+              padding: "12px 20px",
+              borderRadius: 10,
+              fontWeight: 800,
+              fontSize: 14,
+              textDecoration: "none",
+              color: "white",
+              background: "linear-gradient(135deg, #4f46e5, #6366f1)",
+              boxShadow: "0 4px 14px rgba(99,102,241,.35)",
+            }}
+          >
+            🎤 Mock Interview
+          </a>
+        ) : (
+          <button
+            type="button"
+            disabled
+            title={`Unlock at ${MOCK_MIN_PCT}% completion`}
+            style={{
+              flexShrink: 0,
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 8,
+              padding: "12px 20px",
+              borderRadius: 10,
+              fontWeight: 800,
+              fontSize: 14,
+              border: "none",
+              color: "#64748b",
+              background: "#e2e8f0",
+              cursor: "not-allowed",
+              boxShadow: "none",
+            }}
+          >
+            🔒 Mock Interview Locked
+          </button>
+        )}
       </div>
       )}
     </div>

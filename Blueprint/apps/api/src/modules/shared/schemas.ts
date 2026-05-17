@@ -67,6 +67,8 @@ export class SkillQuestion {
 
 @Schema({ collection: "skill_tests", timestamps: true })
 export class SkillTest {
+  /** RolePreparation document _id — attempt limits are per preparation session, not lifetime per role. */
+  @Prop() preparationId?: string;
   @Prop() studentId!: string;
   @Prop() roleName!: string;
   @Prop() skillName!: string;

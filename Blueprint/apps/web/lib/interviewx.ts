@@ -170,7 +170,12 @@ export function buildInterviewXCandidatesUrl(interviewConfigId: string): string 
  * with that role so the user doesn't have to type it in again.
  * Set `NEXT_PUBLIC_INTERVIEWX_ORIGIN` in production.
  */
-export function buildInterviewXStudentPrepHomeUrl(opts?: { email?: string; name?: string; role?: string }): string {
+export function buildInterviewXStudentPrepHomeUrl(opts?: {
+  email?: string;
+  name?: string;
+  role?: string;
+  completedSkills?: string[];
+}): string {
   const base = interviewXBase();
   const role = clean(opts?.role);
   // Go straight to the technical form when a role is known; otherwise land on the hub.
@@ -180,8 +185,16 @@ export function buildInterviewXStudentPrepHomeUrl(opts?: { email?: string; name?
   const u = new URL(path);
   const email = clean(opts?.email);
   const name = clean(opts?.name);
+  const completedSkills = Array.isArray(opts?.completedSkills)
+    ? opts!.completedSkills.map((s) => clean(s)).filter(Boolean)
+    : [];
   if (email) u.searchParams.set("email", email);
   if (name) u.searchParams.set("name", name);
   if (role) u.searchParams.set("role", role);
+  // Pass only completed skills so InterviewX can constrain mock generation.
+  if (completedSkills.length) {
+    u.searchParams.set("skills", completedSkills.join(","));
+    for (const skill of completedSkills) u.searchParams.append("skill", skill);
+  }
   return u.toString();
 }

@@ -35,12 +35,14 @@ export class BlueprintController {
   getRoleProficiencyDelta(
     @Param("roleName") roleName: string,
     @Query("level") level?: string,
-    @Query("baselineRole") baselineRole?: string
+    @Query("baselineRole") baselineRole?: string,
+    @Query("baselineLevel") baselineLevel?: string
   ) {
     return this.service.getSkillProficiencyDelta(
       decodeURIComponent(roleName),
       level ? decodeURIComponent(level) : undefined,
-      baselineRole ? decodeURIComponent(baselineRole) : undefined
+      baselineRole ? decodeURIComponent(baselineRole) : undefined,
+      baselineLevel ? decodeURIComponent(baselineLevel) : undefined
     );
   }
   @Get("role/:roleName/mappings") getRoleMappings(@Param("roleName") roleName: string) { return this.service.roleMappings(decodeURIComponent(roleName)); }

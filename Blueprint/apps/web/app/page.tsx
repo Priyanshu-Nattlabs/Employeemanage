@@ -92,8 +92,9 @@ function rankRolesForSearch(roles: string[], rawQ: string, limit: number): strin
 export default function HomePage() {
   const [resuming, setResuming] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [showPrepPicker, setShowPrepPicker] = useState(false);
   const [activePreparations, setActivePreparations] = useState<
-    Array<{ roleName: string; preparationStartDate?: string; targetCompletionDate?: string }>
+    Array<{ roleName: string; preparationStartDate?: string; targetCompletionDate?: string; pct?: number; completedSkills?: number; totalSkills?: number }>
   >([]);
   const [testReportCards, setTestReportCards] = useState<
     Array<{ roleName: string; tests: number; passed: number; failed: number; latestCompletedAt: string | null }>
@@ -135,6 +136,9 @@ export default function HomePage() {
               roleName: String(x.roleName),
               preparationStartDate: String(x?.preparationStartDate || ""),
               targetCompletionDate: String(x?.targetCompletionDate || ""),
+              pct: typeof x?.pct === "number" ? x.pct : 0,
+              completedSkills: typeof x?.completedSkills === "number" ? x.completedSkills : 0,
+              totalSkills: typeof x?.totalSkills === "number" ? x.totalSkills : 0,
             }));
           setActivePreparations(active);
         }
@@ -196,17 +200,24 @@ export default function HomePage() {
       const r = await fetch(`${getApiPrefix()}/api/role-preparation/ongoing?studentId=${encodeURIComponent(userId)}`);
       const ongoing = await r.json().catch(() => []);
       if (Array.isArray(ongoing) && ongoing.length > 0) {
-        const latest = [...ongoing]
+        const active = [...ongoing]
           .filter((x: any) => x?.roleName)
-          .sort((a: any, b: any) => {
+          .map((x: any) => ({
+            roleName: String(x.roleName),
+            preparationStartDate: String(x?.preparationStartDate || ""),
+            targetCompletionDate: String(x?.targetCompletionDate || ""),
+            pct: typeof x?.pct === "number" ? x.pct : 0,
+            completedSkills: typeof x?.completedSkills === "number" ? x.completedSkills : 0,
+            totalSkills: typeof x?.totalSkills === "number" ? x.totalSkills : 0,
+          }))
+          .sort((a, b) => {
             const ta = new Date(String(a?.preparationStartDate || "")).getTime();
             const tb = new Date(String(b?.preparationStartDate || "")).getTime();
             return (Number.isFinite(tb) ? tb : 0) - (Number.isFinite(ta) ? ta : 0);
-          })[0];
-        if (latest?.roleName) {
-          window.location.href = `/role/${encodeURIComponent(latest.roleName)}`;
-          return;
-        }
+          });
+        setActivePreparations(active);
+        setShowPrepPicker(true);
+        return;
       }
       window.location.href = "/target-role";
     } finally {
@@ -216,6 +227,10 @@ export default function HomePage() {
 
   const goToTargetNewRole = () => {
     window.location.href = "/target-role";
+  };
+
+  const openPreparationRole = (roleName: string) => {
+    window.location.href = `/role/${encodeURIComponent(roleName)}`;
   };
 
   if (!isAuthenticated) {
@@ -429,6 +444,81 @@ export default function HomePage() {
                 </Link>
               </div>
             </div>
+
+            {showPrepPicker && (
+              <div
+                style={{
+                  position: "fixed",
+                  inset: 0,
+                  background: "rgba(15,23,42,0.45)",
+                  zIndex: 80,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  padding: 16,
+                }}
+                onClick={() => setShowPrepPicker(false)}
+              >
+                <div
+                  onClick={(e) => e.stopPropagation()}
+                  style={{
+                    width: "min(860px, 100%)",
+                    maxHeight: "80vh",
+                    overflow: "auto",
+                    background: "#fff",
+                    borderRadius: 14,
+                    border: "1px solid #e2e8f0",
+                    boxShadow: "0 20px 60px rgba(2,6,23,0.25)",
+                    padding: 16,
+                  }}
+                >
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, marginBottom: 10 }}>
+                    <div>
+                      <div style={{ fontWeight: 900, fontSize: 18, color: "#0f172a" }}>Choose a preparation to continue</div>
+                      <div style={{ fontSize: 13, color: "#64748b", marginTop: 4 }}>
+                        You can keep up to <b>3 active preparations</b> at the same time.
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setShowPrepPicker(false)}
+                      style={{ border: "1px solid #cbd5e1", background: "#fff", borderRadius: 8, padding: "6px 10px", cursor: "pointer" }}
+                    >
+                      Close
+                    </button>
+                  </div>
+                  <div style={{ display: "grid", gap: 10 }}>
+                    {activePreparations.length === 0 ? (
+                      <div style={{ color: "#64748b", fontSize: 14, padding: 12 }}>No active preparations found.</div>
+                    ) : (
+                      activePreparations.map((prep) => (
+                        <button
+                          key={prep.roleName}
+                          type="button"
+                          onClick={() => openPreparationRole(prep.roleName)}
+                          style={{
+                            textAlign: "left",
+                            border: "1px solid #e2e8f0",
+                            background: "#f8fafc",
+                            borderRadius: 12,
+                            padding: 12,
+                            cursor: "pointer",
+                          }}
+                        >
+                          <div style={{ fontWeight: 800, color: "#0f172a", fontSize: 15 }}>{prep.roleName}</div>
+                          <div style={{ marginTop: 4, color: "#475569", fontSize: 12 }}>
+                            Progress: {prep.pct ?? 0}% ({prep.completedSkills ?? 0}/{prep.totalSkills ?? 0} skills)
+                          </div>
+                          <div style={{ marginTop: 2, color: "#64748b", fontSize: 12 }}>
+                            Started: {prep.preparationStartDate || "-"} | Target: {prep.targetCompletionDate || "-"}
+                          </div>
+                        </button>
+                      ))
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
 
             <div
               className="jb-hero-ref-images jb-fade2"

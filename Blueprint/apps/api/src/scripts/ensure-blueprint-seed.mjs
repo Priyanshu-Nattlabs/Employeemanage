@@ -145,6 +145,20 @@ async function main() {
     console.log("📭  Empty database — seeding from Excel workbooks…");
   }
 
+  const xlsxPath = path.join(apiRoot, "node_modules", "xlsx");
+  if (!existsSync(xlsxPath)) {
+    console.log("▶️  Installing API dependencies for Excel seed (one-time for empty DB)…");
+    const inst = spawnSync(
+      "npm",
+      ["install", "--omit=dev", "--no-audit", "--no-fund", "--loglevel=error"],
+      { cwd: apiRoot, stdio: "inherit", env: process.env },
+    );
+    if (inst.status !== 0) {
+      console.error("❌  npm install failed with code", inst.status);
+      process.exit(inst.status ?? 1);
+    }
+  }
+
   let sources = (process.env.BLUEPRINT_SEED_SOURCES || "").trim();
   const single = (process.env.BLUEPRINT_XLSX_FILE || "").trim();
 
