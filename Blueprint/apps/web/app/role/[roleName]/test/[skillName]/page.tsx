@@ -21,6 +21,16 @@ type TestType = {
 
 /* ── helpers ───────────────────────────────────────────── */
 const getTestId = (t: TestType) => (t as any)._id || t.id || "";
+
+function notifyPreparationUpdated() {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.setItem("jbv2_prepUpdatedAt", String(Date.now()));
+    window.dispatchEvent(new Event("jbv2-prep-updated"));
+  } catch {
+    // ignore storage errors
+  }
+}
 const cleanQuestionText = (raw: string) =>
   String(raw || "")
     .replace(/^\s*(?:\[\s*)?(easy|medium|tough|hard|difficult)(?:\s*\])?\s*[:\-|]?\s*/i, "")
@@ -337,6 +347,7 @@ export default function SkillTestPage() {
       if (!r.ok) throw new Error(body?.message || `Submit failed (${r.status})`);
       if (!body || !("status" in body)) throw new Error("Invalid response from server.");
       setTest(body);
+      if (body.status !== "IN_PROGRESS") notifyPreparationUpdated();
     } catch (e: any) {
       setError(e.message || "Failed to submit test");
     } finally {
