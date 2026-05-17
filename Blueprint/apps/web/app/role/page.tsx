@@ -30,6 +30,31 @@ function getRoleCategory(name: string): string {
   return "All";
 }
 
+type GroupedRole = {
+  baseName: string;
+  variants: Array<{ fullName: string; level: string }>;
+};
+
+function parseRoleLevel(fullRoleName: string): { baseName: string; level: string } {
+  const raw = String(fullRoleName || "").trim();
+  if (!raw) return { baseName: "", level: "" };
+  const patterns: RegExp[] = [
+    /^(.*?)[\s_-]*\(?level[\s:_-]*([1-3])\)?$/i,
+    /^(.*?)[\s_-]*l([1-3])$/i,
+    /^(.*?)[\s_-]+([1-3])$/i,
+  ];
+  for (const p of patterns) {
+    const m = p.exec(raw);
+    if (m) {
+      return {
+        baseName: String(m[1] || "").trim(),
+        level: String(m[2] || "").trim(),
+      };
+    }
+  }
+  return { baseName: raw, level: "" };
+}
+
 export default function RolesPage() {
   return (
     <Suspense>
@@ -52,6 +77,7 @@ function RolesPageContent() {
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
   const [activeCategory, setActiveCategory] = useState("All");
+  const [levelPicker, setLevelPicker] = useState<GroupedRole | null>(null);
 
   // Recommend-mode: role list from API (manager = their department across industries; HR = employee scope).
   const [recommendRolesList, setRecommendRolesList] = useState<string[]>([]);
@@ -158,31 +184,58 @@ function RolesPageContent() {
     setActiveCategory((cur) => (cur === "All" ? recommendDeptEffective : cur));
   }, [isRecommendMode, recommendDeptIsKnownDomain, recommendDeptEffective]);
 
+  const groupedVisibleRoles = useMemo<GroupedRole[]>(() => {
+    const byBase = new Map<string, GroupedRole>();
+    for (const r of visibleRoles) {
+      const parsed = parseRoleLevel(r);
+      if (!parsed.baseName) continue;
+      const key = parsed.baseName.toLowerCase();
+      const current = byBase.get(key) || { baseName: parsed.baseName, variants: [] };
+      if (!current.variants.some((v) => v.fullName === r)) {
+        current.variants.push({ fullName: r, level: parsed.level });
+      }
+      byBase.set(key, current);
+    }
+    for (const g of byBase.values()) {
+      g.variants.sort((a, b) => {
+        const la = Number(a.level || "999");
+        const lb = Number(b.level || "999");
+        if (la !== lb) return la - lb;
+        return a.fullName.localeCompare(b.fullName);
+      });
+    }
+    return Array.from(byBase.values()).sort((a, b) => a.baseName.localeCompare(b.baseName));
+  }, [visibleRoles]);
+
   const categoryCounts = useMemo(() => {
-    const counts: Record<string, number> = { All: visibleRoles.length };
-    visibleRoles.forEach(r => {
-      const cat = getRoleCategory(r);
+    const counts: Record<string, number> = { All: groupedVisibleRoles.length };
+    groupedVisibleRoles.forEach((r) => {
+      const cat = getRoleCategory(r.baseName);
       if (cat !== "All") counts[cat] = (counts[cat] || 0) + 1;
     });
     return counts;
-  }, [visibleRoles]);
+  }, [groupedVisibleRoles]);
 
   const filtered = useMemo(() => {
-    let list = visibleRoles;
+    let list = groupedVisibleRoles;
     if (activeCategory !== "All") {
-      list = list.filter(r => getRoleCategory(r) === activeCategory);
+      list = list.filter(r => getRoleCategory(r.baseName) === activeCategory);
     }
     if (search) {
-      list = list.filter(r => r.toLowerCase().includes(search.toLowerCase()));
+      list = list.filter((r) => {
+        const q = search.toLowerCase();
+        if (r.baseName.toLowerCase().includes(q)) return true;
+        return r.variants.some((v) => v.fullName.toLowerCase().includes(q));
+      });
     }
     return list;
-  }, [visibleRoles, search, activeCategory]);
+  }, [groupedVisibleRoles, search, activeCategory]);
 
   /* alphabetical groups */
   const groups = useMemo(() => {
-    const g: Record<string, string[]> = {};
+    const g: Record<string, GroupedRole[]> = {};
     filtered.forEach(r => {
-      const l = r[0]?.toUpperCase() || "#";
+      const l = r.baseName[0]?.toUpperCase() || "#";
       if (!g[l]) g[l] = [];
       g[l].push(r);
     });
@@ -195,6 +248,19 @@ function RolesPageContent() {
   const scrollTo = (letter: string) => {
     const el = document.getElementById(`roles-group-${letter}`);
     if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
+
+  const openRole = (group: GroupedRole, explicitFullName?: string) => {
+    const chosen = explicitFullName || group.variants[0]?.fullName || group.baseName;
+    window.location.href = `/role/${encodeURIComponent(chosen)}${recommendQuery}`;
+  };
+
+  const onRoleClick = (group: GroupedRole) => {
+    if (group.variants.length <= 1) {
+      openRole(group);
+      return;
+    }
+    setLevelPicker(group);
   };
 
   return (
@@ -453,9 +519,13 @@ function RolesPageContent() {
             </div>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: 8 }}>
               {items.map((role) => (
-                <Link key={role} href={`/role/${encodeURIComponent(role)}${recommendQuery}`} style={{ textDecoration: "none" }}>
-                  <RoleRow role={role} />
-                </Link>
+                <button
+                  key={role.baseName}
+                  onClick={() => onRoleClick(role)}
+                  style={{ border: "none", padding: 0, background: "transparent", textAlign: "left", cursor: "pointer" }}
+                >
+                  <RoleRow role={role.baseName} levelCount={role.variants.length} />
+                </button>
               ))}
             </div>
           </div>
@@ -463,15 +533,76 @@ function RolesPageContent() {
 
         {!loading && filtered.length > 0 && (
           <p style={{ textAlign: "center", color: "#94A3B8", fontSize: 12, marginTop: 24 }}>
-            Showing {filtered.length} of {roles.length} roles
+            Showing {filtered.length} unique roles from {roles.length} role entries
           </p>
+        )}
+
+        {levelPicker && (
+          <div
+            onClick={() => setLevelPicker(null)}
+            style={{
+              position: "fixed",
+              inset: 0,
+              background: "rgba(2,6,23,0.45)",
+              zIndex: 90,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              padding: 16,
+            }}
+          >
+            <div
+              onClick={(e) => e.stopPropagation()}
+              style={{
+                width: "min(460px, 100%)",
+                background: "#fff",
+                borderRadius: 12,
+                border: "1px solid #e2e8f0",
+                boxShadow: "0 18px 50px rgba(2,6,23,0.24)",
+                padding: 14,
+              }}
+            >
+              <div style={{ fontWeight: 900, fontSize: 18, color: "#0B1723" }}>{levelPicker.baseName}</div>
+              <div style={{ marginTop: 4, color: "#64748b", fontSize: 13 }}>Select your level to continue</div>
+              <div style={{ marginTop: 12, display: "grid", gap: 8 }}>
+                {levelPicker.variants.map((v) => (
+                  <button
+                    key={v.fullName}
+                    type="button"
+                    onClick={() => openRole(levelPicker, v.fullName)}
+                    style={{
+                      border: "1px solid #cbd5e1",
+                      background: "#f8fafc",
+                      borderRadius: 10,
+                      padding: "10px 12px",
+                      cursor: "pointer",
+                      textAlign: "left",
+                      fontWeight: 700,
+                      color: "#0f172a",
+                    }}
+                  >
+                    {v.level ? `Level ${v.level}` : v.fullName}
+                  </button>
+                ))}
+              </div>
+              <div style={{ marginTop: 12, display: "flex", justifyContent: "flex-end" }}>
+                <button
+                  type="button"
+                  onClick={() => setLevelPicker(null)}
+                  style={{ border: "1px solid #cbd5e1", background: "#fff", borderRadius: 8, padding: "7px 12px", cursor: "pointer" }}
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
         )}
       </main>
     </div>
   );
 }
 
-function RoleRow({ role }: { role: string }) {
+function RoleRow({ role, levelCount = 1 }: { role: string; levelCount?: number }) {
   const [hovered, setHovered] = useState(false);
   const cat = getRoleCategory(role);
   const catObj = ROLE_CATEGORIES.find(c => c.label === cat) || ROLE_CATEGORIES[0];
@@ -507,6 +638,11 @@ function RoleRow({ role }: { role: string }) {
         }}>
           {role}
         </div>
+        {levelCount > 1 && (
+          <div style={{ marginTop: 3, fontSize: 11, color: "#3170A5", fontWeight: 700 }}>
+            {levelCount} levels available
+          </div>
+        )}
       </div>
       <span style={{ color: hovered ? "#3170A5" : "#C3C6D7", fontSize: 16, flexShrink: 0, transition: "color 0.12s" }}>›</span>
     </div>

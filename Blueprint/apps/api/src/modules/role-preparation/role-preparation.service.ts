@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from "@nestjs/common";
+import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
 import { InjectModel } from "@nestjs/mongoose";
 import { Model } from "mongoose";
 import { Blueprint, BlueprintDocument, RolePreparation, RolePreparationDocument, SkillTest, SkillTestDocument } from "../shared/schemas";
@@ -15,6 +15,34 @@ export class RolePreparationService {
     return Array.from(new Set((items || []).map((x) => String(x || "").trim()).filter(Boolean)));
   }
 
+  private skillKeyLower(v: string) {
+    return String(v || "").trim().toLowerCase();
+  }
+
+  /** Align test URL / DB skill name with chart task names (e.g. "sql" vs "SQL"). */
+  private resolveCanonicalSkillName(submitted: string, prep: any, gc: any): string {
+    const sn = String(submitted || "").trim();
+    if (!sn) return sn;
+    const want = this.skillKeyLower(sn);
+    if (gc && Array.isArray(gc.plan?.tasks)) {
+      for (const t of gc.plan.tasks) {
+        const n = String(t?.name || "").trim();
+        if (n && this.skillKeyLower(n) === want) return n;
+      }
+    }
+    if (gc && Array.isArray(gc.skillRequirements)) {
+      for (const s of gc.skillRequirements) {
+        const n = String((s as any)?.skillName || "").trim();
+        if (n && this.skillKeyLower(n) === want) return n;
+      }
+    }
+    const sp = prep?.skillProgress || {};
+    for (const k of Object.keys(sp)) {
+      if (this.skillKeyLower(k) === want) return String(k).trim();
+    }
+    return sn;
+  }
+
   async start(
     studentId: string,
     roleName: string,
@@ -24,6 +52,19 @@ export class RolePreparationService {
     activate = true,
     employeeLevel?: string
   ) {
+    if (activate) {
+      const activeOthers = await this.prepModel.countDocuments({
+        studentId,
+        isActive: true,
+        roleName: { $ne: roleName },
+      });
+      if (activeOthers >= 3) {
+        throw new BadRequestException(
+          "You can run at most 3 preparations simultaneously. Stop one preparation before starting a new role."
+        );
+      }
+    }
+
     let prep = await this.prepModel.findOne({ studentId, roleName });
 
     // Build skillProgress from tasks in the saved chart (not just the DB role doc),
@@ -160,8 +201,16 @@ export class RolePreparationService {
   get(studentId: string, roleName: string) { return this.prepModel.findOne({ studentId, roleName }).lean(); }
   getAll(studentId: string) { return this.prepModel.find({ studentId }).lean(); }
 
+  /** Mongo _id of the current preparation row (used to scope skill-test retake limits per session). */
+  async getPreparationId(studentId: string, roleName: string): Promise<string | null> {
+    const prep = await this.prepModel.findOne({ studentId, roleName }).select("_id").lean();
+    const id = (prep as any)?._id;
+    return id != null ? String(id) : null;
+  }
+
   async updateSkill(studentId: string, roleName: string, skillName: string, completed: boolean) {
     if (completed) throw new Error("Skill completion requires passing the test");
+    const sn = String(skillName || "").trim();
     const preps = await this.prepModel.find({ studentId });
     if (!preps.length) throw new NotFoundException("Preparation not found");
     for (const prep of preps) {
@@ -174,6 +223,33 @@ export class RolePreparationService {
         subtopicCompletion: {},
       };
       prep.markModified("skillProgress");
+
+      // If completion had removed this row from the locked chart, put a placeholder row back on undo.
+      if (sn && prep.roleName === roleName) {
+        const gc: any = prep.ganttChartData || {};
+        if (Array.isArray(gc?.plan?.tasks)) {
+          const exists = gc.plan.tasks.some((t: any) => this.skillKeyLower(String(t?.name || "")) === this.skillKeyLower(sn));
+          if (!exists) {
+            const totalMonths = Number(gc?.plan?.totalMonths || 12);
+            gc.plan.tasks.push({
+              id: `skill_${sn.replace(/\s+/g, "_").replace(/[^a-zA-Z0-9_]/g, "")}`,
+              name: sn,
+              start: totalMonths,
+              end: totalMonths,
+              difficulty: "intermediate",
+              importance: "Important",
+              type: "technical",
+              description: "Restored to blueprint after undo",
+              timeRequired: 1,
+              progress: 0,
+              isOptional: false,
+            });
+            prep.ganttChartData = gc;
+            prep.markModified("ganttChartData");
+          }
+        }
+      }
+
       await prep.save();
     }
     await this.skillTestModel.deleteMany({ studentId, skillName });
@@ -183,13 +259,43 @@ export class RolePreparationService {
 
   async markCompletedAfterTest(studentId: string, roleName: string, skillName: string, score: number) {
     if (score < 80) throw new Error("Score must be >= 80");
+    const sn = String(skillName || "").trim();
+    if (!sn) throw new Error("Skill name is required");
     let prep = await this.prepModel.findOne({ studentId, roleName });
     // Ensure completion always gets reflected even if a prep record is missing.
     if (!prep) prep = await this.start(studentId, roleName);
+    const gc: any = prep.ganttChartData && typeof prep.ganttChartData === "object" ? prep.ganttChartData : null;
+    const canonical = this.resolveCanonicalSkillName(sn, prep, gc);
+
     prep.skillProgress = prep.skillProgress || {};
-    prep.skillProgress[skillName] = { ...(prep.skillProgress[skillName] || {}), completed: true, score, completedDate: new Date().toISOString().slice(0, 10) };
+    const dupKeys = Object.keys(prep.skillProgress).filter(
+      (k) => k !== canonical && this.skillKeyLower(k) === this.skillKeyLower(canonical)
+    );
+    for (const k of dupKeys) delete prep.skillProgress[k];
+
+    prep.skillProgress[canonical] = {
+      ...(prep.skillProgress[canonical] || {}),
+      completed: true,
+      score,
+      completedDate: new Date().toISOString().slice(0, 10),
+    };
     prep.isActive = true;
     prep.markModified("skillProgress");
+
+    // Keep locked Gantt snapshot aligned with progress (same document the UI loads when isActive).
+    if (gc) {
+      if (Array.isArray(gc.plan?.tasks)) {
+        gc.plan.tasks = gc.plan.tasks.filter((t: any) => this.skillKeyLower(String(t?.name || "")) !== this.skillKeyLower(canonical));
+      }
+      if (Array.isArray(gc.skillRequirements)) {
+        gc.skillRequirements = gc.skillRequirements.filter(
+          (s: any) => this.skillKeyLower(String(s?.skillName || "")) !== this.skillKeyLower(canonical)
+        );
+      }
+      prep.ganttChartData = gc;
+      prep.markModified("ganttChartData");
+    }
+
     await prep.save();
     return prep;
   }

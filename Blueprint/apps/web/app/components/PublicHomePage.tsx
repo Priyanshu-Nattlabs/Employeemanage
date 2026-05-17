@@ -5,10 +5,17 @@ import { appPath, publicAssetUrl } from "@/lib/apiBase";
 import { GetStartedRoleChoice } from "./GetStartedRoleChoice";
 import { InterviewXFooter } from "./InterviewXFooter";
 
+/** Hero must not rely on `whileInView` only — a tight IO root can leave content at opacity:0 forever (blank page). */
+const heroEnter = {
+  initial: { opacity: 0, y: 18 },
+  animate: { opacity: 1, y: 0 },
+  transition: { duration: 0.5, ease: [0.22, 1, 0.36, 1] as const },
+};
+
 const sectionIn = {
   initial: { opacity: 0, y: 28 },
   whileInView: { opacity: 1, y: 0 },
-  viewport: { once: true, margin: "-80px" as const },
+  viewport: { once: true, amount: 0.08, margin: "0px" },
   transition: { duration: 0.55 },
 };
 
@@ -248,7 +255,7 @@ export function PublicHomePage() {
 
       <section className="hero-shell">
         <div className="public-grid2">
-          <motion.div {...sectionIn}>
+          <motion.div {...heroEnter}>
             <span className="public-badge">WORKFORCE INTELLIGENCE PLATFORM</span>
             <div style={{ marginTop: 20, display: "grid", gap: 14 }}>
               <h1 className="public-h1">If talent is your edge, this is your operating system.</h1>
@@ -261,7 +268,7 @@ export function PublicHomePage() {
             </div>
           </motion.div>
 
-          <motion.div {...sectionIn} transition={{ duration: 0.7 }}>
+          <motion.div {...heroEnter} transition={{ duration: 0.65, ease: [0.22, 1, 0.36, 1] }}>
             <div className="hero-visual" aria-label="Career progression illustration">
               <svg className="hero-lines" viewBox="0 0 1600 720" preserveAspectRatio="none" aria-hidden>
                 <path className="hero-line a" d="M-40 500 C 210 380, 360 590, 640 470 C 860 380, 1140 560, 1660 410" />

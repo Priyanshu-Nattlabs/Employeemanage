@@ -259,18 +259,24 @@ Rules:
     };
   }
 
-  async getSkillProficiencyDelta(roleName: string, level?: string, baselineRoleName?: string) {
+  async getSkillProficiencyDelta(roleName: string, level?: string, baselineRoleName?: string, baselineLevelName?: string) {
     const lvl = Number(String(level || "").trim());
     const baseline = String(baselineRoleName || "").trim();
     const levelText = Number.isFinite(lvl) && lvl >= 1 ? String(lvl) : String(level || "").trim();
+    const blNum = Number(String(baselineLevelName || "").trim());
+    const baselineLevelText =
+      String(baselineLevelName || "").trim() && Number.isFinite(blNum) && blNum >= 1
+        ? String(blNum)
+        : String(baselineLevelName || "").trim();
 
-    // Baseline compare: target role at chosen level vs employee's current designation at same level.
+    // Baseline compare: target role at chosen level vs employee's current profile role (optionally at a different level).
     if (baseline && levelText) {
       const target = (await this.getRole(roleName, levelText)) || (await this.getRole(roleName));
-      let base = await this.getRole(baseline, levelText);
+      const baseLvl = baselineLevelText || levelText;
+      let base = await this.getRole(baseline, baseLvl);
       if (!base) base = await this.getRole(baseline);
-      if (!base && levelText !== "1") base = await this.getRole(baseline, "1");
-      if (!base && levelText !== "2") base = await this.getRole(baseline, "2");
+      if (!base && baseLvl !== "1") base = await this.getRole(baseline, "1");
+      if (!base && baseLvl !== "2") base = await this.getRole(baseline, "2");
       if (!target || !base) {
         return {
           roleName,
@@ -286,10 +292,10 @@ Rules:
         baselineRole: baseline,
         pairIntro: `Role: ${roleName}
 Target: level ${levelText} requirements for "${roleName}"
-Baseline (current job from profile): "${baseline}" at level ${levelText}`,
+Baseline (current job from profile): "${baseline}" at level ${baseLvl}`,
         evalIntro: `Role: ${roleName}
 Target: level ${levelText} skill expectations for "${roleName}"
-Baseline job role: "${baseline}" at level ${levelText}
+Baseline job role: "${baseline}" at level ${baseLvl}
 
 Estimate proficiency gap to reach target expectations where a skill appears in both roles.`,
       });

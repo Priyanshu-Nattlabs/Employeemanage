@@ -17,53 +17,124 @@ export class SkillTestService {
     private readonly ai: AiService
   ) {}
 
-  private async assertAttemptLimitSingleSkill(studentId: string, roleName: string, skillName: string) {
+  private async assertAttemptLimitSingleSkill(studentId: string, roleName: string, skillName: string, preparationId: string) {
     const attempts = await this.testModel.countDocuments({
       studentId,
       roleName,
       skillName,
       testType: "SINGLE_SKILL",
+      preparationId,
     });
     if (attempts >= SkillTestService.MAX_ATTEMPTS_PER_TEST) {
-      throw new BadRequestException(`Retake limit reached. You can attempt this skill test only ${SkillTestService.MAX_ATTEMPTS_PER_TEST} times.`);
+      throw new BadRequestException(
+        `Retake limit reached for this preparation. You can attempt this skill test only ${SkillTestService.MAX_ATTEMPTS_PER_TEST} times before stopping and starting preparation again.`
+      );
     }
   }
 
-  private async assertAttemptLimitKnownSkills(studentId: string, roleName: string) {
+  private async assertAttemptLimitKnownSkills(studentId: string, roleName: string, preparationId: string) {
     const attempts = await this.testModel.countDocuments({
       studentId,
       roleName,
       testType: "KNOWN_SKILLS",
+      preparationId,
     });
     if (attempts >= SkillTestService.MAX_ATTEMPTS_PER_TEST) {
-      throw new BadRequestException(`Retake limit reached. You can attempt this combined test only ${SkillTestService.MAX_ATTEMPTS_PER_TEST} times.`);
+      throw new BadRequestException(
+        `Retake limit reached for this preparation. You can attempt this combined test only ${SkillTestService.MAX_ATTEMPTS_PER_TEST} times before stopping and starting preparation again.`
+      );
     }
   }
 
-  async start(studentId: string, roleName: string, skillName: string) {
-    const existing = await this.testModel.findOne({ studentId, roleName, skillName, status: "IN_PROGRESS" });
-    if (existing) return existing;
-    await this.assertAttemptLimitSingleSkill(studentId, roleName, skillName);
+  private async currentPreparationId(studentId: string, roleName: string): Promise<string | null> {
+    return this.prepService.getPreparationId(studentId, roleName);
+  }
 
-    this.logger.log(`Generating AI questions for skill: "${skillName}" (role: "${roleName}")`);
+  private escapeRegex(value: string) {
+    return String(value || "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  }
+
+  /** Align URL / user input with catalogue skill names (e.g. "sql" → "SQL"). */
+  private async resolveSkillNameAgainstRole(roleName: string, skillName: string): Promise<string> {
+    const want = String(skillName || "").trim().toLowerCase();
+    const rn = String(roleName || "").trim();
+    if (!want || !rn) return String(skillName || "").trim();
+    const doc: any = await this.blueprintModel
+      .findOne({
+        type: { $regex: "^role$", $options: "i" },
+        name: { $regex: `^${this.escapeRegex(rn)}$`, $options: "i" },
+      })
+      .lean();
+    if (!doc) return String(skillName || "").trim();
+    const names: string[] = [];
+    for (const r of doc.skillRequirements || []) {
+      const n = String(r?.skillName || "").trim();
+      if (n) names.push(n);
+    }
+    for (const t of doc.skills?.technical || []) {
+      const n = String(t || "").trim();
+      if (n) names.push(n);
+    }
+    for (const n of names) {
+      if (n.toLowerCase() === want) return n;
+    }
+    return String(skillName || "").trim();
+  }
+
+  async start(studentId: string, roleName: string, skillName: string) {
+    const preparationId = await this.currentPreparationId(studentId, roleName);
+    if (!preparationId) {
+      throw new BadRequestException("Start role preparation for this role before taking a skill test.");
+    }
+    const resolved = await this.resolveSkillNameAgainstRole(roleName, skillName);
+    const existing = await this.testModel.findOne({
+      studentId,
+      roleName,
+      skillName: resolved,
+      status: "IN_PROGRESS",
+      preparationId,
+    });
+    if (existing) return existing;
+    await this.assertAttemptLimitSingleSkill(studentId, roleName, resolved, preparationId);
+
+    this.logger.log(`Generating AI questions for skill: "${resolved}" (role: "${roleName}")`);
     // generateQuestions always returns at least the fallback — never throws
-    const questions = await this.generateQuestions(roleName, skillName).catch(() => this.buildFallback(skillName));
+    const questions = await this.generateQuestions(roleName, resolved).catch(() => this.buildFallback(resolved));
     return this.testModel.create({
-      studentId, roleName, skillName, testType: "SINGLE_SKILL", selectedSkills: [skillName], questions, answers: {}, status: "IN_PROGRESS",
+      preparationId,
+      studentId,
+      roleName,
+      skillName: resolved,
+      testType: "SINGLE_SKILL",
+      selectedSkills: [resolved],
+      questions,
+      answers: {},
+      status: "IN_PROGRESS",
       startedAt: new Date().toISOString(),
     });
   }
 
   async startKnownSkillsTest(studentId: string, roleName: string, selectedSkills: string[]) {
+    const preparationId = await this.currentPreparationId(studentId, roleName);
+    if (!preparationId) {
+      throw new BadRequestException("Start role preparation for this role before taking the known-skills test.");
+    }
     const skills = this.uniq(selectedSkills.map((s) => String(s || "").trim()).filter(Boolean));
     if (!skills.length) throw new BadRequestException("Please select at least one known skill to start the test");
 
-    const existing = await this.testModel.findOne({ studentId, roleName, testType: "KNOWN_SKILLS", status: "IN_PROGRESS" });
+    const existing = await this.testModel.findOne({
+      studentId,
+      roleName,
+      testType: "KNOWN_SKILLS",
+      status: "IN_PROGRESS",
+      preparationId,
+    });
     if (existing) return existing;
-    await this.assertAttemptLimitKnownSkills(studentId, roleName);
+    await this.assertAttemptLimitKnownSkills(studentId, roleName, preparationId);
 
     const questions = await this.generateKnownSkillsQuestions(roleName, skills).catch(() => this.buildKnownSkillsFallback(skills, skills.length * 5));
     return this.testModel.create({
+      preparationId,
       studentId,
       roleName,
       skillName: "KNOWN_SKILLS_COMBINED",
@@ -285,12 +356,31 @@ Return only JSON array.`;
 
   getById(testId: string) { return this.testModel.findById(testId); }
 
-  getInProgress(studentId: string, roleName: string, skillName: string) {
-    return this.testModel.findOne({ studentId, roleName, skillName, status: "IN_PROGRESS" });
+  async getInProgress(studentId: string, roleName: string, skillName: string) {
+    const preparationId = await this.currentPreparationId(studentId, roleName);
+    if (!preparationId) return null;
+    const resolved = await this.resolveSkillNameAgainstRole(roleName, skillName);
+    const byResolved = await this.testModel.findOne({
+      studentId,
+      roleName,
+      skillName: resolved,
+      status: "IN_PROGRESS",
+      preparationId,
+    });
+    if (byResolved) return byResolved;
+    return this.testModel.findOne({
+      studentId,
+      roleName,
+      skillName,
+      status: "IN_PROGRESS",
+      preparationId,
+    });
   }
 
-  getKnownSkillsInProgress(studentId: string, roleName: string) {
-    return this.testModel.findOne({ studentId, roleName, testType: "KNOWN_SKILLS", status: "IN_PROGRESS" });
+  async getKnownSkillsInProgress(studentId: string, roleName: string) {
+    const preparationId = await this.currentPreparationId(studentId, roleName);
+    if (!preparationId) return null;
+    return this.testModel.findOne({ studentId, roleName, testType: "KNOWN_SKILLS", status: "IN_PROGRESS", preparationId });
   }
 
   async answer(testId: string, questionNumber: number, answer: string) {
@@ -417,8 +507,10 @@ Return only JSON array.`;
     return test;
   }
 
-  latestResult(studentId: string, roleName: string, skillName: string) {
-    return this.testModel.findOne({ studentId, roleName, skillName }).sort({ createdAt: -1 });
+  async latestResult(studentId: string, roleName: string, skillName: string) {
+    const preparationId = await this.currentPreparationId(studentId, roleName);
+    if (!preparationId) return null;
+    return this.testModel.findOne({ studentId, roleName, skillName, preparationId }).sort({ createdAt: -1 });
   }
 
   /**
